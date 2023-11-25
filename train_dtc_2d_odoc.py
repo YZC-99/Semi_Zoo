@@ -13,7 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 from model.mcnet.unet import MCNet2d_compete_v1,UNet_DTC2d
 from utils import ramps,losses
 from utils.test_utils import ODOC_metrics
-
+import random
 from utils.util import compute_sdf,compute_sdf_luoxd,compute_sdf_multi_class
 import time
 import logging
@@ -238,7 +238,7 @@ if __name__ == '__main__':
             labeled_batch, label_label_batch = labeled_sampled_batch['image'].cuda(), labeled_sampled_batch['label'].cuda()
 
             all_batch = torch.cat([labeled_batch,unlabeled_batch],dim=0)
-            all_label_batch = torch.cat([unlabel_label_batch,label_label_batch],dim=0)
+            all_label_batch = torch.cat([label_label_batch,unlabel_label_batch],dim=0)
 
             out_dict = model(all_batch)
             outputs_tanh, outputs = out_dict["output_tanh_1"],out_dict["output1"]
@@ -274,7 +274,8 @@ if __name__ == '__main__':
 
 
             # 计算gt_dis的mse损失对应原论文公式(6)
-            loss_sdf = mse_loss(outputs_tanh_od[:labeled_bs, ...], od_gt_dis) + mse_loss(outputs_tanh_oc[:labeled_bs, ...], oc_gt_dis)
+            loss_sdf = mse_loss(outputs_tanh_od[:labeled_bs, ...], od_gt_dis) + \
+                       mse_loss(outputs_tanh_oc[:labeled_bs, ...], oc_gt_dis)
 
             loss_seg = ce_loss(outputs_od[:labeled_bs,0, ...], od_all_label_batch[:labeled_bs].float()) + \
                        ce_loss(outputs_oc[:labeled_bs,0, ...], oc_all_label_batch[:labeled_bs].float())
@@ -320,7 +321,7 @@ if __name__ == '__main__':
             writer.add_scalar('loss/loss', loss, iter_num)
             logging.info('iteration %d : loss : %f' % (iter_num, loss.item()))
 
-            if iter_num % 50 == 0:
+            if iter_num % 1 == 0:
                 image = all_batch[0]
                 writer.add_image('train/Image', image, iter_num)
 
@@ -358,24 +359,27 @@ if __name__ == '__main__':
             # eval
             if iter_num % 100 == 0:
                 model.eval()
-                for data in val_iteriter:
+                show_id = random.randint(0,len(val_iteriter))
+                for id,data in enumerate(val_iteriter):
                     img,label = data['image'].cuda(),data['label'].cuda()
                     out_dict = model(img)
                     outputs_tanh, outputs = out_dict["output_tanh_1"], out_dict["output1"]
                     outputs_od,outputs_oc = outputs[:,0,...].unsqueeze(1),outputs[:,1,...].unsqueeze(1)
                     ODOC_val_metrics.add(outputs,label)
 
-                image = img[0]
-                writer.add_image('val/image', image, iter_num)
-                image_od = (outputs_od > 0.5).to(torch.int8)
-                image_oc = (outputs_oc > 0.5).to(torch.int8)
-                image = image_od[0] + image_oc[0]
-                image = image / (args.num_classes - 1)
-                writer.add_image('val/pred', image, iter_num)
-                image = label
-                image = image / (args.num_classes - 1)
-                writer.add_image('val/Groundtruth_label',
-                                 image, iter_num)
+                    if id == show_id:
+                        image = img[0]
+                        writer.add_image('val/image', image, iter_num)
+                        image_od = (outputs_od > 0.5).to(torch.int8)
+                        image_oc = (outputs_oc > 0.5).to(torch.int8)
+                        image = image_od[0] + image_oc[0]
+                        image = image / (args.num_classes - 1)
+                        writer.add_image('val/pred', image, iter_num)
+                        image = label
+                        image = image / (args.num_classes - 1)
+                        writer.add_image('val/Groundtruth_label',
+                                         image, iter_num)
+
                 Dice_IoU = ODOC_val_metrics.get_metrics()
                 logging.info("OD_Dice:{}--OD_IoU:--{}--OC_Dice:{}--OC_IoU:--{}".format(
                                                                                         Dice_IoU['od_dice'],

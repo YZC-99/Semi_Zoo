@@ -1,5 +1,4 @@
 import torch
-
 from dataloader.transform import crop,test_blur, hflip,vflip, normalize, resize, blur, cutout,dist_transform,random_scale_and_crop
 from dataloader.transform import random_rotate,random_translate,add_salt_pepper_noise,random_scale,color_distortion
 import cv2
@@ -50,10 +49,18 @@ class SemiDataset(Dataset):
         img = Image.open(img_path)
         mask_path = os.path.join(self.root, id.split(' ')[1])
         mask = Image.open(mask_path)
+
+        if self.mode == 'semi_train':
+            img, mask = hflip(img, mask, p=0.5)
+            img, mask = vflip(img, mask, p=0.5)
+            # img, mask = random_rotate(img, mask, p=0.5)
+            img, mask = random_scale_and_crop(img, mask, target_size=(self.size, self.size), min_scale=0.8, max_scale=1.2,p=0.0)
+
         img, mask = resize(img, mask, self.size)
         img, mask = normalize(img, mask)
-        boundary = dist_transform(mask)
-        return {'image':img, 'label':mask,'boundary':boundary}
+        # boundary = dist_transform(mask)
+        # return {'image':img, 'label':mask,'boundary':boundary}
+        return {'image':img, 'label':mask}
 
     def __len__(self):
         return len(self.ids)

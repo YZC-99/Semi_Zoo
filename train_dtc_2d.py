@@ -238,7 +238,7 @@ if __name__ == '__main__':
             labeled_batch, label_label_batch = labeled_sampled_batch['image'].cuda(), labeled_sampled_batch['label'].cuda()
 
             all_batch = torch.cat([labeled_batch,unlabeled_batch],dim=0)
-            all_label_batch = torch.cat([unlabel_label_batch,label_label_batch],dim=0)
+            all_label_batch = torch.cat([label_label_batch,unlabel_label_batch],dim=0)
 
             out_dict = model(all_batch)
             outputs_tanh, outputs = out_dict["output_tanh_1"],out_dict["output1"]
