@@ -321,7 +321,7 @@ if __name__ == '__main__':
             writer.add_scalar('loss/loss', loss, iter_num)
             logging.info('iteration %d : loss : %f' % (iter_num, loss.item()))
 
-            if iter_num % 1 == 0:
+            if iter_num % 50 == 0:
                 image = all_batch[0]
                 writer.add_image('train/Image', image, iter_num)
 
