@@ -5,7 +5,6 @@ from torch.utils.data import DataLoader
 from dataloader.fundus import SemiDataset
 from tqdm import tqdm
 from model.mcnet.unet import MCNet2d_compete_v1,UNet_DTC2d
-# from test_util import test_all_case
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--image_size',type=int,default=256)

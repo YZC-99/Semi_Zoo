@@ -166,20 +166,20 @@ if __name__ == '__main__':
 
     # init model
     scale_num = 2
-    model = UNet_DTC2d(in_chns=3,class_num=args.num_classes)
+    model = UNet_DTC2d(in_chns=3,class_num=args.num_classes,outchannel_minus1 = False)
     model.cuda()
 
     # init dataset
     labeled_dataset = SemiDataset(name='./dataset/semi_refuge400',
-                                  root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
-                                  # root="/home/gu721/yzc/data/odoc/REFUGE/",
+                                  # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
+                                  root="/home/gu721/yzc/data/odoc/REFUGE/",
                                   mode='semi_train',
                                   size=args.image_size,
                                   id_path='labeled.txt')
 
     unlabeled_dataset = SemiDataset(name='./dataset/semi_refuge400',
-                                    root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
-                                    # root="/home/gu721/yzc/data/odoc/REFUGE/",
+                                    # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
+                                    root="/home/gu721/yzc/data/odoc/REFUGE/",
                                     mode='semi_train',
                                     size=args.image_size,
                                     id_path='unlabeled.txt')
@@ -209,15 +209,15 @@ if __name__ == '__main__':
     model.train()
 
     # ce_loss = BCEWithLogitsLoss()
-    ce_loss = CrossEntropyLoss()
+    ce_loss = BCEWithLogitsLoss()
     mse_loss = MSELoss()
 
 
     # 验证集
     # init dataset
     val_dataset = SemiDataset(name='./dataset/semi_refuge400',
-                                    root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
-                                  # root="/home/gu721/yzc/data/odoc/REFUGE/",
+                                    # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
+                                  root="/home/gu721/yzc/data/odoc/REFUGE/",
                                   mode='val',
                                   size=args.image_size)
     val_labeledtrainloader = DataLoader(val_dataset,batch_size=1)
@@ -242,7 +242,17 @@ if __name__ == '__main__':
 
             out_dict = model(all_batch)
             outputs_tanh, outputs = out_dict["output_tanh_1"],out_dict["output1"]
-            outputs_soft = torch.softmax(outputs,dim=1)
+
+            outputs_tanh_od = outputs_tanh[:,0,...].unsqueeze(1)
+            outputs_tanh_oc = outputs_tanh[:,1,...].unsqueeze(1)
+
+            outputs_od = outputs[:,0,...].unsqueeze(1)
+            outputs_oc = outputs[:,1,...].unsqueeze(1)
+
+            outputs_soft = torch.sigmoid(outputs)
+
+            outputs_soft_od = outputs_soft[:,0,...].unsqueeze(1)
+            outputs_soft_oc = outputs_soft[:,1,...].unsqueeze(1)
 
             # calculate the loss
             # 这里需要注意，如果是分割三个类别以上，则需要分开计算dist和分开计算mse
@@ -252,10 +262,7 @@ if __name__ == '__main__':
                 od_all_label_batch = torch.zeros_like(all_label_batch)
                 oc_all_label_batch = torch.zeros_like(all_label_batch)
 
-                # od的区域选择可能会对后续产生影响
                 od_all_label_batch[all_label_batch > 0] = 1
-                # od_all_label_batch[all_label_batch == 1] = 1
-
                 oc_all_label_batch[all_label_batch > 1] = 1
 
 
@@ -265,35 +272,27 @@ if __name__ == '__main__':
                 oc_gt_dis = compute_sdf_luoxd(oc_all_label_batch[:].cpu().numpy(),outputs[:labeled_bs,0,...].shape)
                 oc_gt_dis = torch.from_numpy(oc_gt_dis).float().unsqueeze(1).cuda()
 
-                # Dual的方法
-                # od_gt_dis = compute_sdf(od_all_label_batch[:].cpu().numpy())
-                # od_gt_dis = torch.from_numpy(od_gt_dis).float().unsqueeze(1).cuda()
-                # oc_gt_dis = compute_sdf(oc_all_label_batch[:].cpu().numpy())
-                # oc_gt_dis = torch.from_numpy(oc_gt_dis).float().unsqueeze(1).cuda()
-                # od_gt_dis[od_gt_dis > 0] = 1
-                # oc_gt_dis[oc_gt_dis > 0] = 1
 
+            # 计算gt_dis的mse损失对应原论文公式(6)
+            loss_sdf = mse_loss(outputs_tanh_od[:labeled_bs, ...], od_gt_dis) + mse_loss(outputs_tanh_oc[:labeled_bs, ...], oc_gt_dis)
 
-            # 计算gt_dis的mse损失, 第2个通道给OD，第三个通道给OC,对应原论文公式(6)
-            # loss_sdf = mse_loss(outputs_tanh[:labeled_bs, 1, ...], od_gt_dis) + mse_loss(outputs_tanh[:labeled_bs, 2, ...], oc_gt_dis)
-            # 期望第2个通道上的值与od_dist尽可能的相似
-            # 期望第3个通道上的值与oc_dist尽可能的像素
-            loss_sdf = mse_loss(outputs_tanh[:labeled_bs, 0, ...], od_gt_dis) + mse_loss(outputs_tanh[:labeled_bs, 1, ...], oc_gt_dis)
+            loss_seg = ce_loss(outputs_od[:labeled_bs,0, ...], od_all_label_batch[:labeled_bs].float()) + \
+                       ce_loss(outputs_oc[:labeled_bs,0, ...], oc_all_label_batch[:labeled_bs].float())
 
-            loss_seg = ce_loss(
-                outputs[:labeled_bs, ...], all_label_batch[:labeled_bs])
-            loss_seg_dice = losses.dice_loss(
-                outputs_soft[:labeled_bs,...], all_label_batch[:labeled_bs].unsqueeze(1))
+            loss_seg_dice = losses.dice_loss(outputs_soft_od[:labeled_bs,...], od_all_label_batch[:labeled_bs].unsqueeze(1)) + \
+                            losses.dice_loss(outputs_soft_oc[:labeled_bs,...], oc_all_label_batch[:labeled_bs].unsqueeze(1))
+
             # 统一将水平集函数转化为mask
-            dis_to_mask = torch.sigmoid(-1500*outputs_tanh)
+            dis_to_mask_od = torch.sigmoid(-1500*outputs_tanh_od)
+            dis_to_mask_oc= torch.sigmoid(-1500*outputs_tanh_oc)
             # 原论文公式(4)
             # 计算包括了标记与未标记的部分
             # 这么做的目的是强制两个推理的一致性，一个专注像素级推理，另一个专注几何结构
             # dis_to_mask：(B,num_lcasses - 1,h,w)
             # outputs_soft：(B,num_lcasses ,h,w)
             #所以需要分开算
-            dis_to_mask = dis_to_mask.sum(dim=1)
-            consistency_loss = torch.mean((dis_to_mask - torch.argmax(outputs_soft,dim=1)) ** 2)
+            consistency_loss = torch.mean((dis_to_mask_od - outputs_soft_od) ** 2) + \
+                               torch.mean((dis_to_mask_oc - outputs_soft_oc) ** 2)
             supervised_loss = loss_seg_dice + args.beta * loss_sdf
             consistency_weight = get_current_consistency_weight(iter_num//150)
 
@@ -325,11 +324,15 @@ if __name__ == '__main__':
                 image = all_batch[0]
                 writer.add_image('train/Image', image, iter_num)
 
-                image = torch.argmax(torch.softmax(outputs[0],dim=0),dim=0,keepdim=True)
+                image_od = (outputs_od > 0.5).to(torch.int8)
+                image_oc = (outputs_oc > 0.5).to(torch.int8)
+                image = image_od[0] + image_oc[0]
                 image = image / (args.num_classes - 1)
                 writer.add_image('train/Predicted_label', image, iter_num)
 
-                image = dis_to_mask
+
+                image = dis_to_mask_od[0] + dis_to_mask_oc[0]
+                image  = image / (args.num_classes - 1)
                 writer.add_image('train/Dis2Mask', image, iter_num)
 
                 image = outputs_tanh[0,0,...]
@@ -359,10 +362,14 @@ if __name__ == '__main__':
                     img,label = data['image'].cuda(),data['label'].cuda()
                     out_dict = model(img)
                     outputs_tanh, outputs = out_dict["output_tanh_1"], out_dict["output1"]
+                    outputs_od,outputs_oc = outputs[:,0,...].unsqueeze(1),outputs[:,1,...].unsqueeze(1)
                     ODOC_val_metrics.add(outputs,label)
+
                 image = img[0]
                 writer.add_image('val/image', image, iter_num)
-                image = torch.argmax(torch.softmax(outputs[0],dim=0),dim=0,keepdim=True)
+                image_od = (outputs_od > 0.5).to(torch.int8)
+                image_oc = (outputs_oc > 0.5).to(torch.int8)
+                image = image_od[0] + image_oc[0]
                 image = image / (args.num_classes - 1)
                 writer.add_image('val/pred', image, iter_num)
                 image = label

@@ -119,7 +119,7 @@ class Decoder(nn.Module):
         return output
 
 class Decoder_dtc(nn.Module):
-    def __init__(self, params):
+    def __init__(self, params,outchannel_minus1 = False):
         super(Decoder_dtc, self).__init__()
         self.params = params
         self.in_chns = self.params['in_chns']
@@ -133,8 +133,11 @@ class Decoder_dtc(nn.Module):
         self.up3 = UpBlock(self.ft_chns[2], self.ft_chns[1], self.ft_chns[1], dropout_p=0.0, mode_upsampling=self.up_type)
         self.up4 = UpBlock(self.ft_chns[1], self.ft_chns[0], self.ft_chns[0], dropout_p=0.0, mode_upsampling=self.up_type)
 
-        self.out_conv = nn.Conv2d(self.ft_chns[0], self.n_class, kernel_size=3, padding=1)
-        self.out_conv2 = nn.Conv2d(self.ft_chns[0], self.n_class, kernel_size=3, padding=1)
+        out_channel = self.n_class
+        if outchannel_minus1:
+            out_channel = self.n_class - 1
+        self.out_conv = nn.Conv2d(self.ft_chns[0], out_channel, kernel_size=3, padding=1)
+        self.out_conv2 = nn.Conv2d(self.ft_chns[0], out_channel, kernel_size=3, padding=1)
         self.tanh = nn.Tanh()
 
     def forward(self, feature):
@@ -172,8 +175,9 @@ class UNet(nn.Module):
         feature = self.encoder(x)
         output1 = self.decoder1(feature)
         return output1
+
 class UNet_DTC2d(nn.Module):
-    def __init__(self, in_chns, class_num):
+    def __init__(self, in_chns, class_num,outchannel_minus1 = False):
         super(UNet_DTC2d, self).__init__()
 
         params1 = {'in_chns': in_chns,
@@ -184,7 +188,7 @@ class UNet_DTC2d(nn.Module):
                   'acti_func': 'relu'}
 
         self.encoder = Encoder(params1)
-        self.decoder1 = Decoder_dtc(params1)
+        self.decoder1 = Decoder_dtc(params1,outchannel_minus1 = False)
         self.tanh = nn.Tanh()
 
     def forward(self, x):
