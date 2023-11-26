@@ -62,7 +62,7 @@ parser.add_argument('--cps_un_rampup_scheme', type=str,  default='None', help='c
 parser.add_argument('--cps_un_rampup', type=float,  default=40.0, help='cps_rampup')
 parser.add_argument('--cps_un_with_dice', type=bool,  default=True, help='cps_un_with_dice')
 
-parser.add_argument('--exp',type=str,default='refuge400')
+parser.add_argument('--exp',type=str,default='refuge400_odrim')
 
 
 def get_unsup_cont_weight(epoch, weight, scheme, ramp_up_or_down ):
@@ -187,7 +187,7 @@ if __name__ == '__main__':
     labeled_idxs = list(range(args.labeled_num))
     unlabeled_idxs = list(range(args.labeled_num,args.total_num))
     labeled_batch_sampler = LabeledBatchSampler(labeled_idxs,labeled_bs)
-    unlabeled_batch_sampler = UnlabeledBatchSampler(labeled_idxs, args.batch_size - args.labeled_bs)
+    unlabeled_batch_sampler = UnlabeledBatchSampler(unlabeled_idxs, args.batch_size - args.labeled_bs)
 
     # init dataloader
     def worker_init_fn(worker_id):
@@ -263,8 +263,8 @@ if __name__ == '__main__':
                 oc_all_label_batch = torch.zeros_like(all_label_batch)
 
                 # 这里的od选择可能回影响后续的任务
-                od_all_label_batch[all_label_batch > 0] = 1
-                # od_all_label_batch[all_label_batch == 1] = 1
+                # od_all_label_batch[all_label_batch > 0] = 1
+                od_all_label_batch[all_label_batch == 1] = 1
                 oc_all_label_batch[all_label_batch > 1] = 2
 
 
@@ -329,12 +329,12 @@ if __name__ == '__main__':
 
                 image_od = (outputs_od > 0.5).to(torch.int8)
                 image_oc = (outputs_oc > 0.5).to(torch.int8)
-                image = image_od[0] + image_oc[0]
+                image = image_od[0] + image_oc[0] * 2
                 image = image / (args.num_classes - 1)
                 writer.add_image('train/Predicted_label', image, iter_num)
 
 
-                image = dis_to_mask_od[0] + dis_to_mask_oc[0]
+                image = dis_to_mask_od[0] + dis_to_mask_oc[0] * 2
                 image  = image / (args.num_classes - 1)
                 writer.add_image('train/Dis2Mask', image, iter_num)
 
@@ -374,7 +374,7 @@ if __name__ == '__main__':
                         writer.add_image('val/image', image, iter_num)
                         image_od = (outputs_od > 0.5).to(torch.int8)
                         image_oc = (outputs_oc > 0.5).to(torch.int8)
-                        image = image_od[0] + image_oc[0]
+                        image = image_od[0] + image_oc[0] * 2
                         image = image / (args.num_classes - 1)
                         writer.add_image('val/pred', image, iter_num)
                         image = label

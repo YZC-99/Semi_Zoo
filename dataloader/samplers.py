@@ -28,13 +28,6 @@ class LabeledBatchSampler(Sampler):
             primary_batch
             for primary_batch in grouper(primary_iter, self.primary_batch_size)
         )
-        # import pdb
-        # pdb.set_trace()
-        # for secondary_batch in grouper(secondary_iter, self.secondary_batch_size):
-        #     print(secondary_batch)
-        # if self.fixed_order:
-        #     for _ in range(8):
-        #         print(next(res))
         return res
 
 

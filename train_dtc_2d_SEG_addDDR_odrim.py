@@ -24,15 +24,17 @@ import sys
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed',type=int,default=42)
+parser.add_argument('--device',type=int,default=0)
+parser.add_argument('--num_works',type=int,default=4)
 
 parser.add_argument('--backbone',type=str,default='resnet34')
 
 parser.add_argument('--amp',type=bool,default=True)
 parser.add_argument('--num_classes',type=int,default=3)
-parser.add_argument('--base_lr',type=float,default=0.001)
+parser.add_argument('--base_lr',type=float,default=0.01)
 
-parser.add_argument('--batch_size',type=int,default=4)
-parser.add_argument('--labeled_bs',type=int,default=2)
+parser.add_argument('--batch_size',type=int,default=32)
+parser.add_argument('--labeled_bs',type=int,default=16)
 
 parser.add_argument('--image_size',type=int,default=256)
 
@@ -62,7 +64,7 @@ parser.add_argument('--cps_un_rampup_scheme', type=str,  default='None', help='c
 parser.add_argument('--cps_un_rampup', type=float,  default=40.0, help='cps_rampup')
 parser.add_argument('--cps_un_with_dice', type=bool,  default=True, help='cps_un_with_dice')
 
-parser.add_argument('--exp',type=str,default='refuge400')
+parser.add_argument('--exp',type=str,default='SEG_addDDR_5_odrim')
 
 
 def get_unsup_cont_weight(epoch, weight, scheme, ramp_up_or_down ):
@@ -94,7 +96,7 @@ def get_supervised_loss(outputs, label_batch,  with_dice=True):
     #     loss_seg_dice = losses.dice_loss(outputs_soft[:, 1, :, :, :], label_batch == 1)
     #     supervised_loss = 0.5 * (loss_seg + loss_seg_dice)
     # else:
-    loss_seg_dice = torch.zeros([1]).cuda()
+    loss_seg_dice = torch.zeros([1]).to(device)
     supervised_loss = loss_seg + loss_seg_dice
     return supervised_loss, loss_seg, loss_seg_dice
 
@@ -156,6 +158,8 @@ if __name__ == '__main__':
         os.makedirs(snapshot_path)
     snapshot_path = create_version_folder(snapshot_path)
 
+    device = "cuda:{}".format(args.device)
+
     # if os.path.exists(snapshot_path + '/code'):
     #     shutil.rmtree(snapshot_path + '/code')
     # shutil.copytree('.', snapshot_path + '/code', shutil.ignore_patterns(['.git', '__pycache__']))
@@ -167,34 +171,32 @@ if __name__ == '__main__':
     # init model
     scale_num = 2
     model = UNet_DTC2d(in_chns=3,class_num=args.num_classes,outchannel_minus1 = False)
-    model.cuda()
+    model.to(device)
 
     # init dataset
-    labeled_dataset = SemiDataset(name='./dataset/semi_refuge400',
-                                  # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
-                                  root="/home/gu721/yzc/data/odoc/REFUGE/",
+    labeled_dataset = SemiDataset(name='./dataset/SEG',
+                                  root="/home/gu721/yzc/data/odoc",
                                   mode='semi_train',
                                   size=args.image_size,
                                   id_path='labeled.txt')
 
-    unlabeled_dataset = SemiDataset(name='./dataset/semi_refuge400',
-                                    # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
-                                    root="/home/gu721/yzc/data/odoc/REFUGE/",
+    unlabeled_dataset = SemiDataset(name='./dataset/SEG',
+                                    root="/home/gu721/yzc/data/odoc",
                                     mode='semi_train',
                                     size=args.image_size,
-                                    id_path='unlabeled.txt')
+                                    id_path='unlabeled_addDDR.txt')
 
     labeled_idxs = list(range(args.labeled_num))
     unlabeled_idxs = list(range(args.labeled_num,args.total_num))
     labeled_batch_sampler = LabeledBatchSampler(labeled_idxs,labeled_bs)
-    unlabeled_batch_sampler = UnlabeledBatchSampler(labeled_idxs, args.batch_size - args.labeled_bs)
+    unlabeled_batch_sampler = UnlabeledBatchSampler(unlabeled_idxs, args.batch_size - args.labeled_bs)
 
     # init dataloader
     def worker_init_fn(worker_id):
         random.seed(args.seed + worker_id)
-    labeledtrainloader = DataLoader(labeled_dataset, batch_sampler=labeled_batch_sampler, num_workers=0, pin_memory=True,
+    labeledtrainloader = DataLoader(labeled_dataset, batch_sampler=labeled_batch_sampler, num_workers=args.num_works, pin_memory=True,
                                     worker_init_fn=worker_init_fn)
-    unlabeledtrainloader = DataLoader(unlabeled_dataset, batch_sampler=unlabeled_batch_sampler, num_workers=0,
+    unlabeledtrainloader = DataLoader(unlabeled_dataset, batch_sampler=unlabeled_batch_sampler, num_workers=args.num_works,
                                       pin_memory=True, worker_init_fn=worker_init_fn)
 
     model.train()
@@ -215,12 +217,12 @@ if __name__ == '__main__':
 
     # 验证集
     # init dataset
-    val_dataset = SemiDataset(name='./dataset/semi_refuge400',
+    val_dataset = SemiDataset(name='./dataset/SEG',
                                     # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
-                                  root="/home/gu721/yzc/data/odoc/REFUGE/",
+                                  root="/home/gu721/yzc/data/odoc",
                                   mode='val',
                                   size=args.image_size)
-    val_labeledtrainloader = DataLoader(val_dataset,batch_size=1)
+    val_labeledtrainloader = DataLoader(val_dataset,batch_size=1,num_workers=args.num_works)
     val_iteriter = tqdm(val_labeledtrainloader)
 
 
@@ -234,8 +236,8 @@ if __name__ == '__main__':
         for i_batch,(labeled_sampled_batch, unlabeled_sampled_batch) in enumerate(zip(labeledtrainloader,unlabeledtrainloader)):
             time2 = time.time()
 
-            unlabeled_batch, unlabel_label_batch = unlabeled_sampled_batch['image'].cuda(), unlabeled_sampled_batch['label'].cuda()
-            labeled_batch, label_label_batch = labeled_sampled_batch['image'].cuda(), labeled_sampled_batch['label'].cuda()
+            unlabeled_batch, unlabel_label_batch = unlabeled_sampled_batch['image'].to(device), unlabeled_sampled_batch['label'].to(device)
+            labeled_batch, label_label_batch = labeled_sampled_batch['image'].to(device), labeled_sampled_batch['label'].to(device)
 
             all_batch = torch.cat([labeled_batch,unlabeled_batch],dim=0)
             all_label_batch = torch.cat([label_label_batch,unlabel_label_batch],dim=0)
@@ -263,16 +265,16 @@ if __name__ == '__main__':
                 oc_all_label_batch = torch.zeros_like(all_label_batch)
 
                 # 这里的od选择可能回影响后续的任务
-                od_all_label_batch[all_label_batch > 0] = 1
-                # od_all_label_batch[all_label_batch == 1] = 1
+                # od_all_label_batch[all_label_batch > 0] = 1
+                od_all_label_batch[all_label_batch == 1] = 1
                 oc_all_label_batch[all_label_batch > 1] = 2
 
 
                 #luoxd的方法
                 od_gt_dis = compute_sdf_luoxd(od_all_label_batch[:].cpu().numpy(),outputs[:labeled_bs,0,...].shape)
-                od_gt_dis = torch.from_numpy(od_gt_dis).float().unsqueeze(1).cuda()
+                od_gt_dis = torch.from_numpy(od_gt_dis).float().unsqueeze(1).to(device)
                 oc_gt_dis = compute_sdf_luoxd(oc_all_label_batch[:].cpu().numpy(),outputs[:labeled_bs,0,...].shape)
-                oc_gt_dis = torch.from_numpy(oc_gt_dis).float().unsqueeze(1).cuda()
+                oc_gt_dis = torch.from_numpy(oc_gt_dis).float().unsqueeze(1).to(device)
 
 
             # 计算gt_dis的mse损失对应原论文公式(6)
@@ -329,12 +331,12 @@ if __name__ == '__main__':
 
                 image_od = (outputs_od > 0.5).to(torch.int8)
                 image_oc = (outputs_oc > 0.5).to(torch.int8)
-                image = image_od[0] + image_oc[0]
+                image = image_od[0] + image_oc[0] * 2
                 image = image / (args.num_classes - 1)
                 writer.add_image('train/Predicted_label', image, iter_num)
 
 
-                image = dis_to_mask_od[0] + dis_to_mask_oc[0]
+                image = dis_to_mask_od[0] + dis_to_mask_oc[0] * 2
                 image  = image / (args.num_classes - 1)
                 writer.add_image('train/Dis2Mask', image, iter_num)
 
@@ -363,7 +365,7 @@ if __name__ == '__main__':
                 model.eval()
                 show_id = random.randint(0,len(val_iteriter))
                 for id,data in enumerate(val_iteriter):
-                    img,label = data['image'].cuda(),data['label'].cuda()
+                    img,label = data['image'].to(device),data['label'].to(device)
                     out_dict = model(img)
                     outputs_tanh, outputs = out_dict["output_tanh_1"], out_dict["output1"]
                     outputs_od,outputs_oc = outputs[:,0,...].unsqueeze(1),outputs[:,1,...].unsqueeze(1)
@@ -374,7 +376,7 @@ if __name__ == '__main__':
                         writer.add_image('val/image', image, iter_num)
                         image_od = (outputs_od > 0.5).to(torch.int8)
                         image_oc = (outputs_oc > 0.5).to(torch.int8)
-                        image = image_od[0] + image_oc[0]
+                        image = image_od[0] + image_oc[0] * 2
                         image = image / (args.num_classes - 1)
                         writer.add_image('val/pred', image, iter_num)
                         image = label

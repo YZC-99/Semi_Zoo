@@ -24,15 +24,16 @@ import sys
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed',type=int,default=42)
+parser.add_argument('--num_works',type=int,default=4)
 
 parser.add_argument('--backbone',type=str,default='resnet34')
 
 parser.add_argument('--amp',type=bool,default=True)
 parser.add_argument('--num_classes',type=int,default=3)
-parser.add_argument('--base_lr',type=float,default=0.001)
+parser.add_argument('--base_lr',type=float,default=0.01)
 
-parser.add_argument('--batch_size',type=int,default=4)
-parser.add_argument('--labeled_bs',type=int,default=2)
+parser.add_argument('--batch_size',type=int,default=32)
+parser.add_argument('--labeled_bs',type=int,default=16)
 
 parser.add_argument('--image_size',type=int,default=256)
 
@@ -62,7 +63,7 @@ parser.add_argument('--cps_un_rampup_scheme', type=str,  default='None', help='c
 parser.add_argument('--cps_un_rampup', type=float,  default=40.0, help='cps_rampup')
 parser.add_argument('--cps_un_with_dice', type=bool,  default=True, help='cps_un_with_dice')
 
-parser.add_argument('--exp',type=str,default='refuge400')
+parser.add_argument('--exp',type=str,default='SEG_5_odrim')
 
 
 def get_unsup_cont_weight(epoch, weight, scheme, ramp_up_or_down ):
@@ -170,16 +171,16 @@ if __name__ == '__main__':
     model.cuda()
 
     # init dataset
-    labeled_dataset = SemiDataset(name='./dataset/semi_refuge400',
+    labeled_dataset = SemiDataset(name='./dataset/SEG',
                                   # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
-                                  root="/home/gu721/yzc/data/odoc/REFUGE/",
+                                  root="/home/gu721/yzc/data/odoc",
                                   mode='semi_train',
                                   size=args.image_size,
                                   id_path='labeled.txt')
 
-    unlabeled_dataset = SemiDataset(name='./dataset/semi_refuge400',
+    unlabeled_dataset = SemiDataset(name='./dataset/SEG',
                                     # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
-                                    root="/home/gu721/yzc/data/odoc/REFUGE/",
+                                    root="/home/gu721/yzc/data/odoc",
                                     mode='semi_train',
                                     size=args.image_size,
                                     id_path='unlabeled.txt')
@@ -187,14 +188,14 @@ if __name__ == '__main__':
     labeled_idxs = list(range(args.labeled_num))
     unlabeled_idxs = list(range(args.labeled_num,args.total_num))
     labeled_batch_sampler = LabeledBatchSampler(labeled_idxs,labeled_bs)
-    unlabeled_batch_sampler = UnlabeledBatchSampler(labeled_idxs, args.batch_size - args.labeled_bs)
+    unlabeled_batch_sampler = UnlabeledBatchSampler(unlabeled_idxs, args.batch_size - args.labeled_bs)
 
     # init dataloader
     def worker_init_fn(worker_id):
         random.seed(args.seed + worker_id)
-    labeledtrainloader = DataLoader(labeled_dataset, batch_sampler=labeled_batch_sampler, num_workers=0, pin_memory=True,
+    labeledtrainloader = DataLoader(labeled_dataset, batch_sampler=labeled_batch_sampler, num_workers=args.num_works, pin_memory=True,
                                     worker_init_fn=worker_init_fn)
-    unlabeledtrainloader = DataLoader(unlabeled_dataset, batch_sampler=unlabeled_batch_sampler, num_workers=0,
+    unlabeledtrainloader = DataLoader(unlabeled_dataset, batch_sampler=unlabeled_batch_sampler, num_workers=args.num_works,
                                       pin_memory=True, worker_init_fn=worker_init_fn)
 
     model.train()
@@ -215,12 +216,12 @@ if __name__ == '__main__':
 
     # 验证集
     # init dataset
-    val_dataset = SemiDataset(name='./dataset/semi_refuge400',
+    val_dataset = SemiDataset(name='./dataset/SEG',
                                     # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
-                                  root="/home/gu721/yzc/data/odoc/REFUGE/",
+                                  root="/home/gu721/yzc/data/odoc",
                                   mode='val',
                                   size=args.image_size)
-    val_labeledtrainloader = DataLoader(val_dataset,batch_size=1)
+    val_labeledtrainloader = DataLoader(val_dataset,batch_size=1,num_workers=4)
     val_iteriter = tqdm(val_labeledtrainloader)
 
 
@@ -263,8 +264,8 @@ if __name__ == '__main__':
                 oc_all_label_batch = torch.zeros_like(all_label_batch)
 
                 # 这里的od选择可能回影响后续的任务
-                od_all_label_batch[all_label_batch > 0] = 1
-                # od_all_label_batch[all_label_batch == 1] = 1
+                # od_all_label_batch[all_label_batch > 0] = 1
+                od_all_label_batch[all_label_batch == 1] = 1
                 oc_all_label_batch[all_label_batch > 1] = 2
 
 
@@ -329,12 +330,12 @@ if __name__ == '__main__':
 
                 image_od = (outputs_od > 0.5).to(torch.int8)
                 image_oc = (outputs_oc > 0.5).to(torch.int8)
-                image = image_od[0] + image_oc[0]
+                image = image_od[0] + image_oc[0] * 2
                 image = image / (args.num_classes - 1)
                 writer.add_image('train/Predicted_label', image, iter_num)
 
 
-                image = dis_to_mask_od[0] + dis_to_mask_oc[0]
+                image = dis_to_mask_od[0] + dis_to_mask_oc[0] * 2
                 image  = image / (args.num_classes - 1)
                 writer.add_image('train/Dis2Mask', image, iter_num)
 
@@ -374,7 +375,7 @@ if __name__ == '__main__':
                         writer.add_image('val/image', image, iter_num)
                         image_od = (outputs_od > 0.5).to(torch.int8)
                         image_oc = (outputs_oc > 0.5).to(torch.int8)
-                        image = image_od[0] + image_oc[0]
+                        image = image_od[0] + image_oc[0] * 2
                         image = image / (args.num_classes - 1)
                         writer.add_image('val/pred', image, iter_num)
                         image = label
