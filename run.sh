@@ -20,4 +20,4 @@ python train_dtc_2d.py --exp semi/SEG_addDDR_5_od_rim_outchannel-minus1_oc-label
 
 
 # supervised
-python train_supervised_2d.py  --device 1
+python train_supervised_2d.py  --device 0
