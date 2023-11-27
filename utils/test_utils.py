@@ -41,6 +41,9 @@ class ODOC_metrics(object):
         od_pred = (outputs_od > 0.5).to(torch.int8)
         oc_pred = (outputs_oc > 0.5).to(torch.int8)
 
+
+        od_pred = od_pred + oc_pred
+        od_pred[od_pred > 0] = 1
         #包含oc的od
         od_label = copy.deepcopy(label)
         od_label[od_label > 0] = 1

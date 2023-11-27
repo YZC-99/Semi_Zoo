@@ -24,7 +24,7 @@
 
 * Semi-supervised Medical Image Segmentation through Dual-task Consistency（3D -> 2D）
 
-* [ ]  Dual Consistency Enabled Weakly and Semi-Supervised Optic Disc and Cup Segmentation with Dual Adaptive Graph Convolutional Networks(输入的数据格式有点多，带实现)
+* [ ]  Dual Consistency Enabled Weakly and Semi-Supervised Optic Disc and Cup Segmentation with Dual Adaptive Graph Convolutional Networks(输入的数据格式有点多，待实现)
 
 # TODO List
 

@@ -333,6 +333,7 @@ if __name__ == '__main__':
                 image_od = (outputs_od > 0.5).to(torch.int8)
                 image_oc = (outputs_oc > 0.5).to(torch.int8)
                 image = image_od[0] + image_oc[0] * 2
+                image[image > 2] = 2
                 image = image / (args.num_classes - 1)
                 writer.add_image('train/Predicted_label', image, iter_num)
 
@@ -370,7 +371,7 @@ if __name__ == '__main__':
                     out_dict = model(img)
                     outputs_tanh, outputs = out_dict["output_tanh_1"], out_dict["output1"]
                     outputs_od,outputs_oc = outputs[:,0,...].unsqueeze(1),outputs[:,1,...].unsqueeze(1)
-                    ODOC_val_metrics.add(outputs,label)
+                    ODOC_val_metrics.add(outputs,label,od_rim=args.od_rim)
 
                     if id == show_id:
                         image = img[0]
@@ -378,6 +379,7 @@ if __name__ == '__main__':
                         image_od = (outputs_od > 0.5).to(torch.int8)
                         image_oc = (outputs_oc > 0.5).to(torch.int8)
                         image = image_od[0] + image_oc[0] * 2
+                        image[image > 2] = 2
                         image = image / (args.num_classes - 1)
                         writer.add_image('val/pred', image, iter_num)
                         image = label

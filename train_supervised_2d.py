@@ -39,7 +39,7 @@ parser.add_argument('--unlabeled_txt',type=str,default='unlabeled_addDDR.txt')
 
 parser.add_argument('--amp',type=bool,default=True)
 parser.add_argument('--num_classes',type=int,default=3)
-parser.add_argument('--base_lr',type=float,default=0.01)
+parser.add_argument('--base_lr',type=float,default=0.005)
 
 parser.add_argument('--batch_size',type=int,default=32)
 parser.add_argument('--labeled_bs',type=int,default=16)
