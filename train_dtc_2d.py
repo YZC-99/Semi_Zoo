@@ -298,7 +298,7 @@ if __name__ == '__main__':
             #所以需要分开算
             consistency_loss = torch.mean((dis_to_mask_od - outputs_soft_od) ** 2) + \
                                torch.mean((dis_to_mask_oc - outputs_soft_oc) ** 2)
-            supervised_loss = loss_seg_dice + args.beta * loss_sdf
+            supervised_loss = loss_seg_dice + args.beta * loss_sdf + loss_seg
             consistency_weight = get_current_consistency_weight(iter_num//150)
 
             loss = supervised_loss + consistency_weight * consistency_loss

@@ -244,8 +244,10 @@ if __name__ == '__main__':
 
             # calculate the loss
             # 这里需要注意，如果是分割三个类别以上，则需要分开计算dist和分开计算mse
-
-            loss = ce_loss(outputs,all_label_batch)
+            loss_seg_ce = ce_loss(outputs,all_label_batch)
+            outputs_soft = torch.argmax(outputs,dim=1)
+            loss_seg_dice = losses.dice_loss(outputs_soft,all_label_batch)
+            loss = loss_seg_ce + loss_seg_dice
 
             optimizer.zero_grad()
             loss.backward()
@@ -255,12 +257,16 @@ if __name__ == '__main__':
             iter_num = iter_num + 1
             writer.add_scalar('lr', optimizer.param_groups[0]['lr'], iter_num)
             writer.add_scalar('loss/loss', loss, iter_num)
+            writer.add_scalar('loss/loss_seg_ce', loss_seg_ce, iter_num)
+            writer.add_scalar('loss/loss_seg_dice', loss_seg_dice, iter_num)
 
             logging.info(
                 'iteration %d : loss : %f' %
                 (iter_num, loss.item()))
             writer.add_scalar('loss/loss', loss, iter_num)
             logging.info('iteration %d : loss : %f' % (iter_num, loss.item()))
+            logging.info('iteration %d : loss_seg_ce : %f' % (iter_num, loss_seg_ce.item()))
+            logging.info('iteration %d : loss_seg_dice : %f' % (iter_num, loss_seg_dice.item()))
 
             if iter_num % 50 == 0:
                 image = all_batch[0]
