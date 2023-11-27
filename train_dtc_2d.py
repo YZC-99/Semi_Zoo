@@ -1,11 +1,13 @@
 import random
 from tqdm import tqdm
 from dataloader.fundus import SemiDataset
-from dataloader.samplers import LabeledBatchSampler,UnlabeledBatchSampler
+from dataloader.samplers import TwoStreamBatchSampler, LabeledBatchSampler,UnlabeledBatchSampler
 import torch
+import glob
 import argparse
 import torch.optim as optim
 from torch.utils.data import DataLoader
+from torch.optim.lr_scheduler import StepLR,LambdaLR
 from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss,MSELoss
 from torch.cuda.amp import autocast,GradScaler
 import torch.nn.functional as F
@@ -13,8 +15,8 @@ from torch.utils.tensorboard import SummaryWriter
 from model.mcnet.unet import MCNet2d_compete_v1,UNet_DTC2d
 from utils import ramps,losses
 from utils.test_utils import ODOC_metrics
-
-from utils.util import compute_sdf,compute_sdf_luoxd,compute_sdf_multi_class
+import random
+from utils.util import PolyLRwithWarmup, compute_sdf,compute_sdf_luoxd,compute_sdf_multi_class
 import time
 import logging
 import os
@@ -22,24 +24,37 @@ import shutil
 import logging
 import sys
 
+os.environ['OPENBLAS_NUM_THREADS'] = '5'
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed',type=int,default=42)
-
+parser.add_argument('--device',type=int,default=0)
+parser.add_argument('--num_works',type=int,default=4)
 parser.add_argument('--backbone',type=str,default='resnet34')
+
+parser.add_argument('--exp',type=str,default='semi/SEG_addDDR_5_odrim')
+
+parser.add_argument('--dataset_name',type=str,default='SEG')
+parser.add_argument('--unlabeled_txt',type=str,default='unlabeled_addDDR.txt')
 
 parser.add_argument('--amp',type=bool,default=True)
 parser.add_argument('--num_classes',type=int,default=3)
-parser.add_argument('--base_lr',type=float,default=0.001)
+parser.add_argument('--outchannel_minus1',type=bool,default=True)
+parser.add_argument('--base_lr',type=float,default=0.005)
 
-parser.add_argument('--batch_size',type=int,default=4)
-parser.add_argument('--labeled_bs',type=int,default=2)
+parser.add_argument('--batch_size',type=int,default=32)
+parser.add_argument('--labeled_bs',type=int,default=16)
 
+parser.add_argument('--od_rim',type=bool,default=False)
+parser.add_argument('--oc_label',type=int,default=2)
 parser.add_argument('--image_size',type=int,default=256)
 
-parser.add_argument('--labeled_num',type=int,default=100)
-parser.add_argument('--total_num',type=int,default=360)
+parser.add_argument('--labeled_num',type=int,default=100,help="5%:100,")
+parser.add_argument('--total_num',type=int,default=11249,help="SEG:2859;SEG_add_DDR:11249")
+
+
 parser.add_argument('--scale_num',type=int,default=2)
-parser.add_argument('--max_iterations',type=int,default=60000)
+parser.add_argument('--max_iterations',type=int,default=10000)
 
 parser.add_argument('--with_dice',type=bool,default=False)
 
@@ -62,7 +77,6 @@ parser.add_argument('--cps_un_rampup_scheme', type=str,  default='None', help='c
 parser.add_argument('--cps_un_rampup', type=float,  default=40.0, help='cps_rampup')
 parser.add_argument('--cps_un_with_dice', type=bool,  default=True, help='cps_un_with_dice')
 
-parser.add_argument('--exp',type=str,default='refuge400')
 
 
 def get_unsup_cont_weight(epoch, weight, scheme, ramp_up_or_down ):
@@ -89,35 +103,15 @@ def get_current_consistency_weight(epoch):
 
 def get_supervised_loss(outputs, label_batch,  with_dice=True):
     loss_seg = F.cross_entropy(outputs, label_batch)
-    # outputs_soft = F.softmax(outputs, dim=1)
-    # if with_dice:
-    #     loss_seg_dice = losses.dice_loss(outputs_soft[:, 1, :, :, :], label_batch == 1)
-    #     supervised_loss = 0.5 * (loss_seg + loss_seg_dice)
-    # else:
-    loss_seg_dice = torch.zeros([1]).cuda()
-    supervised_loss = loss_seg + loss_seg_dice
+    outputs_soft = F.softmax(outputs, dim=1)
+    if with_dice:
+        loss_seg_dice = losses.dice_loss(outputs_soft[:, 1, :, :, :], label_batch == 1)
+        supervised_loss = 0.5 * (loss_seg + loss_seg_dice)
+    else:
+        loss_seg_dice = torch.zeros([1]).to(device)
+        supervised_loss = loss_seg + loss_seg_dice
     return supervised_loss, loss_seg, loss_seg_dice
 
-def pseudo_labeling_from_most_confident_prediction(pred_1, pred_2, max_1, max_2):
-        # stack很有意思，因为是堆叠，所以会产生一个新的维度，dim就是指定这个维度应该放在哪里
-        prob_all_ex_3 = torch.stack([pred_1, pred_2], dim=2)  # bs, n_c, n_branch - 1, h, w
-        max_all_ex_3 = torch.stack([max_1, max_2], dim=1)  # bs, n_branch - 1, h, w
-        # 获取堆叠后的最大分数,注意，这里返回后的维度，现在分数不再是softmax的，而是来自不同branch的最大分数
-        max_conf_each_branch_ex_3, _ = torch.max(prob_all_ex_3, dim=1)  # bs, n_branch - 1, h, w
-        # 再计算伪标签的值和索引，branch_id_max_conf_ex_3代表的是第几个branch
-        max_conf_ex_3, branch_id_max_conf_ex_3 = torch.max(max_conf_each_branch_ex_3, dim=1,
-                                                              keepdim=True)  # bs, h, w
-        # branch_id_max_conf_ex_3是索引，因此可以通过索引从堆叠的标签中获取最终通过竞争机制得到的伪标签
-        pseudo_12 = torch.gather(max_all_ex_3, dim=1, index=branch_id_max_conf_ex_3)[:, 0]
-        # 返回的是一个布尔值，因此从max_conf_ex_3的伪标签
-        max_conf_fg_ex_3 = max_conf_ex_3[:, 0][pseudo_12 == 1]
-        try:
-            mean_max_conf_fg_ex_3, var_max_conf_fg_ex_3, min_max_conf_fg_ex_3, max_max_conf_fg_ex_3 = torch.mean(
-                max_conf_fg_ex_3).detach().cpu(), torch.var(max_conf_fg_ex_3).detach().cpu(), torch.min(
-                max_conf_fg_ex_3).detach().cpu(), torch.max(max_conf_fg_ex_3).detach().cpu()
-        except:
-            mean_max_conf_fg_ex_3, var_max_conf_fg_ex_3, min_max_conf_fg_ex_3, max_max_conf_fg_ex_3 = 0, 0, 0, 0
-        return pseudo_12, branch_id_max_conf_ex_3, [mean_max_conf_fg_ex_3, var_max_conf_fg_ex_3, min_max_conf_fg_ex_3, max_max_conf_fg_ex_3]
 
 
 def create_version_folder(snapshot_path):
@@ -156,6 +150,8 @@ if __name__ == '__main__':
         os.makedirs(snapshot_path)
     snapshot_path = create_version_folder(snapshot_path)
 
+    device = "cuda:{}".format(args.device)
+
     # if os.path.exists(snapshot_path + '/code'):
     #     shutil.rmtree(snapshot_path + '/code')
     # shutil.copytree('.', snapshot_path + '/code', shutil.ignore_patterns(['.git', '__pycache__']))
@@ -166,40 +162,43 @@ if __name__ == '__main__':
 
     # init model
     scale_num = 2
-    model = UNet_DTC2d(in_chns=3,class_num=args.num_classes)
-    model.cuda()
+    model = UNet_DTC2d(in_chns=3,class_num=args.num_classes,outchannel_minus1 = False)
+    model.to(device)
 
     # init dataset
-    labeled_dataset = SemiDataset(name='./dataset/semi_refuge400',
-                                  root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
-                                  # root="/home/gu721/yzc/data/odoc/REFUGE/",
+    labeled_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
+                                  root="/home/gu721/yzc/data/odoc",
                                   mode='semi_train',
                                   size=args.image_size,
-                                  id_path='labeled.txt')
+                                  id_path='train_addDDR.txt')
 
-    unlabeled_dataset = SemiDataset(name='./dataset/semi_refuge400',
-                                    root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
-                                    # root="/home/gu721/yzc/data/odoc/REFUGE/",
+    unlabeled_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
+                                    root="/home/gu721/yzc/data/odoc",
                                     mode='semi_train',
                                     size=args.image_size,
-                                    id_path='unlabeled.txt')
+                                    id_path= 'train_addDDR.txt')
 
     labeled_idxs = list(range(args.labeled_num))
     unlabeled_idxs = list(range(args.labeled_num,args.total_num))
+    # batch_sampler = TwoStreamBatchSampler(labeled_idxs, unlabeled_idxs, args.batch_size, args.batch_size-labeled_bs)
+
     labeled_batch_sampler = LabeledBatchSampler(labeled_idxs,labeled_bs)
-    unlabeled_batch_sampler = UnlabeledBatchSampler(labeled_idxs, args.batch_size - args.labeled_bs)
+    unlabeled_batch_sampler = UnlabeledBatchSampler(unlabeled_idxs, args.batch_size - args.labeled_bs)
 
     # init dataloader
     def worker_init_fn(worker_id):
         random.seed(args.seed + worker_id)
-    labeledtrainloader = DataLoader(labeled_dataset, batch_sampler=labeled_batch_sampler, num_workers=0, pin_memory=True,
+    labeledtrainloader = DataLoader(labeled_dataset, batch_sampler=labeled_batch_sampler, num_workers=args.num_works, pin_memory=True,
                                     worker_init_fn=worker_init_fn)
-    unlabeledtrainloader = DataLoader(unlabeled_dataset, batch_sampler=unlabeled_batch_sampler, num_workers=0,
+    unlabeledtrainloader = DataLoader(unlabeled_dataset, batch_sampler=unlabeled_batch_sampler, num_workers=args.num_works,
                                       pin_memory=True, worker_init_fn=worker_init_fn)
 
     model.train()
     # init optimizer
     optimizer = optim.SGD(model.parameters(), lr=args.base_lr, momentum=0.9, weight_decay=0.0001)
+
+    # scheduler = StepLR(optimizer,step_size=100,gamma=0.999)
+    scheduler = PolyLRwithWarmup(optimizer,total_steps=args.max_iterations,warmup_steps=args.max_iterations * 0.01)
     # init summarywriter
     writer = SummaryWriter(snapshot_path + '/log')
 
@@ -209,40 +208,51 @@ if __name__ == '__main__':
     model.train()
 
     # ce_loss = BCEWithLogitsLoss()
-    ce_loss = CrossEntropyLoss()
+    ce_loss = BCEWithLogitsLoss()
     mse_loss = MSELoss()
 
 
     # 验证集
     # init dataset
-    val_dataset = SemiDataset(name='./dataset/semi_refuge400',
-                                    root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
-                                  # root="/home/gu721/yzc/data/odoc/REFUGE/",
+    val_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
+                                    # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
+                                  root="/home/gu721/yzc/data/odoc",
                                   mode='val',
                                   size=args.image_size)
-    val_labeledtrainloader = DataLoader(val_dataset,batch_size=1)
+
+    val_labeledtrainloader = DataLoader(val_dataset,batch_size=1,num_workers=args.num_works)
     val_iteriter = tqdm(val_labeledtrainloader)
 
 
     # 开始训练
     iterator = tqdm(range(max_epoch), ncols=70)
 
-    ODOC_val_metrics = ODOC_metrics('cuda')
-
+    ODOC_val_metrics = ODOC_metrics(device)
+    best_OD_DICE,best_OC_DICE = 0,0
     for epoch_num in iterator:
         time1 = time.time()
         for i_batch,(labeled_sampled_batch, unlabeled_sampled_batch) in enumerate(zip(labeledtrainloader,unlabeledtrainloader)):
             time2 = time.time()
 
-            unlabeled_batch, unlabel_label_batch = unlabeled_sampled_batch['image'].cuda(), unlabeled_sampled_batch['label'].cuda()
-            labeled_batch, label_label_batch = labeled_sampled_batch['image'].cuda(), labeled_sampled_batch['label'].cuda()
+            unlabeled_batch, unlabel_label_batch = unlabeled_sampled_batch['image'].to(device), unlabeled_sampled_batch['label'].to(device)
+            labeled_batch, label_label_batch = labeled_sampled_batch['image'].to(device), labeled_sampled_batch['label'].to(device)
 
             all_batch = torch.cat([labeled_batch,unlabeled_batch],dim=0)
             all_label_batch = torch.cat([label_label_batch,unlabel_label_batch],dim=0)
 
             out_dict = model(all_batch)
             outputs_tanh, outputs = out_dict["output_tanh_1"],out_dict["output1"]
-            outputs_soft = torch.softmax(outputs,dim=1)
+
+            outputs_tanh_od = outputs_tanh[:,0,...].unsqueeze(1)
+            outputs_tanh_oc = outputs_tanh[:,1,...].unsqueeze(1)
+
+            outputs_od = outputs[:,0,...].unsqueeze(1)
+            outputs_oc = outputs[:,1,...].unsqueeze(1)
+
+            outputs_soft = torch.sigmoid(outputs)
+
+            outputs_soft_od = outputs_soft[:,0,...].unsqueeze(1)
+            outputs_soft_oc = outputs_soft[:,1,...].unsqueeze(1)
 
             # calculate the loss
             # 这里需要注意，如果是分割三个类别以上，则需要分开计算dist和分开计算mse
@@ -252,48 +262,42 @@ if __name__ == '__main__':
                 od_all_label_batch = torch.zeros_like(all_label_batch)
                 oc_all_label_batch = torch.zeros_like(all_label_batch)
 
-                # od的区域选择可能会对后续产生影响
-                od_all_label_batch[all_label_batch > 0] = 1
-                # od_all_label_batch[all_label_batch == 1] = 1
-
-                oc_all_label_batch[all_label_batch > 1] = 1
+                # 这里的od选择可能回影响后续的任务
+                if args.od_rim:
+                    od_all_label_batch[all_label_batch == 1] = 1
+                else:
+                    od_all_label_batch[all_label_batch > 0] = 1
+                oc_all_label_batch[all_label_batch > 1] = args.oc_label
 
 
                 #luoxd的方法
                 od_gt_dis = compute_sdf_luoxd(od_all_label_batch[:].cpu().numpy(),outputs[:labeled_bs,0,...].shape)
-                od_gt_dis = torch.from_numpy(od_gt_dis).float().unsqueeze(1).cuda()
+                od_gt_dis = torch.from_numpy(od_gt_dis).float().unsqueeze(1).to(device)
                 oc_gt_dis = compute_sdf_luoxd(oc_all_label_batch[:].cpu().numpy(),outputs[:labeled_bs,0,...].shape)
-                oc_gt_dis = torch.from_numpy(oc_gt_dis).float().unsqueeze(1).cuda()
-
-                # Dual的方法
-                # od_gt_dis = compute_sdf(od_all_label_batch[:].cpu().numpy())
-                # od_gt_dis = torch.from_numpy(od_gt_dis).float().unsqueeze(1).cuda()
-                # oc_gt_dis = compute_sdf(oc_all_label_batch[:].cpu().numpy())
-                # oc_gt_dis = torch.from_numpy(oc_gt_dis).float().unsqueeze(1).cuda()
-                # od_gt_dis[od_gt_dis > 0] = 1
-                # oc_gt_dis[oc_gt_dis > 0] = 1
+                oc_gt_dis = torch.from_numpy(oc_gt_dis).float().unsqueeze(1).to(device)
 
 
-            # 计算gt_dis的mse损失, 第2个通道给OD，第三个通道给OC,对应原论文公式(6)
-            # loss_sdf = mse_loss(outputs_tanh[:labeled_bs, 1, ...], od_gt_dis) + mse_loss(outputs_tanh[:labeled_bs, 2, ...], oc_gt_dis)
-            # 期望第2个通道上的值与od_dist尽可能的相似
-            # 期望第3个通道上的值与oc_dist尽可能的像素
-            loss_sdf = mse_loss(outputs_tanh[:labeled_bs, 0, ...], od_gt_dis) + mse_loss(outputs_tanh[:labeled_bs, 1, ...], oc_gt_dis)
+            # 计算gt_dis的mse损失对应原论文公式(6)
+            loss_sdf = mse_loss(outputs_tanh_od[:labeled_bs, ...], od_gt_dis) + \
+                       mse_loss(outputs_tanh_oc[:labeled_bs, ...], oc_gt_dis)
 
-            loss_seg = ce_loss(
-                outputs[:labeled_bs, ...], all_label_batch[:labeled_bs])
-            loss_seg_dice = losses.dice_loss(
-                outputs_soft[:labeled_bs,...], all_label_batch[:labeled_bs].unsqueeze(1))
+            loss_seg = ce_loss(outputs_od[:labeled_bs,0, ...], od_all_label_batch[:labeled_bs].float()) + \
+                       ce_loss(outputs_oc[:labeled_bs,0, ...], oc_all_label_batch[:labeled_bs].float())
+
+            loss_seg_dice = losses.dice_loss(outputs_soft_od[:labeled_bs,...], od_all_label_batch[:labeled_bs].unsqueeze(1)) + \
+                            losses.dice_loss(outputs_soft_oc[:labeled_bs,...], oc_all_label_batch[:labeled_bs].unsqueeze(1))
+
             # 统一将水平集函数转化为mask
-            dis_to_mask = torch.sigmoid(-1500*outputs_tanh)
+            dis_to_mask_od = torch.sigmoid(-1500*outputs_tanh_od)
+            dis_to_mask_oc= torch.sigmoid(-1500*outputs_tanh_oc)
             # 原论文公式(4)
             # 计算包括了标记与未标记的部分
             # 这么做的目的是强制两个推理的一致性，一个专注像素级推理，另一个专注几何结构
             # dis_to_mask：(B,num_lcasses - 1,h,w)
             # outputs_soft：(B,num_lcasses ,h,w)
             #所以需要分开算
-            dis_to_mask = dis_to_mask.sum(dim=1)
-            consistency_loss = torch.mean((dis_to_mask - torch.argmax(outputs_soft,dim=1)) ** 2)
+            consistency_loss = torch.mean((dis_to_mask_od - outputs_soft_od) ** 2) + \
+                               torch.mean((dis_to_mask_oc - outputs_soft_oc) ** 2)
             supervised_loss = loss_seg_dice + args.beta * loss_sdf
             consistency_weight = get_current_consistency_weight(iter_num//150)
 
@@ -302,9 +306,10 @@ if __name__ == '__main__':
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            scheduler.step()
 
             iter_num = iter_num + 1
-            writer.add_scalar('lr', lr_, iter_num)
+            writer.add_scalar('lr', optimizer.param_groups[0]['lr'], iter_num)
             writer.add_scalar('loss/loss', loss, iter_num)
             writer.add_scalar('loss/loss_seg', loss_seg, iter_num)
             writer.add_scalar('loss/loss_dice', loss_seg_dice, iter_num)
@@ -325,11 +330,15 @@ if __name__ == '__main__':
                 image = all_batch[0]
                 writer.add_image('train/Image', image, iter_num)
 
-                image = torch.argmax(torch.softmax(outputs[0],dim=0),dim=0,keepdim=True)
+                image_od = (outputs_od > 0.5).to(torch.int8)
+                image_oc = (outputs_oc > 0.5).to(torch.int8)
+                image = image_od[0] + image_oc[0] * 2
                 image = image / (args.num_classes - 1)
                 writer.add_image('train/Predicted_label', image, iter_num)
 
-                image = dis_to_mask
+
+                image = dis_to_mask_od[0] + dis_to_mask_oc[0] * 2
+                image  = image / (args.num_classes - 1)
                 writer.add_image('train/Dis2Mask', image, iter_num)
 
                 image = outputs_tanh[0,0,...]
@@ -355,37 +364,75 @@ if __name__ == '__main__':
             # eval
             if iter_num % 100 == 0:
                 model.eval()
-                for data in val_iteriter:
-                    img,label = data['image'].cuda(),data['label'].cuda()
+                show_id = random.randint(0,len(val_iteriter))
+                for id,data in enumerate(val_iteriter):
+                    img,label = data['image'].to(device),data['label'].to(device)
                     out_dict = model(img)
                     outputs_tanh, outputs = out_dict["output_tanh_1"], out_dict["output1"]
+                    outputs_od,outputs_oc = outputs[:,0,...].unsqueeze(1),outputs[:,1,...].unsqueeze(1)
                     ODOC_val_metrics.add(outputs,label)
-                image = img[0]
-                writer.add_image('val/image', image, iter_num)
-                image = torch.argmax(torch.softmax(outputs[0],dim=0),dim=0,keepdim=True)
-                image = image / (args.num_classes - 1)
-                writer.add_image('val/pred', image, iter_num)
-                image = label
-                image = image / (args.num_classes - 1)
-                writer.add_image('val/Groundtruth_label',
-                                 image, iter_num)
+
+                    if id == show_id:
+                        image = img[0]
+                        writer.add_image('val/image', image, iter_num)
+                        image_od = (outputs_od > 0.5).to(torch.int8)
+                        image_oc = (outputs_oc > 0.5).to(torch.int8)
+                        image = image_od[0] + image_oc[0] * 2
+                        image = image / (args.num_classes - 1)
+                        writer.add_image('val/pred', image, iter_num)
+                        image = label
+                        image = image / (args.num_classes - 1)
+                        writer.add_image('val/Groundtruth_label',
+                                         image, iter_num)
+
                 Dice_IoU = ODOC_val_metrics.get_metrics()
+                OD_DICE,OD_IOU,OC_DICE,OC_IOU =  Dice_IoU['od_dice'],Dice_IoU['od_iou'],Dice_IoU['oc_dice'],Dice_IoU['oc_iou']
+                OD_BIOU,OC_BIOU =  Dice_IoU['od_biou'],Dice_IoU['oc_biou']
                 logging.info("OD_Dice:{}--OD_IoU:--{}--OC_Dice:{}--OC_IoU:--{}".format(
-                                                                                        Dice_IoU['od_dice'],
-                                                                                        Dice_IoU['od_iou'],
-                                                                                        Dice_IoU['oc_dice'],
-                                                                                        Dice_IoU['oc_iou'],
+                                                                                        OD_DICE,
+                                                                                        OD_IOU,
+                                                                                        OC_DICE,
+                                                                                       OC_IOU,
                                                                                        ))
-                writer.add_scalar('val/OD_Dice',Dice_IoU['od_dice'], iter_num)
-                writer.add_scalar('val/OD_IOU',Dice_IoU['od_iou'], iter_num)
-                writer.add_scalar('val/OC_Dice',Dice_IoU['oc_dice'], iter_num)
-                writer.add_scalar('val/OC_IOU',Dice_IoU['oc_iou'], iter_num)
+                writer.add_scalar('val/OD_Dice',OD_DICE, iter_num)
+                writer.add_scalar('val/OD_IOU',OD_IOU, iter_num)
+                writer.add_scalar('val/OD_BIOU',OD_BIOU, iter_num)
+                writer.add_scalar('val/OC_Dice',OC_DICE, iter_num)
+                writer.add_scalar('val/OC_IOU',OC_IOU, iter_num)
+                writer.add_scalar('val/OC_BIOU',OC_BIOU, iter_num)
+
+                if OD_DICE > best_OD_DICE:
+                    best_OD_DICE = OD_DICE
+                    name = "OD_DICE" + str(round(best_OD_DICE.item(), 4)) +'_iter_' + str(iter_num)  + '.pth'
+                    save_mode_path = os.path.join(
+                        snapshot_path, name)
+
+                    previous_files = glob.glob(os.path.join(snapshot_path, '*OD_DICE*.pth'))
+                    for file_path in previous_files:
+                        os.remove(file_path)
+
+                    torch.save(model.state_dict(), save_mode_path)
+                    logging.info("save model to {}".format(save_mode_path))
+
+                if OC_DICE > best_OC_DICE:
+                    best_OC_DICE = OC_DICE
+                    previous_files = glob.glob(os.path.join(snapshot_path, '*OC_DICE*.pth'))
+                    for file_path in previous_files:
+                        os.remove(file_path)
+                    name = "OC_DICE" + str(round(best_OC_DICE.item(), 4)) +'_iter_' + str(iter_num)  + '.pth'
+                    save_mode_path = os.path.join(
+                        snapshot_path, name)
+                    torch.save(model.state_dict(), save_mode_path)
+                    logging.info("save model to {}".format(save_mode_path))
+
+
+
                 model.train()
             # change lr
-            if iter_num % 2500 == 0:
-                lr_ = base_lr * 0.1 ** (iter_num // 2500)
-                for param_group in optimizer.param_groups:
-                    param_group['lr'] = lr_
+            # if iter_num % 2500 == 0:
+            #     lr_ = base_lr * 0.1 ** (iter_num // 2500)
+            #     for param_group in optimizer.param_groups:
+            #         param_group['lr'] = lr_
             if iter_num % 1000 == 0:
                 save_mode_path = os.path.join(
                     snapshot_path, 'iter_' + str(iter_num) + '.pth')

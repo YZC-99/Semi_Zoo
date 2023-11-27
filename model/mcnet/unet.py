@@ -379,9 +379,10 @@ class MCNet2d_tanh_v1(nn.Module):
 
 if __name__ == '__main__':
     # compute FLOPS & PARAMETERS
-    from ptflops import get_model_complexity_info
+    # from ptflops import get_model_complexity_info
     # model = UNet(in_chns=3, class_num=3)
-    model = MCNet2d_tanh_v1(in_chns=3, class_num=3)
+    # model = MCNet2d_tanh_v1(in_chns=3, class_num=3)
+    model = UNet(in_chns=3, class_num=3)
     # with torch.cuda.device(0):
     #   macs, params = get_model_complexity_info(model, (3, 256, 256), as_strings=True,
     #                                            print_per_layer_stat=True, verbose=True)

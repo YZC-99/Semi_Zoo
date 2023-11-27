@@ -1,6 +1,6 @@
 import torch
-from dataloader.transform import crop,test_blur, hflip,vflip, normalize, resize, blur, cutout,dist_transform,random_scale_and_crop
-from dataloader.transform import random_rotate,random_translate,add_salt_pepper_noise,random_scale,color_distortion
+from dataloader.transform import  hflip,vflip, normalize, resize, random_scale_and_crop
+from dataloader.transform import random_rotate,random_translate
 import cv2
 import math
 import os
@@ -47,8 +47,11 @@ class SemiDataset(Dataset):
         id = self.ids[item]
         img_path = os.path.join(self.root, id.split(' ')[0])
         img = Image.open(img_path)
-        mask_path = os.path.join(self.root, id.split(' ')[1])
-        mask = Image.open(mask_path)
+        if "DDR" in id or "G1020" in id or "ACRIMA" in id:
+            mask = Image.fromarray(np.zeros((2,2)))
+        else:
+            mask_path = os.path.join(self.root, id.split(' ')[1])
+            mask = Image.open(mask_path)
 
         if self.mode == 'semi_train':
             img, mask = hflip(img, mask, p=0.5)
@@ -58,6 +61,7 @@ class SemiDataset(Dataset):
 
         img, mask = resize(img, mask, self.size)
         img, mask = normalize(img, mask)
+
         # boundary = dist_transform(mask)
         # return {'image':img, 'label':mask,'boundary':boundary}
         return {'image':img, 'label':mask}
