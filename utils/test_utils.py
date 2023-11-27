@@ -53,7 +53,8 @@ class ODOC_metrics(object):
         self.od_binary_boundary_jaccard.update(od_pred[0,...],od_label)
         #oc
         oc_label = copy.deepcopy(label)
-        oc_label[oc_label > 1] = 1
+        oc_label[oc_label != 2] = 0
+        oc_label[oc_label != 0] = 1
 
         self.oc_dice_score.update(oc_pred[0,...],oc_label)
         self.oc_binary_jaccard.update(oc_pred[0,...],oc_label)
