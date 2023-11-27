@@ -28,8 +28,10 @@ class ODOC_metrics(object):
         #oc
         oc_pred = copy.deepcopy(pred)
         oc_label = copy.deepcopy(label)
-        oc_pred[oc_pred == 2] = 1
-        oc_label[oc_label == 2] = 1
+        oc_pred[oc_pred != 2] = 0
+        oc_pred[oc_pred != 0] = 1
+        oc_label[oc_label != 2] = 0
+        oc_label[oc_label != 0] = 1
         # self.od_dice_score.add_state(oc_pred,oc_label)
         # self.od_binary_jaccard.add_state(oc_pred,oc_label)
         self.oc_dice_score.update(oc_pred,oc_label)
