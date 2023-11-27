@@ -371,7 +371,7 @@ if __name__ == '__main__':
                     out_dict = model(img)
                     outputs_tanh, outputs = out_dict["output_tanh_1"], out_dict["output1"]
                     outputs_od,outputs_oc = outputs[:,0,...].unsqueeze(1),outputs[:,1,...].unsqueeze(1)
-                    ODOC_val_metrics.add(outputs,label,od_rim=args.od_rim)
+                    ODOC_val_metrics.add(outputs,label)
 
                     if id == show_id:
                         image = img[0]
