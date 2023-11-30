@@ -9,14 +9,19 @@ OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_supervised_2d_odoc_vessel.py \
 
 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_supervised_2d_odoc_vessel.py \
         --num_works 0 \
-        --device 1 \
+        --device 0 \
         --exp supervised/UNet_MiT_two_Decoder_RIM-ONE_Vessel_add \
         --fuse_type add \
-        --model UNet_MiT_two_Decoder \
-        --image_size 64 \
-        --batch_size 8 \
-        --labeled_bs 4 \
+        --model UNet_two_Decoder \
         --backbone b2
+
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_supervised_2d_odoc_vessel.py \
+        --num_works 0 \
+        --device 1 \
+        --exp supervised/UNet_ResNet_two_Decoder_RIM-ONE_Vessel_add \
+        --fuse_type add \
+        --model UNet_two_Decoder \
+        --backbone resnet50
 
 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_supervised_2d_odoc_vessel.py \
         --num_works 0 \
@@ -51,3 +56,11 @@ OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_supervised_2d.py \
         --exp supervised/UNet_ResNet_RIM-ONE \
         --model UNet_ResNet \
         --backbone resnet50
+
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_supervised_2d.py \
+        --num_works 0 \
+        --device 0 \
+        --exp supervised/UNet_ResNet_RIM-ONE \
+        --model UNet_ResNet \
+        --backbone resnet50 \
+        --ohem 0.5

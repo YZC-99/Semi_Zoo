@@ -75,9 +75,9 @@ def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type):
     elif model == 'UNet_MiT':
         return UNet_MiT(in_chns=in_chns, class_num=class_num1,phi=backbone,pretrained=True)
     elif model == 'UNet_two_Decoder':
-        return UNet_two_Decoder(in_chns=in_chns, class_num1=class_num1,class_num2=class_num2,fuse_type=fuse_type)
-    elif model == 'UNet_MiT_two_Decoder':
-        return UNet_MiT_two_Decoder(in_chns=in_chns, class_num1=class_num1,class_num2=class_num2,fuse_type=fuse_type)
+        return UNet_two_Decoder(in_chns=in_chns, class_num1=class_num1,class_num2=class_num2,phi=backbone,fuse_type=fuse_type)
+    # elif model == 'UNet_MiT_two_Decoder':
+    #     return UNet_MiT_two_Decoder(in_chns=in_chns, class_num1=class_num1,class_num2=class_num2,fuse_type=fuse_type)
 
 def get_vessel_loss_weight(iter):
     # 发现训练容易塌陷，所以考虑对vessel的权重进行退火衰减
@@ -178,11 +178,10 @@ if __name__ == '__main__':
     model.train()
 
     ce_loss_vessel = BCEWithLogitsLoss()
-    ce_loss_odoc = CrossEntropyLoss()
-    # if args.ohem > 0:
-    #     ce_loss = OhemCrossEntropy(thres=args.ohem,weight=torch.tensor([1.0,2.8,3.0],device=device))
-    # else:
-    #     ce_loss = CrossEntropyLoss(ignore_index=255)
+    if args.ohem > 0:
+        ce_loss_odoc = OhemCrossEntropy(thres=args.ohem,weight=torch.tensor([1.0,2.8,3.0],device=device))
+    else:
+        ce_loss_odoc = CrossEntropyLoss()
     # mse_loss = MSELoss()
 
 

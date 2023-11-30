@@ -409,41 +409,41 @@ class UNet_ResNet(nn.Module):
 
 
 
-class UNet_two_Decoder(nn.Module):
-    def __init__(self, in_chns, class_num1,class_num2,fuse_type=None):
-        super(UNet_two_Decoder, self).__init__()
-
-        params1 = {'in_chns': in_chns,
-                  'feature_chns': [16, 32, 64, 128, 256],
-                  'dropout': [0.05, 0.1, 0.2, 0.3, 0.5],
-                  'class_num': class_num2,
-                  'up_type': 1,
-                  'acti_func': 'relu'}
-        params2 = {'in_chns': in_chns,
-                  'feature_chns': [16, 32, 64, 128, 256],
-                  'dropout': [0.05, 0.1, 0.2, 0.3, 0.5],
-                  'class_num': class_num1,
-                  'up_type': 1,
-                  'acti_func': 'relu'}
-
-        self.fuse_type = fuse_type
-        self.encoder = Encoder(params1)
-        self.decoder1 = Decoder(params1)
-        if fuse_type == 'add':
-            self.decoder2 = Decoder_add_Decoder(params2)
-        elif fuse_type == 'cat':
-            self.decoder2 = Decoder_add_Decoder(params2)
-        else:
-            self.decoder2 = Decoder(params2)
-
-    def forward(self, x):
-        feature = self.encoder(x)
-        output_decoder1 = self.decoder1(feature)
-        if self.fuse_type is not None:
-            output_decoder2 = self.decoder2(feature,output_decoder1)
-        else:
-            output_decoder2 = self.decoder2(feature)
-        return output_decoder2[-1],output_decoder1[-1]
+# class UNet_two_Decoder(nn.Module):
+#     def __init__(self, in_chns, class_num1,class_num2,fuse_type=None):
+#         super(UNet_two_Decoder, self).__init__()
+#
+#         params1 = {'in_chns': in_chns,
+#                   'feature_chns': [16, 32, 64, 128, 256],
+#                   'dropout': [0.05, 0.1, 0.2, 0.3, 0.5],
+#                   'class_num': class_num2,
+#                   'up_type': 1,
+#                   'acti_func': 'relu'}
+#         params2 = {'in_chns': in_chns,
+#                   'feature_chns': [16, 32, 64, 128, 256],
+#                   'dropout': [0.05, 0.1, 0.2, 0.3, 0.5],
+#                   'class_num': class_num1,
+#                   'up_type': 1,
+#                   'acti_func': 'relu'}
+#
+#         self.fuse_type = fuse_type
+#         self.encoder = Encoder(params1)
+#         self.decoder1 = Decoder(params1)
+#         if fuse_type == 'add':
+#             self.decoder2 = Decoder_add_Decoder(params2)
+#         elif fuse_type == 'cat':
+#             self.decoder2 = Decoder_add_Decoder(params2)
+#         else:
+#             self.decoder2 = Decoder(params2)
+#
+#     def forward(self, x):
+#         feature = self.encoder(x)
+#         output_decoder1 = self.decoder1(feature)
+#         if self.fuse_type is not None:
+#             output_decoder2 = self.decoder2(feature,output_decoder1)
+#         else:
+#             output_decoder2 = self.decoder2(feature)
+#         return output_decoder2[-1],output_decoder1[-1]
 
 
 class UNet_MiT_two_Decoder(nn.Module):
@@ -495,6 +495,61 @@ class UNet_MiT_two_Decoder(nn.Module):
         else:
             output_decoder2 = self.decoder2(feature)
         return output_decoder2[-1],output_decoder1[-1]
+
+
+class UNet_two_Decoder(nn.Module):
+    def __init__(self, in_chns, class_num1,class_num2,phi='b2',fuse_type=None,pretrained=True):
+        super(UNet_two_Decoder, self).__init__()
+
+        self.phi = phi
+        self.in_channels = {
+            'b0': [32, 64, 160, 256], 'b1': [64, 128, 320, 512], 'b2': [64, 128, 320, 512],
+            'b3': [64, 128, 320, 512], 'b4': [64, 128, 320, 512], 'b5': [64, 128, 320, 512],
+            'resnet18': [64, 128, 256, 512], 'resnet34': [64, 128, 256, 512], 'resnet50': [256, 512, 1024, 2048],
+        }[phi]
+        self.encoder = {
+            'b0': mit_b0, 'b1': mit_b1, 'b2': mit_b2,
+            'b3': mit_b3, 'b4': mit_b4, 'b5': mit_b5,
+            'resnet18': resnet18, 'resnet34': resnet34, 'resnet50': resnet50,
+        }[phi](pretrained)
+
+        feature_chns = [32]
+        feature_chns.extend(self.in_channels)
+        params1 = {'in_chns': in_chns,
+                  'feature_chns': feature_chns,
+                  'dropout': [0.05, 0.1, 0.2, 0.3, 0.5],
+                  'class_num': class_num2,
+                  'up_type': 1,
+                  'acti_func': 'relu'}
+        params2 = {'in_chns': in_chns,
+                  'feature_chns': feature_chns,
+                  'dropout': [0.05, 0.1, 0.2, 0.3, 0.5],
+                  'class_num': class_num1,
+                  'up_type': 1,
+                  'acti_func': 'relu'}
+
+        self.fuse_type = fuse_type
+
+        self.decoder1 = Decoder4Segformer(params1)
+        if fuse_type == 'add':
+            self.decoder2 = Decoder4Segformer_add_Decoder(params2)
+        elif fuse_type == 'cat':
+            self.decoder2 = Decoder_add_Decoder(params2)
+        else:
+            self.decoder2 = Decoder(params2)
+
+    def forward(self, x):
+        if 'resnet' in self.phi:
+            feature = self.encoder.base_forward(x)
+        else:
+            feature = self.encoder.forward(x)
+        output_decoder1 = self.decoder1(feature)
+        if self.fuse_type is not None:
+            output_decoder2 = self.decoder2(feature,output_decoder1)
+        else:
+            output_decoder2 = self.decoder2(feature)
+        return output_decoder2[-1],output_decoder1[-1]
+
 
 
 if __name__ == '__main__':

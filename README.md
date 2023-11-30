@@ -27,6 +27,13 @@
 
 * [ ]  Dual Consistency Enabled Weakly and Semi-Supervised Optic Disc and Cup Segmentation with Dual Adaptive Graph Convolutional Networks(输入的数据格式有点多，待实现)
 
+# Tools
+
+* statistic_experiments.py
+  * 该工具可根据指定路径一键收集实验保存的pth文件以及该次实验的实验配置参数
+
+
+
 # TODO List
 
 * [ ]  调试DTC在多类别和2D场景中训练的细节
