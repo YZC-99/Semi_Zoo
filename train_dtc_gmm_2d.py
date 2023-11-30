@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss,MSELoss
 import torch.nn.functional as F
 from tensorboardX import SummaryWriter
-from model.mcnet.unet import MCNet2d_compete_v1,UNet_DTC2d,UNet_DTC_GMM2d
+from model.netwotks.unet import MCNet2d_compete_v1,UNet_DTC2d,UNet_DTC_GMM2d
 from utils import ramps,losses
 from utils.test_utils import ODOC_metrics
 from utils.gaussian import GMM,build_cur_cls_label,cal_protypes,cal_gmm_loss

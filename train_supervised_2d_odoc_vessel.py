@@ -13,8 +13,8 @@ from torch.cuda.amp import autocast,GradScaler
 import torch.nn.functional as F
 # from torch.utils.tensorboard import SummaryWriter
 from tensorboardX import SummaryWriter
-from model.mcnet.unet import UNet, MCNet2d_compete_v1,UNet_DTC2d
-from model.mcnet.unet_two_decoder import UNet_two_Decoder,UNet_MiT,UNet_MiT_two_Decoder
+from model.netwotks.unet import UNet, MCNet2d_compete_v1,UNet_DTC2d
+from model.netwotks.unet_two_decoder import UNet_two_Decoder,UNet_MiT,UNet_MiT_two_Decoder
 from utils import ramps,losses
 from utils.losses import OhemCrossEntropy
 from utils.test_utils import ODOC_metrics

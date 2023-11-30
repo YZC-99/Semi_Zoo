@@ -1,5 +1,5 @@
-from model.mcnet.unet import UNet, MCNet2d_v1, MCNet2d_v2, MCNet2d_v3
-from model.mcnet.VNet import VNet, MCNet3d_v1, MCNet3d_v2
+from model.netwotks.unet import UNet, MCNet2d_v1, MCNet2d_v2, MCNet2d_v3
+from model.netwotks.VNet import VNet, MCNet3d_v1, MCNet3d_v2
 
 def net_factory(net_type="unet", in_chns=1, class_num=4, mode = "train"):
     if net_type == "unet":
