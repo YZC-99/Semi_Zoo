@@ -14,7 +14,7 @@ import torch.nn.functional as F
 # from torch.utils.tensorboard import SummaryWriter
 from tensorboardX import SummaryWriter
 from model.mcnet.unet import UNet, MCNet2d_compete_v1,UNet_DTC2d
-from model.mcnet.unet_two_decoder import UNet_two_Decoder,UNet_MiT,UNet_ResNet
+from model.mcnet.unet_two_decoder import UNet_two_Decoder,UNet_MiT,UNet_MiT_two_Decoder
 from utils import ramps,losses
 from utils.losses import OhemCrossEntropy
 from utils.test_utils import ODOC_metrics
@@ -34,9 +34,13 @@ parser.add_argument('--device',type=int,default=0)
 parser.add_argument('--num_works',type=int,default=0)
 parser.add_argument('--model',type=str,default='unet')
 parser.add_argument('--backbone',type=str,default='b2')
+parser.add_argument('--fuse_type',type=str,default=None)
 parser.add_argument('--lr_decouple',action='store_true')
 
-parser.add_argument('--exp',type=str,default='supervised/RIM-ONE')
+# parser.add_argument('--exp',type=str,default='supervised/RIM-ONE_Vessel')
+parser.add_argument('--exp',type=str,default='demo')
+
+
 parser.add_argument('--save_period',type=int,default=5000)
 parser.add_argument('--val_period',type=int,default=100)
 
@@ -47,54 +51,38 @@ parser.add_argument('--optim',type=str,default='AdamW')
 parser.add_argument('--amp',type=bool,default=True)
 parser.add_argument('--num_classes',type=int,default=3)
 parser.add_argument('--base_lr',type=float,default=0.005)
+parser.add_argument('--vessel_loss_weight',type=float,default=0.1)
 
 parser.add_argument('--batch_size',type=int,default=16)
-parser.add_argument('--labeled_bs',type=int,default=16)
+parser.add_argument('--labeled_bs',type=int,default=8)
 
-parser.add_argument('--od_rim',type=bool,default=True)
 parser.add_argument('--oc_label',type=int,default=2)
 parser.add_argument('--image_size',type=int,default=256)
 
-parser.add_argument('--labeled_num',type=int,default=100,help="5%:100,")
-parser.add_argument('--total_num',type=int,default=11249,help="SEG:2859;SEG_add_DDR:11249")
+parser.add_argument('--labeled_num',type=int,default=111,help="RIM-ONE:111")
+parser.add_argument('--total_num',type=int,default=156,help="HRF:45")
 
 
 parser.add_argument('--scale_num',type=int,default=2)
 parser.add_argument('--max_iterations',type=int,default=10000)
 
 parser.add_argument('--ohem',type=float,default=-1.0)
-parser.add_argument('--with_dice',type=bool,default=False)
 
-parser.add_argument('--beta', type=float,  default=0.3,
-                    help='balance factor to control regional and sdm loss')
-parser.add_argument('--consistency', type=float,
-                    default=1.0, help='consistency')
-parser.add_argument('--consistency_type', type=str,
-                    default="kl", help='consistency_type')
-parser.add_argument('--consistency_rampup', type=float,
-                    default=40.0, help='consistency_rampup')
-
-parser.add_argument('--cps_la_weight_final', type=float,  default=0.1)
-parser.add_argument('--cps_la_rampup_scheme', type=str,  default='None', help='cps_la_rampup_scheme')
-parser.add_argument('--cps_la_rampup',type=float,  default=40.0)
-parser.add_argument('--cps_la_with_dice',type=bool,default=False)
-
-parser.add_argument('--cps_un_weight_final', type=float,  default=0.1, help='consistency')
-parser.add_argument('--cps_un_rampup_scheme', type=str,  default='None', help='cps_rampup_scheme')
-parser.add_argument('--cps_un_rampup', type=float,  default=40.0, help='cps_rampup')
-parser.add_argument('--cps_un_with_dice', type=bool,  default=True, help='cps_un_with_dice')
 
 def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type):
     if model == "UNet":
         return UNet(in_chns=in_chns,class_num=class_num1)
-    elif model == 'UNet_ResNet':
-        return UNet_ResNet(in_chns=in_chns, class_num=class_num1, phi=backbone, pretrained=True)
     elif model == 'UNet_MiT':
-        return UNet_MiT( in_chns=in_chns, class_num=class_num1,phi=backbone,pretrained=True)
+        return UNet_MiT(in_chns=in_chns, class_num=class_num1,phi=backbone,pretrained=True)
     elif model == 'UNet_two_Decoder':
-        return UNet_two_Decoder( in_chns=in_chns, class_num1=class_num1,class_num2=class_num2,fuse_type=fuse_type)
+        return UNet_two_Decoder(in_chns=in_chns, class_num1=class_num1,class_num2=class_num2,fuse_type=fuse_type)
+    elif model == 'UNet_MiT_two_Decoder':
+        return UNet_MiT_two_Decoder(in_chns=in_chns, class_num1=class_num1,class_num2=class_num2,fuse_type=fuse_type)
 
-
+def get_vessel_loss_weight(iter):
+    # 发现训练容易塌陷，所以考虑对vessel的权重进行退火衰减
+    weight = args.vessel_loss_weight * ( 1 - iter / args.max_iterations)
+    return weight
 
 
 def create_version_folder(snapshot_path):
@@ -143,23 +131,41 @@ if __name__ == '__main__':
     logging.info(str(args))
 
     # init model
-    model = build_model(model=args.model,backbone=args.backbone,in_chns=3,class_num1=args.num_classes,class_num2=2,fuse_type=None)
+
+    model = build_model(model=args.model,backbone=args.backbone,in_chns=3,class_num1=args.num_classes,class_num2=2,fuse_type=args.fuse_type)
     model.to(device)
 
     # init dataset
-    labeled_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
+    odoc_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
                                   root="/home/gu721/yzc/data/odoc/{}".format(args.dataset_name),
                                   mode='semi_train',
                                   size=args.image_size,
-                                  id_path='train.txt')
+                                  id_path='train_addHRF.txt')
+
+    vessel_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
+                                  root="/home/gu721/yzc/data/vessel/{}".format(''),
+                                  mode='semi_train',
+                                  size=args.image_size,
+                                  id_path='train_addHRF.txt')
+
+    odoc_idxs = list(range(args.labeled_num))
+    vessel_idxs = list(range(args.labeled_num,args.total_num))
+
+    odoc_batch_sampler = LabeledBatchSampler(odoc_idxs,labeled_bs)
+    vessel_batch_sampler = UnlabeledBatchSampler(vessel_idxs, args.batch_size - args.labeled_bs)
+
+    # init dataloader
+    def worker_init_fn(worker_id):
+        random.seed(args.seed + worker_id)
+    odoc_trainloader = DataLoader(odoc_dataset,batch_sampler = odoc_batch_sampler, num_workers=args.num_works, pin_memory=True,worker_init_fn=worker_init_fn)
+    vessel_trainloader = DataLoader(vessel_dataset,batch_sampler = vessel_batch_sampler, num_workers=args.num_works, pin_memory=True,worker_init_fn=worker_init_fn)
 
 
-    labeledtrainloader = DataLoader(labeled_dataset,batch_size=args.batch_size, num_workers=args.num_works, pin_memory=True,)
 
     model.train()
     # init optimizer
+    # init optimizer
     optimizer = get_optimizer(model=model,name=args.optim,base_lr=args.base_lr,lr_decouple=args.lr_decouple)
-
 
     # scheduler = StepLR(optimizer,step_size=100,gamma=0.999)
     scheduler = PolyLRwithWarmup(optimizer,total_steps=args.max_iterations,warmup_steps=args.max_iterations * 0.01)
@@ -167,15 +173,16 @@ if __name__ == '__main__':
     writer = SummaryWriter(snapshot_path + '/log')
 
     iter_num = 0
-    max_epoch = args.max_iterations // len(labeledtrainloader) + 1
+    max_epoch = args.max_iterations // len(odoc_trainloader) + 1
     lr_ = args.base_lr
     model.train()
 
-    # ce_loss = BCEWithLogitsLoss()
-    if args.ohem > 0:
-        ce_loss = OhemCrossEntropy(thres=args.ohem,weight=torch.tensor([1.0,2.8,3.0],device=device))
-    else:
-        ce_loss = CrossEntropyLoss(ignore_index=255)
+    ce_loss_vessel = BCEWithLogitsLoss()
+    ce_loss_odoc = CrossEntropyLoss()
+    # if args.ohem > 0:
+    #     ce_loss = OhemCrossEntropy(thres=args.ohem,weight=torch.tensor([1.0,2.8,3.0],device=device))
+    # else:
+    #     ce_loss = CrossEntropyLoss(ignore_index=255)
     # mse_loss = MSELoss()
 
 
@@ -198,24 +205,31 @@ if __name__ == '__main__':
     best_OD_DICE,best_OC_DICE = 0,0
     for epoch_num in iterator:
         time1 = time.time()
-        for i_batch,labeled_sampled_batch in enumerate(labeledtrainloader):
+        for i_batch,(odoc_sampled_batch,vessel_sampled_batch) in enumerate(zip(odoc_trainloader,vessel_trainloader)):
             time2 = time.time()
 
-            labeled_batch, label_label_batch = labeled_sampled_batch['image'].to(device), labeled_sampled_batch['label'].to(device)
+            odoc_labeled_batch, odoc_label_batch = odoc_sampled_batch['image'].to(device), odoc_sampled_batch['label'].to(device)
+            vessel_labeled_batch, vessel_label_batch = vessel_sampled_batch['image'].to(device), vessel_sampled_batch['label'].to(device)
 
-            all_batch = labeled_batch
-            all_label_batch = label_label_batch
-            all_label_batch[all_label_batch > 2] = 0
+            # od_all_label_batch = torch.zeros_like(odoc_label_batch)
+            # oc_all_label_batch = torch.zeros_like(odoc_label_batch)
+            # od_all_label_batch[odoc_label_batch > 0] = 1
+            # oc_all_label_batch[odoc_label_batch > 1] = 1
 
-            outputs = model(all_batch)
 
-            # calculate the loss
-            # 这里需要注意，如果是分割三个类别以上，则需要分开计算dist和分开计算mse
-            outputs_soft = torch.argmax(outputs,dim=1)
-            loss_seg_ce = ce_loss(outputs,all_label_batch)
-            # loss_seg_dice = losses.dice_loss(outputs_soft,all_label_batch)
-            # loss = loss_seg_ce + loss_seg_dice
-            loss = loss_seg_ce
+            all_batch = torch.cat([odoc_labeled_batch,vessel_labeled_batch],dim=0)
+
+            outputs_odoc,outputs_vessel = model(all_batch)
+
+            # calculate the loss of od and oc
+            odoc_label_batch[odoc_label_batch > 2] = 0
+            loss_seg_ce_odoc = ce_loss_odoc(outputs_odoc[:labeled_bs,...],odoc_label_batch)
+
+            loss_seg_ce_vessel = ce_loss_vessel(outputs_vessel[labeled_bs:,0, ...], vessel_label_batch.float())
+
+
+            loss = loss_seg_ce_odoc + get_vessel_loss_weight(iter_num) * loss_seg_ce_vessel
+            # loss = loss_seg_ce_odoc + loss_seg_ce_vessel
             # loss =  loss_seg_dice
 
             optimizer.zero_grad()
@@ -226,27 +240,40 @@ if __name__ == '__main__':
             iter_num = iter_num + 1
             writer.add_scalar('lr', optimizer.param_groups[0]['lr'], iter_num)
             writer.add_scalar('loss/loss', loss, iter_num)
-            writer.add_scalar('loss/loss_seg', loss_seg_ce, iter_num)
-            # writer.add_scalar('loss/loss_dice', loss_seg_dice, iter_num)
+            writer.add_scalar('loss/vessel_loss_weight', get_vessel_loss_weight(iter_num), iter_num)
+            writer.add_scalar('loss/loss_seg_ce_odoc', loss_seg_ce_odoc, iter_num)
+            writer.add_scalar('loss/loss_seg_ce_vessel', loss_seg_ce_vessel, iter_num)
 
             logging.info(
                 'iteration %d : loss : %f' %
                 (iter_num, loss.item()))
             writer.add_scalar('loss/loss', loss, iter_num)
             logging.info('iteration %d : loss : %f' % (iter_num, loss.item()))
-            logging.info('iteration %d : loss_seg : %f' % (iter_num, loss_seg_ce.item()))
-            # logging.info('iteration %d : loss_dice : %f' % (iter_num, loss_seg_dice.item()))
+            logging.info('iteration %d : loss_seg_ce_odoc : %f' % (iter_num, loss_seg_ce_odoc.item()))
+            logging.info('iteration %d : loss_seg_ce_vessel : %f' % (iter_num, loss_seg_ce_vessel.item()))
 
             if iter_num % 50 == 0:
                 image = all_batch[0]
                 writer.add_image('train/Image', image, iter_num)
 
-                image = torch.argmax(outputs,dim=1)
+
+                image = torch.argmax(outputs_vessel,dim=1)
+                image = image[0]
+                writer.add_image('train/Predicted_label_vessel', image.unsqueeze(0), iter_num)
+
+                image = vessel_label_batch[0].unsqueeze(0)
+                image = image / 2
+                print("vessel")
+                print(torch.unique(image))
+                writer.add_image('train/Groundtruth_label_vessel',
+                                 image, iter_num)
+
+                image = torch.argmax(outputs_odoc,dim=1)
                 image = image[0] / (args.num_classes - 1)
                 writer.add_image('train/Predicted_label', image.unsqueeze(0), iter_num)
 
 
-                image = all_label_batch[0].unsqueeze(0)
+                image = odoc_label_batch[0].unsqueeze(0)
                 image = image / (args.num_classes - 1)
                 writer.add_image('train/Groundtruth_label',
                                  image, iter_num)
@@ -258,14 +285,14 @@ if __name__ == '__main__':
                 show_id = random.randint(0,len(val_iteriter))
                 for id,data in enumerate(val_iteriter):
                     img,label = data['image'].to(device),data['label'].to(device)
-                    outputs = model(img)
+                    outputs_odoc,_ = model(img)
 
-                    ODOC_val_metrics.add_multi_class(outputs,label)
+                    ODOC_val_metrics.add_multi_class(outputs_odoc,label)
 
                     if id == show_id:
                         image = img[0]
                         writer.add_image('val/image', image, iter_num)
-                        image = torch.argmax(outputs,dim=1)
+                        image = torch.argmax(outputs_odoc,dim=1)
                         image = image[0] / (args.num_classes - 1)
                         writer.add_image('val/pred', image.unsqueeze(0), iter_num)
                         image = label

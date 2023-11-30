@@ -16,9 +16,10 @@
 ## 目前支持的网络
 
 * U-Net
-
-* [ ]  U-Net(ResNet as encoder)
-* [ ]  Segformer
+* U-Net(ResNet as encoder)
+* U-Net(Mit as encoder)
+* Segformer
+* U-Net_two_Decoder
 
 ## 目前支持的半监督学习方案
 

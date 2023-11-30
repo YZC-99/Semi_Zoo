@@ -1,7 +1,6 @@
 from torchmetrics import JaccardIndex,Dice
 from utils.my_metrics import BoundaryIoU
 import torch
-import copy
 
 class ODOC_metrics(object):
     def __init__(self,device):
@@ -16,24 +15,18 @@ class ODOC_metrics(object):
     def add_multi_class(self,outputs,label):
         pred = torch.argmax(outputs,dim=1)
         #包含oc的od
-        od_pred = copy.deepcopy(pred)
-        od_label = copy.deepcopy(label)
-        od_pred[od_pred > 0] = 1
-        od_label[od_label > 0] = 1
-        # self.od_dice_score.add_state(od_pred,od_label)
-        # self.od_binary_jaccard.add_state(od_pred,od_label)
+        od_pred = torch.zeros_like(pred)
+        od_label = torch.zeros_like(label)
+        od_pred[pred > 0] = 1
+        od_label[label > 0] = 1
         self.od_dice_score.update(od_pred,od_label)
         self.od_binary_jaccard.update(od_pred,od_label)
         self.od_binary_boundary_jaccard.update(od_pred,od_label)
         #oc
-        oc_pred = copy.deepcopy(pred)
-        oc_label = copy.deepcopy(label)
-        oc_pred[oc_pred != 2] = 0
-        oc_pred[oc_pred != 0] = 1
-        oc_label[oc_label != 2] = 0
-        oc_label[oc_label != 0] = 1
-        # self.od_dice_score.add_state(oc_pred,oc_label)
-        # self.od_binary_jaccard.add_state(oc_pred,oc_label)
+        oc_pred = torch.zeros_like(pred)
+        oc_label = torch.zeros_like(label)
+        oc_pred[pred == 2] = 1
+        oc_label[label == 2] = 1
         self.oc_dice_score.update(oc_pred,oc_label)
         self.oc_binary_jaccard.update(oc_pred,oc_label)
         self.oc_binary_boundary_jaccard.update(oc_pred,oc_label)
@@ -47,16 +40,15 @@ class ODOC_metrics(object):
         od_pred = od_pred + oc_pred
         od_pred[od_pred > 0] = 1
         #包含oc的od
-        od_label = copy.deepcopy(label)
-        od_label[od_label > 0] = 1
+        od_label = torch.zeros_like(label)
+        od_label[label > 0] = 1
 
         self.od_dice_score.update(od_pred[0,...],od_label)
         self.od_binary_jaccard.update(od_pred[0,...],od_label)
         self.od_binary_boundary_jaccard.update(od_pred[0,...],od_label)
         #oc
-        oc_label = copy.deepcopy(label)
-        oc_label[oc_label != 2] = 0
-        oc_label[oc_label != 0] = 1
+        oc_label = torch.zeros_like(label)
+        oc_label[label == 2] = 1
 
         self.oc_dice_score.update(oc_pred[0,...],oc_label)
         self.oc_binary_jaccard.update(oc_pred[0,...],oc_label)

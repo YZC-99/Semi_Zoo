@@ -1,23 +1,53 @@
-#并行执行
-python train_dtc_2d.py --exp semi/SEG_addDDR_5_od_not-rim --od_rim False --device 0 &
-python train_dtc_2d.py --exp semi/SEG_addDDR_5_od_rim --od_rim True --device 1 &
 
-wait
-
-#等待上面两个并行执行结束后，再并行执行
-python train_dtc_2d.py --exp semi/SEG_addDDR_5_od_not-rim_oc-label-2 --oc_label 2 --od_rim False --device 0 &
-python train_dtc_2d.py --exp semi/SEG_addDDR_5_od_not-rim_oc-label-1 --oc_label 1 --od_rim False --device 1
-
-
-python train_dtc_2d.py --exp semi/SEG_addDDR_5_od_rim_outchannel-minus1 --outchannel_minus1 True --od_rim True --device 0
-
-python train_dtc_2d.py --exp semi/SEG_addDDR_5_od_rim_outchannel-minus1_oc-label1 --oc_label 1 --outchannel_minus1 True --od_rim True --device 1
-
-python train_dtc_2d.py --exp semi/SEG_addDDR_5_od_not-rim_outchannel-minus1_oc-label1 --oc_label 1 --device 0
-
-python train_dtc_2d.py --exp semi/SEG_addDDR_5_od_rim_outchannel-minus1_oc-label1 --oc_label 1 --od_rim True --device 1
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_supervised_2d_odoc_vessel.py \
+        --num_works 0 \
+        --device 0 \
+        --exp supervised/RIM-ONE_Vessel_add \
+        --fuse_type add
 
 
 
-# supervised
-python train_supervised_2d.py  --device 0
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_supervised_2d_odoc_vessel.py \
+        --num_works 0 \
+        --device 1 \
+        --exp supervised/UNet_MiT_two_Decoder_RIM-ONE_Vessel_add \
+        --fuse_type add \
+        --model UNet_MiT_two_Decoder \
+        --image_size 64 \
+        --batch_size 8 \
+        --labeled_bs 4 \
+        --backbone b2
+
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_supervised_2d_odoc_vessel.py \
+        --num_works 0 \
+        --device 0 \
+        --exp supervised/RIM-ONE_Vessel_None
+
+
+
+
+########################
+
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_supervised_2d.py \
+        --num_works 0 \
+        --device 0 \
+        --exp supervised/UNet_MiT_RIM-ONE \
+        --model UNet_MiT \
+        --backbone b2
+
+
+
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_supervised_2d.py \
+        --num_works 0 \
+        --device 0 \
+        --exp supervised/UNet_lr-decouple_MiT_RIM-ONE \
+        --model UNet_MiT \
+        --lr_decouple \
+        --backbone b2
+
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_supervised_2d.py \
+        --num_works 0 \
+        --device 1 \
+        --exp supervised/UNet_ResNet_RIM-ONE \
+        --model UNet_ResNet \
+        --backbone resnet50

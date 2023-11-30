@@ -4,7 +4,6 @@ import random
 import torch
 from torchvision import transforms
 from dataloader.boundary_utils import class2one_hot,one_hot2dist
-import cv2
 
 
 
@@ -58,8 +57,8 @@ def random_scale_and_crop(img, mask, target_size=(256, 256), min_scale=0.8, max_
 def random_rotate(img, mask, p=0.5, max_rotation_angle=90):
     if random.random() < p:
         rotation_angle = random.uniform(-max_rotation_angle, max_rotation_angle)
-        img = img.rotate(rotation_angle, resample=Image.BILINEAR, expand=True)
-        mask = mask.rotate(rotation_angle, resample=Image.NEAREST, expand=True)
+        img = img.rotate(rotation_angle, resample=Image.BILINEAR)
+        mask = mask.rotate(rotation_angle, resample=Image.NEAREST)
 
     return img, mask
 
@@ -90,10 +89,6 @@ def normalize(img, mask=None,mean=[0.0,0.0,0.0],std=[1.0,1.0,1.0]):
     """
     img = transforms.Compose([
         transforms.ToTensor(),
-        # transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-        # transforms.Normalize([151.818,74.596,23.749], [28.438,15.263 ,5.225]),
-        # Mean: [151.81788834  74.5958448   23.74884842]
-        # Std: [28.43763701 15.26303392  5.22472751]
         transforms.Normalize((0.0,), (1.0,))
     ])(img)
     if mask is not None:

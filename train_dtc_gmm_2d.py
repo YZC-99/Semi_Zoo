@@ -7,21 +7,17 @@ import glob
 import argparse
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from torch.optim.lr_scheduler import StepLR,LambdaLR
 from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss,MSELoss
-from torch.cuda.amp import autocast,GradScaler
 import torch.nn.functional as F
-# from torch.utils.tensorboard import SummaryWriter
 from tensorboardX import SummaryWriter
-from model.mcnet.unet import MCNet2d_compete_v1,UNet_DTC2d
+from model.mcnet.unet import MCNet2d_compete_v1,UNet_DTC2d,UNet_DTC_GMM2d
 from utils import ramps,losses
 from utils.test_utils import ODOC_metrics
+from utils.gaussian import GMM,build_cur_cls_label,cal_protypes,cal_gmm_loss
 import random
 from utils.util import PolyLRwithWarmup, compute_sdf,compute_sdf_luoxd,compute_sdf_multi_class
 import time
-import logging
 import os
-import shutil
 import logging
 import sys
 
@@ -35,7 +31,7 @@ parser.add_argument('--num_works',type=int,default=4)
 parser.add_argument('--backbone',type=str,default='resnet34')
 parser.add_argument('-h5','--h5_file',action = 'store_true')
 
-parser.add_argument('--exp',type=str,default='semi/SEG_addDDR_5_odrim')
+parser.add_argument('--exp',type=str,default='semi/SEG_addDDR_5_GMM')
 parser.add_argument('--save_period',type=int,default=5000)
 
 parser.add_argument('--dataset_name',type=str,default='SEG')
@@ -60,6 +56,7 @@ parser.add_argument('--total_num',type=int,default=10449,help="SEG:2059;SEG_add_
 parser.add_argument('--scale_num',type=int,default=2)
 parser.add_argument('--max_iterations',type=int,default=10000)
 
+parser.add_argument('--gmm4unlabeld',type=bool,default=True)
 parser.add_argument('--with_dice',type=bool,default=False)
 
 parser.add_argument('--beta', type=float,  default=0.3,
@@ -166,7 +163,7 @@ if __name__ == '__main__':
 
     # init model
     scale_num = 2
-    model = UNet_DTC2d(in_chns=3,class_num=args.num_classes,outchannel_minus1 = False)
+    model = UNet_DTC_GMM2d(in_chns=3,class_num=args.num_classes,outchannel_minus1 = args.outchannel_minus1)
     model.to(device)
 
     # init dataset
@@ -245,7 +242,7 @@ if __name__ == '__main__':
             all_label_batch = torch.cat([label_label_batch,unlabel_label_batch],dim=0)
 
             out_dict = model(all_batch)
-            outputs_tanh, outputs = out_dict["output_tanh_1"],out_dict["output1"]
+            outputs_tanh, outputs,feat = out_dict["output_tanh_1"],out_dict["output1"],out_dict["feat"]
 
             outputs_tanh_od = outputs_tanh[:,0,...].unsqueeze(1)
             outputs_tanh_oc = outputs_tanh[:,1,...].unsqueeze(1)
@@ -305,7 +302,62 @@ if __name__ == '__main__':
             supervised_loss = loss_seg_dice + args.beta * loss_sdf + loss_seg
             consistency_weight = get_current_consistency_weight(iter_num//150)
 
-            loss = supervised_loss + consistency_weight * consistency_loss
+
+            if args.gmm4unlabeld:
+                # Gaussian
+                # 从dit中转化为伪标签
+                pseudo_mask_1 = dis_to_mask_od[labeled_bs:,...] + dis_to_mask_oc[labeled_bs:,...] * 2
+                pseudo_mask_1[pseudo_mask_1 > 2] = 2
+                pseudo_mask_1 = pseudo_mask_1.long().squeeze()
+
+                #预测出来的伪标签
+                image_od = (outputs_od[labeled_bs:,...] > 0.5).to(torch.int8)
+                image_oc = (outputs_oc[labeled_bs:,...] > 0.5).to(torch.int8)
+                pseudo_mask_2 = image_od + image_oc * 2
+                pseudo_mask_2[pseudo_mask_2 > 2] = 2
+                pseudo_mask_2 = pseudo_mask_2.long().squeeze()
+
+                # 取交集,只有pseudo_mask_1和pseudo_mask_2在同一个位置上都为1的时候才给pseudo_mask赋值为1
+                pseudo_mask = torch.zeros_like(pseudo_mask_1)
+                pseudo_mask[(pseudo_mask_1 == 1) & (pseudo_mask_2 == 1)] = 1
+                pseudo_mask[(pseudo_mask_1 == 2) & (pseudo_mask_2 == 2)] = 2
+                # pseudo_mask = pseudo_mask_1
+                cur_cls_label = build_cur_cls_label(pseudo_mask, args.num_classes)# (B,num_classes,1,1)
+                # TODO 从代码中得知，仅为了拿到形状,所以选择谁不重要
+                pred_cl = outputs_soft[labeled_bs:,...]
+
+                unlabeled_feat = feat[labeled_bs:,...]
+                # proto_loss
+                # vec (B,num_classes,channels),这里的channels是指feat的通道数
+                vecs, unlabled_proto_loss = cal_protypes(unlabeled_feat, pseudo_mask, args.num_classes)
+                # TODO 可能考虑将OD和OC的GMM分开实现
+                unlabeled_pred = outputs[labeled_bs:,...]
+                res = GMM(unlabeled_feat, vecs, pred_cl, pseudo_mask, cur_cls_label)
+                # 损失崩坏可能出现在这里
+                gmm_loss = cal_gmm_loss(unlabeled_pred.softmax(1), res, cur_cls_label,
+                                        pseudo_mask)
+
+            else:
+                # 取交集,只有pseudo_mask_1和pseudo_mask_2在同一个位置上都为1的时候才给pseudo_mask赋值为1
+                pseudo_mask =label_label_batch
+                # pseudo_mask = pseudo_mask_1
+                cur_cls_label = build_cur_cls_label(pseudo_mask, args.num_classes)  # (B,num_classes,1,1)
+                # TODO 从代码中得知，仅为了拿到形状,所以选择谁不重要
+                pred_cl = outputs_soft[:labeled_bs, ...]
+
+                unlabeled_feat = feat[:labeled_bs, ...]
+                # proto_loss
+                # vec (B,num_classes,channels),这里的channels是指feat的通道数
+                vecs, unlabled_proto_loss = cal_protypes(unlabeled_feat, pseudo_mask, args.num_classes)
+                # TODO 可能考虑将OD和OC的GMM分开实现
+                unlabeled_pred = outputs[:labeled_bs, ...]
+                res = GMM(unlabeled_feat, vecs, pred_cl, pseudo_mask, cur_cls_label)
+                # 损失崩坏可能出现在这里
+                gmm_loss = cal_gmm_loss(unlabeled_pred.softmax(1), res, cur_cls_label,
+                                        pseudo_mask)
+
+            #+ unlabled_proto_loss 这个损失函数很快降到0，因此先不用它
+            loss = supervised_loss + consistency_weight * consistency_loss + gmm_loss
 
             optimizer.zero_grad()
             loss.backward()
@@ -320,8 +372,9 @@ if __name__ == '__main__':
             writer.add_scalar('loss/loss_hausdorff', loss_sdf, iter_num)
             writer.add_scalar('loss/consistency_weight',
                               consistency_weight, iter_num)
-            writer.add_scalar('loss/consistency_loss',
-                              consistency_loss, iter_num)
+            writer.add_scalar('loss/consistency_loss',consistency_loss, iter_num)
+            writer.add_scalar('loss/unlabled_proto_loss',unlabled_proto_loss, iter_num)
+            writer.add_scalar('loss/gmm_loss',gmm_loss, iter_num)
 
             logging.info(
                 'iteration %d : loss : %f, loss_consis: %f, loss_haus: %f, loss_seg: %f, loss_dice: %f' %

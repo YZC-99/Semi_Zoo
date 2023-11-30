@@ -3,6 +3,8 @@ import cv2
 import torch
 import torch.nn.functional as F
 import torchmetrics
+cv2.ocl.setUseOpenCL(False)   #设置opencv不使用多进程运行，但这句命令只在本作用域有效。
+cv2.setNumThreads(0)  #设置opencv不使用多进程运行，但这句命令只在本作用域有效。
 
 
 def gt2boundary(gt, ignore_label=-1):  # gt NHW
@@ -19,7 +21,7 @@ def gt2boundary(gt, ignore_label=-1):  # gt NHW
 
     return gt_combine > 0
 
-def mask_to_boundary(mask, boundary_size=4, dilation_ratio=0.02):
+def mask_to_boundary(mask, boundary_size=5, dilation_ratio=0.02):
     h, w = mask.shape
     img_diag = np.sqrt(h ** 2 + w ** 2)
     dilation = int(round(dilation_ratio * img_diag))
@@ -76,6 +78,8 @@ class BoundaryIoU(torchmetrics.Metric):
                 preds[i], boundary_size=self.boundary_size,
             )
             boundary_preds = torch.Tensor(boundary_preds).int().to(self.iou.device)
+            boundary_preds[boundary_preds > 1] = 0
+            boundary_target[boundary_target > 1] = 0
             self.iou(boundary_preds, boundary_target)
 
     def compute(self):

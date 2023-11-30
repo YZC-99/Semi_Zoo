@@ -140,4 +140,69 @@ def DDR_Cropped():
         for image_file in image_files:
             image_path = image_file.replace(root, '')
             f.write(f"{image_path} {image_path.replace('.jpg','.png')}\n")
-ACRIMA()
+
+def SEG_h5():
+    data_path = "/home/gu721/yzc/data/odoc/SEG2859_h5/"  # 数据路径
+    save_path = '/home/gu721/yzc/data/odoc/SEG2859_h5/all_index.txt'
+
+    with open(save_path, 'w') as f:
+
+        for root,dir,files in os.walk(data_path):
+            if len(files) > 0:
+                if '.h5' in files[0]:
+                    for i in files:
+                        f.write(f"{i}\n")
+
+def DDR_h5():
+    data_path = "/home/gu721/yzc/data/odoc/DDR_h5/"  # 数据路径
+    save_path = "/home/gu721/yzc/data/odoc/ddr_h5_all_index.txt"
+
+    with open(save_path, 'w') as f:
+
+        for root,dir,files in os.walk(data_path):
+            if len(files) > 0:
+                if '.h5' in files[0]:
+                    for i in files:
+                        f.write(f"{i}\n")
+
+def CHASEDB1():
+    data_path = "/home/gu721/yzc/data/vessel/CHASEDB1/"  # 数据路径
+
+    images_dir = os.path.join(data_path, 'images_cropped')  # 图像文件夹路径
+
+    save_path = data_path + '/index.txt'
+    ground_truths_dir = os.path.join(data_path, 'gts_cropped')  # ground_truths文件夹路径
+    # 获取images文件夹下的文件列表
+    image_files = [os.path.join(images_dir, file) for file in os.listdir(images_dir) if file.endswith('.jpg') or file.endswith('.JPG')]
+    # 获取ground_truths文件夹下对应的文件列表
+    ground_truth_files = [os.path.join(ground_truths_dir, file) for file in os.listdir(ground_truths_dir) if
+                          file.endswith('.png')]
+    # 确保两个文件列表长度相同
+    confirm_length(image_files, ground_truth_files)
+    #     创建index.txt文件并写入内容
+
+    with open(save_path, 'w') as f:
+        for image_file in image_files:
+            ground_truth_path = image_file.replace('images_cropped', 'gts_cropped').replace('jpg', 'png').replace('JPG', 'png')
+            f.write(f"{image_file} {ground_truth_path}\n")
+def HRF():
+    data_path = "/home/gu721/yzc/data/vessel/HRF/"  # 数据路径
+
+    images_dir = os.path.join(data_path, 'images_cropped')  # 图像文件夹路径
+
+    save_path = data_path + '/index.txt'
+    ground_truths_dir = os.path.join(data_path, 'gts_cropped')  # ground_truths文件夹路径
+    # 获取images文件夹下的文件列表
+    image_files = [os.path.join(images_dir, file) for file in os.listdir(images_dir) if file.endswith('.jpg') or file.endswith('.JPG')]
+    # 获取ground_truths文件夹下对应的文件列表
+    ground_truth_files = [os.path.join(ground_truths_dir, file) for file in os.listdir(ground_truths_dir) if
+                          file.endswith('.tif')]
+    # 确保两个文件列表长度相同
+    confirm_length(image_files, ground_truth_files)
+    #     创建index.txt文件并写入内容
+
+    with open(save_path, 'w') as f:
+        for image_file in image_files:
+            ground_truth_path = image_file.replace('images_cropped', 'gts_cropped').replace('jpg', 'tif').replace('JPG', 'tif')
+            f.write(f"{image_file} {ground_truth_path}\n")
+HRF()
