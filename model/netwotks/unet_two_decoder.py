@@ -5,6 +5,7 @@ The implementation is borrowed from: https://github.com/HiLab-git/PyMIC
 from __future__ import division, print_function
 from model.backbone.mit import mit_b0, mit_b1, mit_b2, mit_b3, mit_b4, mit_b5
 from model.backbone.resnet import resnet18,resnet34,resnet50,resnet101,resnet152
+from model.compare_modules.rtb import RTB
 import torch.nn.functional as F
 import torch
 import torch.nn as nn
@@ -104,29 +105,65 @@ class UpBlock(nn.Module):
 
 class UpBlock_3input(nn.Module):
     """Upssampling followed by ConvBlock"""
-    def __init__(self, in_channels1, in_channels2,in_channels3, out_channels, dropout_p, mode_upsampling=1):
-        super(UpBlock, self).__init__()
+    def __init__(self, in_channels1, in_channels2,in_channels3, out_channels, dropout_p, mode_upsampling=1,backbone='b2'):
+        super(UpBlock_3input, self).__init__()
         self.mode_upsampling = mode_upsampling
+        self.backbone = backbone
         if mode_upsampling==0:
-            self.up = nn.ConvTranspose2d(in_channels1, in_channels2,in_channels3, kernel_size=2, stride=2)
+            self.up = nn.ConvTranspose2d(in_channels1, in_channels2, kernel_size=2, stride=2)
         elif mode_upsampling==1:
-            self.conv1x1 = nn.Conv2d(in_channels1, in_channels2,in_channels3, kernel_size=1)
+            self.conv1x1 = nn.Conv2d(in_channels1, in_channels2, kernel_size=1)
             self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
         elif mode_upsampling==2:
-            self.conv1x1 = nn.Conv2d(in_channels1, in_channels2,in_channels3, kernel_size=1)
+            self.conv1x1 = nn.Conv2d(in_channels1, in_channels2, kernel_size=1)
             self.up = nn.Upsample(scale_factor=2, mode='nearest')
         elif mode_upsampling==3:
-            self.conv1x1 = nn.Conv2d(in_channels1, in_channels2,in_channels3, kernel_size=1)
+            self.conv1x1 = nn.Conv2d(in_channels1, in_channels2, kernel_size=1)
             self.up = nn.Upsample(scale_factor=2, mode='bicubic', align_corners=True)
-        self.conv = ConvBlock(in_channels2 * 2, out_channels, dropout_p)
+        self.conv = ConvBlock(in_channels2 * 3, out_channels, dropout_p)
 
     def forward(self, x1,x2,x3):
-        if self.mode_upsampling != 0:
-            x1 = self.conv1x1(x1)
-        x1 = self.up(x1)
-        x = torch.cat([x3,x2, x1], dim=1)
-        x = self.conv(x)
+        if self.backbone in ['b2','b4']:
+            if self.mode_upsampling != 0:
+                x1 = self.conv1x1(x1)
+            x1 = self.up(x1)
+            x3 = self.up(x3)
+            x = torch.cat([x3,x2, x1], dim=1)
+            x = self.conv(x)
+        elif self.backbone in ['resnet50','resnet34']:
+            if self.mode_upsampling != 0:
+                x1 = self.conv1x1(x1)
+            if x1.size()[-2:] != x2.size()[-2:]:
+                x1 = self.up(x1)
+            if x3.size()[-2:] != x2.size()[-2:]:
+                x3 = self.up(x3)
+            x = torch.cat([x3,x2, x1], dim=1)
+            x = self.conv(x)
+        else:
+            if self.mode_upsampling != 0:
+                x1 = self.conv1x1(x1)
+            if x1.size()[-2:] != x2.size()[-2:]:
+                x1 = self.up(x1)
+            x = torch.cat([x3,x2, x1], dim=1)
+            x = self.conv(x)
         return x
+
+class Double_UpBlock_3input(nn.Module):
+    """Upssampling followed by ConvBlock"""
+    def __init__(self, in_channels,out_channels):
+        super(Double_UpBlock_3input, self).__init__()
+        self.up = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels, kernel_size=1),
+            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
+            nn.BatchNorm2d(in_channels),
+            nn.Conv2d(in_channels, out_channels, kernel_size=1),
+            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
+        )
+    def forward(self, x1,x2,x3):
+        x = torch.cat([x3,x2, x1], dim=1)
+        x = self.up(x)
+        return x
+
 
 
 class Encoder(nn.Module):
@@ -218,7 +255,7 @@ class Decoder4Segformer(nn.Module):
         return [x_up1,x_up2,x_up3,x_up4,output]
 
 class Decoder4Segformer_add_Decoder(nn.Module):
-    def __init__(self, params):
+    def __init__(self, params,backbone = 'mit'):
         super(Decoder4Segformer_add_Decoder, self).__init__()
         self.params = params
         self.in_chns = self.params['in_chns']
@@ -226,6 +263,7 @@ class Decoder4Segformer_add_Decoder(nn.Module):
         self.n_class = self.params['class_num']
         self.up_type = self.params['up_type']
         assert (len(self.ft_chns) == 5)
+
 
         self.up1 = UpBlock(self.ft_chns[4], self.ft_chns[3], self.ft_chns[3], dropout_p=0.0, mode_upsampling=self.up_type)
         self.up2 = UpBlock(self.ft_chns[3], self.ft_chns[2], self.ft_chns[2], dropout_p=0.0, mode_upsampling=self.up_type)
@@ -265,6 +303,113 @@ class Decoder4Segformer_add_Decoder(nn.Module):
         output = self.out_conv(x_up4)
         return [x_up1,x_up2,x_up3,x_up4,output]
 
+
+class Decoder4Segformer_cat_Decoder(nn.Module):
+    def __init__(self, params,backbone = 'b2'
+                                         ''):
+        super(Decoder4Segformer_cat_Decoder, self).__init__()
+        self.params = params
+        self.in_chns = self.params['in_chns']
+        self.ft_chns = self.params['feature_chns']
+        self.n_class = self.params['class_num']
+        self.up_type = self.params['up_type']
+        assert (len(self.ft_chns) == 5)
+
+        self.up1 = UpBlock_3input(self.ft_chns[4], self.ft_chns[3],self.ft_chns[3],self.ft_chns[3],
+                                  dropout_p=0.0, mode_upsampling=self.up_type,backbone=backbone)
+        self.up2 = UpBlock_3input(self.ft_chns[3], self.ft_chns[2],self.ft_chns[2],self.ft_chns[2],
+                                  dropout_p=0.0, mode_upsampling=self.up_type,backbone=backbone)
+        self.up3 = UpBlock_3input(self.ft_chns[2], self.ft_chns[1],self.ft_chns[1],self.ft_chns[1],
+                                  dropout_p=0.0, mode_upsampling=self.up_type,backbone=backbone)
+
+        if backbone in ['resnet50']:
+            self.up4 = Double_UpBlock_3input(self.ft_chns[1] + self.ft_chns[0] * 2, self.ft_chns[0])
+        else:
+            self.up4 = Double_UpBlock_3input(self.ft_chns[1] * 2,self.ft_chns[0])
+
+
+        self.out_conv = nn.Conv2d(self.ft_chns[0], self.n_class, kernel_size=3, padding=1)
+    def forward(self, feature,decoder_feature):
+        x1 = feature[0]
+        x2 = feature[1]
+        x3 = feature[2]
+        x4 = feature[3]
+
+        other_up1 = F.interpolate(decoder_feature[0], size=x4.size()[2:], mode='bilinear')
+        other_up2 = F.interpolate(decoder_feature[1], size=x3.size()[2:], mode='bilinear')
+        other_up3 = F.interpolate(decoder_feature[2], size=x2.size()[2:], mode='bilinear')
+        other_up4 = F.interpolate(decoder_feature[3], size=x1.size()[2:], mode='bilinear')
+
+
+
+        x_up1 = self.up1(x4, x3 , other_up1)
+
+        x_up2 = self.up2(x_up1, x2 , other_up2)
+
+        x_up3 = self.up3(x_up2, x1 , other_up3)
+
+        x_up4 = self.up4(x_up3 , other_up4,other_up4)
+
+
+        output = self.out_conv(x_up4)
+        return [x_up1,x_up2,x_up3,x_up4,output]
+
+class Decoder4Segformer_rtb_Decoder(nn.Module):
+    def __init__(self, params,rbt_layer = 4):
+        super(Decoder4Segformer_rtb_Decoder, self).__init__()
+        self.params = params
+        self.in_chns = self.params['in_chns']
+        self.ft_chns = self.params['feature_chns']
+        self.n_class = self.params['class_num']
+        self.up_type = self.params['up_type']
+        assert (len(self.ft_chns) == 5)
+
+
+        self.up1 = UpBlock(self.ft_chns[4], self.ft_chns[3], self.ft_chns[3], dropout_p=0.0, mode_upsampling=self.up_type)
+        self.up2 = UpBlock(self.ft_chns[3], self.ft_chns[2], self.ft_chns[2], dropout_p=0.0, mode_upsampling=self.up_type)
+        self.up3 = UpBlock(self.ft_chns[2], self.ft_chns[1], self.ft_chns[1], dropout_p=0.0, mode_upsampling=self.up_type)
+        self.up4 = nn.Sequential(
+            nn.Conv2d(self.ft_chns[1], self.ft_chns[1], kernel_size=1),
+            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
+            nn.BatchNorm2d(self.ft_chns[1]),
+            nn.Conv2d(self.ft_chns[1], self.ft_chns[0], kernel_size=1),
+            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
+        )
+
+        self.rbt_layer = rbt_layer
+        self.rbt = RTB(self.ft_chns[4 - rbt_layer])
+
+        self.out_conv = nn.Conv2d(self.ft_chns[0] , self.n_class, kernel_size=3, padding=1)
+    def forward(self, feature,decoder_feature):
+        x1 = feature[0]
+        x2 = feature[1]
+        x3 = feature[2]
+        x4 = feature[3]
+
+        x_up1 = self.up1(x4, x3)
+        if self.rbt_layer == 1:
+            other_up1 = F.interpolate(decoder_feature[0], size=x_up1.size()[2:], mode='bilinear')
+            x_up1 = self.rbt(x_up1,other_up1)
+
+
+        x_up2 = self.up2(x_up1, x2)
+        if self.rbt_layer == 2:
+            other_up2 = F.interpolate(decoder_feature[1], size=x_up2.size()[2:], mode='bilinear')
+            x_up2 = self.rbt(x_up2,other_up2)
+
+
+        x_up3 = self.up3(x_up2, x1)
+        if self.rbt_layer == 3:
+            other_up3 = F.interpolate(decoder_feature[2], size=x_up3.size()[2:], mode='bilinear')
+            x_up3= self.rbt(x_up3,other_up3)
+
+        x_up4 = self.up4(x_up3)
+        if self.rbt_layer == 4:
+            other_up4 = F.interpolate(decoder_feature[3], size=x_up4.size()[2:], mode='bilinear')
+            x_up4 = self.rbt(x_up4,other_up4)
+
+        output = self.out_conv(x_up4)
+        return [x_up1,x_up2,x_up3,x_up4,output]
 
 
 class Decoder_add_Decoder(nn.Module):
@@ -319,10 +464,10 @@ class Decoder_cat_Decoder(nn.Module):
         self.up_type = self.params['up_type']
         assert (len(self.ft_chns) == 5)
 
-        self.up1 = UpBlock_3input(self.ft_chns[4], self.ft_chns[3], self.ft_chns[3],self.ft_chns[3], dropout_p=0.0, mode_upsampling=self.up_type)
-        self.up2 = UpBlock_3input(self.ft_chns[3], self.ft_chns[2], self.ft_chns[2],self.ft_chns[2], dropout_p=0.0, mode_upsampling=self.up_type)
-        self.up3 = UpBlock_3input(self.ft_chns[2], self.ft_chns[1], self.ft_chns[1],self.ft_chns[1], dropout_p=0.0, mode_upsampling=self.up_type)
-        self.up4 = UpBlock_3input(self.ft_chns[1], self.ft_chns[0], self.ft_chns[0],self.ft_chns[0], dropout_p=0.0, mode_upsampling=self.up_type)
+        self.up1 = UpBlock_3input(self.ft_chns[4], self.ft_chns[3], self.ft_chns[3],self.ft_chns[3], dropout_p=0.0, mode_upsampling=self.up_type,backbone='org')
+        self.up2 = UpBlock_3input(self.ft_chns[3], self.ft_chns[2], self.ft_chns[2],self.ft_chns[2], dropout_p=0.0, mode_upsampling=self.up_type,backbone='org')
+        self.up3 = UpBlock_3input(self.ft_chns[2], self.ft_chns[1], self.ft_chns[1],self.ft_chns[1], dropout_p=0.0, mode_upsampling=self.up_type,backbone='org')
+        self.up4 = UpBlock_3input(self.ft_chns[1], self.ft_chns[0], self.ft_chns[0],self.ft_chns[0], dropout_p=0.0, mode_upsampling=self.up_type,backbone='org')
         self.out_conv = nn.Conv2d(self.ft_chns[0], self.n_class, kernel_size=3, padding=1)
 
     def forward(self, feature,decoder_feature):
@@ -505,16 +650,25 @@ class UNet_two_Decoder(nn.Module):
         self.in_channels = {
             'b0': [32, 64, 160, 256], 'b1': [64, 128, 320, 512], 'b2': [64, 128, 320, 512],
             'b3': [64, 128, 320, 512], 'b4': [64, 128, 320, 512], 'b5': [64, 128, 320, 512],
-            'resnet18': [64, 128, 256, 512], 'resnet34': [64, 128, 256, 512], 'resnet50': [256, 512, 1024, 2048],
+            'resnet18': [64, 128, 256, 512], 'resnet34': [64, 128, 256, 512],
+            'resnet50': [256, 512, 1024, 2048],'resnet101': [256, 512, 1024, 2048],
+            'org': [16, 32, 64, 128, 256],
         }[phi]
+
         self.encoder = {
             'b0': mit_b0, 'b1': mit_b1, 'b2': mit_b2,
             'b3': mit_b3, 'b4': mit_b4, 'b5': mit_b5,
-            'resnet18': resnet18, 'resnet34': resnet34, 'resnet50': resnet50,
+            'resnet18': resnet18, 'resnet34': resnet34,
+            'resnet50': resnet50, 'resnet101': resnet101,
+            'org': resnet50,
         }[phi](pretrained)
 
-        feature_chns = [32]
-        feature_chns.extend(self.in_channels)
+        if phi == 'org':
+            feature_chns = self.in_channels
+        else:
+            feature_chns = [32]
+            feature_chns.extend(self.in_channels)
+
         params1 = {'in_chns': in_chns,
                   'feature_chns': feature_chns,
                   'dropout': [0.05, 0.1, 0.2, 0.3, 0.5],
@@ -530,13 +684,26 @@ class UNet_two_Decoder(nn.Module):
 
         self.fuse_type = fuse_type
 
-        self.decoder1 = Decoder4Segformer(params1)
-        if fuse_type == 'add':
-            self.decoder2 = Decoder4Segformer_add_Decoder(params2)
-        elif fuse_type == 'cat':
-            self.decoder2 = Decoder_add_Decoder(params2)
+        if phi == 'org':
+            self.encoder = Encoder(params1)
+            self.decoder1 = Decoder(params1)
+            if fuse_type == 'add':
+                self.decoder2 = Decoder_add_Decoder(params2)
+            elif fuse_type == 'cat':
+                self.decoder2 = Decoder_cat_Decoder(params2)
+            else:
+                self.decoder2 = Decoder(params2)
         else:
-            self.decoder2 = Decoder(params2)
+            self.decoder1 = Decoder4Segformer(params1)
+            if fuse_type == 'add':
+                self.decoder2 = Decoder4Segformer_add_Decoder(params2)
+            elif fuse_type == 'cat':
+                self.decoder2 = Decoder4Segformer_cat_Decoder(params2,backbone = phi)
+            elif 'rtb' in fuse_type:
+                rbt_layer = int(fuse_type.split('rtb')[-1])
+                self.decoder2 = Decoder4Segformer_rtb_Decoder(params2,rbt_layer=rbt_layer)
+            else:
+                self.decoder2 = Decoder4Segformer(params2)
 
     def forward(self, x):
         if 'resnet' in self.phi:
@@ -544,7 +711,7 @@ class UNet_two_Decoder(nn.Module):
         else:
             feature = self.encoder.forward(x)
         output_decoder1 = self.decoder1(feature)
-        if self.fuse_type is not None:
+        if self.fuse_type in ['add','cat','rtb1','rtb2','rtb3','rtb4'] :
             output_decoder2 = self.decoder2(feature,output_decoder1)
         else:
             output_decoder2 = self.decoder2(feature)
@@ -566,9 +733,9 @@ if __name__ == '__main__':
     # import ipdb; ipdb.set_trace()
     input_data = torch.randn(2,3,256,256,dtype=torch.float32)
     # model = UNet_MiT(in_chns=3, class_num=3,pretrained=False)
-    model = UNet_ResNet(in_chns=3, class_num=3,pretrained=False)
-    out = model(input_data)
+    # model = UNet_ResNet(in_chns=3, class_num=3,pretrained=False)
+    # out = model(input_data)
 
-    # model = UNet_MiT_two_Decoder(in_chns=3, class_num1=3,class_num2=2,pretrained=False,fuse_type='add')
-    # out,_ = model(input_data)
+    model = UNet_two_Decoder(in_chns=3, class_num1=3,class_num2=2,phi='b2',pretrained=False,fuse_type='rtb1')
+    out,_ = model(input_data)
     print(out.shape)

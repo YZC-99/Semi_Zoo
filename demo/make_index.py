@@ -205,4 +205,18 @@ def HRF():
         for image_file in image_files:
             ground_truth_path = image_file.replace('images_cropped', 'gts_cropped').replace('jpg', 'tif').replace('JPG', 'tif')
             f.write(f"{image_file} {ground_truth_path}\n")
-HRF()
+
+
+def IDRID():
+    data_path = "/home/gu721/yzc/data/dr/IDRID/"  # 数据路径
+    save_path = "/home/gu721/yzc/data/dr/IDRID/all_index.txt"
+    img_path = []
+    for root,dir,files in os.walk(data_path):
+        if 'images' in root:
+            img_path.extend([os.path.join(root,i) for i in files])
+    with open(save_path,'w') as f:
+        for i in img_path:
+            name = i.replace(data_path,'')
+            f.write(name + ' ' + name.replace('.jpg','_fuse.png').replace('images','labels_fused') + '\n')
+
+IDRID()

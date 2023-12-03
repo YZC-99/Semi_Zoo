@@ -14,12 +14,10 @@ import torch.nn.functional as F
 # from torch.utils.tensorboard import SummaryWriter
 from tensorboardX import SummaryWriter
 from model.netwotks.unet import UNet, MCNet2d_compete_v1,UNet_DTC2d
-from model.netwotks.segformer import SegFormer
-from model.netwotks.deeplabv3plus import DeepLabV3Plus
 from model.netwotks.unet_two_decoder import UNet_two_Decoder,UNet_MiT,UNet_ResNet
 from utils import ramps,losses
 from utils.losses import OhemCrossEntropy
-from utils.test_utils import ODOC_metrics
+from utils.test_utils import DR_metrics
 import random
 from utils.util import get_optimizer,PolyLRwithWarmup, compute_sdf,compute_sdf_luoxd,compute_sdf_multi_class
 import time
@@ -38,24 +36,24 @@ parser.add_argument('--model',type=str,default='unet')
 parser.add_argument('--backbone',type=str,default='b2')
 parser.add_argument('--lr_decouple',action='store_true')
 
-parser.add_argument('--exp',type=str,default='supervised/RIM-ONE')
+parser.add_argument('--exp',type=str,default='IDRID')
 parser.add_argument('--save_period',type=int,default=5000)
 parser.add_argument('--val_period',type=int,default=100)
 
-parser.add_argument('--dataset_name',type=str,default='RIM-ONE')
+parser.add_argument('--dataset_name',type=str,default='IDRID')
 parser.add_argument('--unlabeled_txt',type=str,default='unlabeled_addDDR.txt')
 
 parser.add_argument('--optim',type=str,default='AdamW')
 parser.add_argument('--amp',type=bool,default=True)
-parser.add_argument('--num_classes',type=int,default=3)
-parser.add_argument('--base_lr',type=float,default=0.005)
+parser.add_argument('--num_classes',type=int,default=5)
+parser.add_argument('--base_lr',type=float,default=0.0001)
 
-parser.add_argument('--batch_size',type=int,default=16)
+parser.add_argument('--batch_size',type=int,default=4)
 parser.add_argument('--labeled_bs',type=int,default=16)
 
 parser.add_argument('--od_rim',type=bool,default=True)
 parser.add_argument('--oc_label',type=int,default=2)
-parser.add_argument('--image_size',type=int,default=256)
+parser.add_argument('--image_size',type=int,default=1024)
 
 parser.add_argument('--labeled_num',type=int,default=100,help="5%:100,")
 parser.add_argument('--total_num',type=int,default=11249,help="SEG:2859;SEG_add_DDR:11249")
@@ -65,8 +63,7 @@ parser.add_argument('--scale_num',type=int,default=2)
 parser.add_argument('--max_iterations',type=int,default=10000)
 
 parser.add_argument('--ohem',type=float,default=-1.0)
-parser.add_argument('--with_ce',action='store_false')
-parser.add_argument('--with_dice',action='store_true')
+parser.add_argument('--with_dice',type=bool,default=False)
 
 parser.add_argument('--beta', type=float,  default=0.3,
                     help='balance factor to control regional and sdm loss')
@@ -94,10 +91,6 @@ def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type):
         return UNet_ResNet(in_chns=in_chns, class_num=class_num1, phi=backbone, pretrained=True)
     elif model == 'UNet_MiT':
         return UNet_MiT( in_chns=in_chns, class_num=class_num1,phi=backbone,pretrained=True)
-    elif model == 'Segformer':
-        return SegFormer(num_classes=class_num1,phi=backbone,pretrained=True)
-    elif model == 'Deeplabv3+':
-        return DeepLabV3Plus(backbone=backbone,nclass=class_num1)
     elif model == 'UNet_two_Decoder':
         return UNet_two_Decoder( in_chns=in_chns, class_num1=class_num1,class_num2=class_num2,fuse_type=fuse_type)
 
@@ -123,16 +116,13 @@ def create_version_folder(snapshot_path):
 
 
 args = parser.parse_args()
-snapshot_path = "./exp_2d/" + args.exp + "/"
+snapshot_path = "./exp_2d_dr/" + args.exp + "/"
 max_iterations = args.max_iterations
 base_lr = args.base_lr
 labeled_bs = args.labeled_bs
 
 
 if __name__ == '__main__':
-    assert args.with_ce  or args.with_dice,"ce 和 dice至少有一个！！！！！"
-
-
     """
     1、搜寻snapshot_path下面的含有version的文件夹，如果没有就创建version0，即：
     snapshot_path = snapshot_path + "/" + "version0"
@@ -158,7 +148,7 @@ if __name__ == '__main__':
 
     # init dataset
     labeled_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
-                                  root="/home/gu721/yzc/data/odoc/{}".format(args.dataset_name),
+                                  root="/home/gu721/yzc/data/dr/{}".format(args.dataset_name),
                                   mode='semi_train',
                                   size=args.image_size,
                                   id_path='train.txt')
@@ -186,7 +176,6 @@ if __name__ == '__main__':
         ce_loss = OhemCrossEntropy(thres=args.ohem,weight=torch.tensor([1.0,2.8,3.0],device=device))
     else:
         ce_loss = CrossEntropyLoss(ignore_index=255)
-
     # mse_loss = MSELoss()
 
 
@@ -205,8 +194,8 @@ if __name__ == '__main__':
     # 开始训练
     iterator = tqdm(range(max_epoch), ncols=70)
 
-    ODOC_val_metrics = ODOC_metrics(device)
-    best_OD_DICE,best_OC_DICE = 0,0
+    DR_val_metrics = DR_metrics(device)
+    AUC = {}
     for epoch_num in iterator:
         time1 = time.time()
         for i_batch,labeled_sampled_batch in enumerate(labeledtrainloader):
@@ -223,16 +212,11 @@ if __name__ == '__main__':
             # calculate the loss
             # 这里需要注意，如果是分割三个类别以上，则需要分开计算dist和分开计算mse
             outputs_soft = torch.argmax(outputs,dim=1)
-
             loss_seg_ce = ce_loss(outputs,all_label_batch)
-
-            if args.with_dice:
-                loss_seg_dice = losses.dice_loss(outputs_soft,all_label_batch)
-                loss = loss_seg_ce + loss_seg_dice
-            else:
-                loss = loss_seg_ce
-            if not args.with_ce:
-                loss_seg_ce = torch.zeros(1)
+            # loss_seg_dice = losses.dice_loss(outputs_soft,all_label_batch)
+            # loss = loss_seg_ce + loss_seg_dice
+            loss = loss_seg_ce
+            # loss =  loss_seg_dice
 
             optimizer.zero_grad()
             loss.backward()
@@ -243,8 +227,7 @@ if __name__ == '__main__':
             writer.add_scalar('lr', optimizer.param_groups[0]['lr'], iter_num)
             writer.add_scalar('loss/loss', loss, iter_num)
             writer.add_scalar('loss/loss_seg', loss_seg_ce, iter_num)
-            if args.with_dice:
-                writer.add_scalar('loss/loss_dice', loss_seg_dice, iter_num)
+            # writer.add_scalar('loss/loss_dice', loss_seg_dice, iter_num)
 
             logging.info(
                 'iteration %d : loss : %f' %
@@ -252,22 +235,31 @@ if __name__ == '__main__':
             writer.add_scalar('loss/loss', loss, iter_num)
             logging.info('iteration %d : loss : %f' % (iter_num, loss.item()))
             logging.info('iteration %d : loss_seg : %f' % (iter_num, loss_seg_ce.item()))
-            if args.with_dice:
-                logging.info('iteration %d : loss_dice : %f' % (iter_num, loss_seg_dice.item()))
+            # logging.info('iteration %d : loss_dice : %f' % (iter_num, loss_seg_dice.item()))
 
-            if iter_num % 50 == 0:
+            if iter_num % 1 == 0:
                 image = all_batch[0]
                 writer.add_image('train/Image', image, iter_num)
 
                 image = torch.argmax(outputs,dim=1)
-                image = image[0] / (args.num_classes - 1)
-                writer.add_image('train/Predicted_label', image.unsqueeze(0), iter_num)
+                # image = image[0] / (args.num_classes - 1)
+                image = image[0]
+                # 将单通道张量转换为 RGB 通道
+                w,h = image.size()
+                image_rgb = torch.zeros(3, w,h)
+                for i in range(3):
+                    image_rgb[i, :, :] = (image == i).float()
+                writer.add_image('train/Predicted_label', image_rgb, iter_num)
 
 
-                image = all_label_batch[0].unsqueeze(0)
-                image = image / (args.num_classes - 1)
+                image = all_label_batch[0]
+                w,h = image.size()
+                image_rgb = torch.zeros(3, w,h)
+                for i in range(3):
+                    image_rgb[i, :, :] = (image == i).float()
+                # image = image / (args.num_classes - 1)
                 writer.add_image('train/Groundtruth_label',
-                                 image, iter_num)
+                                 image_rgb, iter_num)
 
 
             # eval
@@ -278,7 +270,7 @@ if __name__ == '__main__':
                     img,label = data['image'].to(device),data['label'].to(device)
                     outputs = model(img)
 
-                    ODOC_val_metrics.add_multi_class(outputs,label)
+                    DR_val_metrics.add(outputs,label)
 
                     if id == show_id:
                         image = img[0]
@@ -291,54 +283,24 @@ if __name__ == '__main__':
                         writer.add_image('val/Groundtruth_label',
                                          image, iter_num)
 
-                Dice_IoU = ODOC_val_metrics.get_metrics()
-                OD_DICE,OD_IOU,OC_DICE,OC_IOU =  Dice_IoU['od_dice'],Dice_IoU['od_iou'],Dice_IoU['oc_dice'],Dice_IoU['oc_iou']
-                OD_BIOU,OC_BIOU =  Dice_IoU['od_biou'],Dice_IoU['oc_biou']
-                logging.info("OD_Dice:{}--OD_IoU:--{}--OC_Dice:{}--OC_IoU:--{}".format(
-                                                                                        OD_DICE,
-                                                                                        OD_IOU,
-                                                                                        OC_DICE,
-                                                                                       OC_IOU,
+                val_metrics = DR_val_metrics.get_metrics()
+                AUC = val_metrics[0]
+                MA_auc, HE_auc, EX_auc, SE_auc = AUC['MA_auc'],AUC['HE_auc'],AUC['EX_auc'],AUC['SE_auc']
+
+
+
+                logging.info("MA_auc:{}--HE_auc:--{}--EX_auc:{}--SE_auc:--{}".format(
+                                                                                        MA_auc,
+                                                                                        HE_auc,
+                                                                                        EX_auc,
+                                                                                       SE_auc,
                                                                                        ))
-                writer.add_scalar('val/OD_Dice',OD_DICE, iter_num)
-                writer.add_scalar('val/OD_IOU',OD_IOU, iter_num)
-                writer.add_scalar('val/OD_BIOU',OD_BIOU, iter_num)
-                writer.add_scalar('val/OC_Dice',OC_DICE, iter_num)
-                writer.add_scalar('val/OC_IOU',OC_IOU, iter_num)
-                writer.add_scalar('val/OC_BIOU',OC_BIOU, iter_num)
-
-                if OD_DICE > best_OD_DICE:
-                    best_OD_DICE = OD_DICE
-                    name = "OD_DICE" + str(round(best_OD_DICE.item(), 4)) +'_iter_' + str(iter_num)  + '.pth'
-                    save_mode_path = os.path.join(
-                        snapshot_path, name)
-
-                    previous_files = glob.glob(os.path.join(snapshot_path, '*OD_DICE*.pth'))
-                    for file_path in previous_files:
-                        os.remove(file_path)
-
-                    torch.save(model.state_dict(), save_mode_path)
-                    logging.info("save model to {}".format(save_mode_path))
-
-                if OC_DICE > best_OC_DICE:
-                    best_OC_DICE = OC_DICE
-                    previous_files = glob.glob(os.path.join(snapshot_path, '*OC_DICE*.pth'))
-                    for file_path in previous_files:
-                        os.remove(file_path)
-                    name = "OC_DICE" + str(round(best_OC_DICE.item(), 4)) +'_iter_' + str(iter_num)  + '.pth'
-                    save_mode_path = os.path.join(
-                        snapshot_path, name)
-                    torch.save(model.state_dict(), save_mode_path)
-                    logging.info("save model to {}".format(save_mode_path))
-
-
-
+                writer.add_scalar('val/MA_auc',MA_auc, iter_num)
+                writer.add_scalar('val/HE_auc',HE_auc, iter_num)
+                writer.add_scalar('val/EX_auc',EX_auc, iter_num)
+                writer.add_scalar('val/SE_auc',SE_auc, iter_num)
                 model.train()
-            # change lr
-            # if iter_num % 2500 == 0:
-            #     lr_ = base_lr * 0.1 ** (iter_num // 2500)
-            #     for param_group in optimizer.param_groups:
-            #         param_group['lr'] = lr_
+
             if iter_num % args.save_period == 0:
                 save_mode_path = os.path.join(
                     snapshot_path, 'iter_' + str(iter_num) + '.pth')

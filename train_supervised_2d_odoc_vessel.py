@@ -52,6 +52,7 @@ parser.add_argument('--amp',type=bool,default=True)
 parser.add_argument('--num_classes',type=int,default=3)
 parser.add_argument('--base_lr',type=float,default=0.005)
 parser.add_argument('--vessel_loss_weight',type=float,default=0.1)
+parser.add_argument('--CLAHE',action='store_true')
 
 parser.add_argument('--batch_size',type=int,default=16)
 parser.add_argument('--labeled_bs',type=int,default=8)
@@ -59,14 +60,17 @@ parser.add_argument('--labeled_bs',type=int,default=8)
 parser.add_argument('--oc_label',type=int,default=2)
 parser.add_argument('--image_size',type=int,default=256)
 
-parser.add_argument('--labeled_num',type=int,default=111,help="RIM-ONE:111")
-parser.add_argument('--total_num',type=int,default=156,help="HRF:45")
+parser.add_argument('--labeled_num',type=int,default=99,help="RIM-ONE:99")
+parser.add_argument('--total_num',type=int,default=144,help="HRF:45")
 
 
 parser.add_argument('--scale_num',type=int,default=2)
 parser.add_argument('--max_iterations',type=int,default=10000)
 
 parser.add_argument('--ohem',type=float,default=-1.0)
+parser.add_argument('--with_ce',action='store_false')
+parser.add_argument('--with_dice',action='store_true')
+
 
 
 def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type):
@@ -111,11 +115,8 @@ labeled_bs = args.labeled_bs
 
 
 if __name__ == '__main__':
-    """
-    1、搜寻snapshot_path下面的含有version的文件夹，如果没有就创建version0，即：
-    snapshot_path = snapshot_path + "/" + "version0"
-    2、如果有version的文件夹，如果当前文件夹下有version0和version01，则创建version02，以此类推
-    """
+    assert args.with_ce  or args.with_dice,"ce 和 dice至少有一个！！！！！"
+
 
     if not os.path.exists(snapshot_path):
         os.makedirs(snapshot_path)
@@ -131,8 +132,8 @@ if __name__ == '__main__':
     logging.info(str(args))
 
     # init model
-
-    model = build_model(model=args.model,backbone=args.backbone,in_chns=3,class_num1=args.num_classes,class_num2=2,fuse_type=args.fuse_type)
+    in_chns = 3
+    model = build_model(model=args.model,backbone=args.backbone,in_chns=in_chns,class_num1=args.num_classes,class_num2=2,fuse_type=args.fuse_type)
     model.to(device)
 
     # init dataset
@@ -140,13 +141,13 @@ if __name__ == '__main__':
                                   root="/home/gu721/yzc/data/odoc/{}".format(args.dataset_name),
                                   mode='semi_train',
                                   size=args.image_size,
-                                  id_path='train_addHRF.txt')
+                                  id_path='train_addHRF.txt',CLAHE=args.CLAHE)
 
     vessel_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
                                   root="/home/gu721/yzc/data/vessel/{}".format(''),
                                   mode='semi_train',
                                   size=args.image_size,
-                                  id_path='train_addHRF.txt')
+                                  id_path='train_addHRF.txt',CLAHE=args.CLAHE)
 
     odoc_idxs = list(range(args.labeled_num))
     vessel_idxs = list(range(args.labeled_num,args.total_num))
@@ -191,7 +192,7 @@ if __name__ == '__main__':
                                     # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
                                   root="/home/gu721/yzc/data/odoc/{}".format(args.dataset_name),
                                   mode='val',
-                                  size=args.image_size)
+                                  size=args.image_size,CLAHE=args.CLAHE)
 
     val_labeledtrainloader = DataLoader(val_dataset,batch_size=1,num_workers=args.num_works)
     val_iteriter = tqdm(val_labeledtrainloader)
@@ -210,11 +211,6 @@ if __name__ == '__main__':
             odoc_labeled_batch, odoc_label_batch = odoc_sampled_batch['image'].to(device), odoc_sampled_batch['label'].to(device)
             vessel_labeled_batch, vessel_label_batch = vessel_sampled_batch['image'].to(device), vessel_sampled_batch['label'].to(device)
 
-            # od_all_label_batch = torch.zeros_like(odoc_label_batch)
-            # oc_all_label_batch = torch.zeros_like(odoc_label_batch)
-            # od_all_label_batch[odoc_label_batch > 0] = 1
-            # oc_all_label_batch[odoc_label_batch > 1] = 1
-
 
             all_batch = torch.cat([odoc_labeled_batch,vessel_labeled_batch],dim=0)
 
@@ -222,14 +218,19 @@ if __name__ == '__main__':
 
             # calculate the loss of od and oc
             odoc_label_batch[odoc_label_batch > 2] = 0
-            loss_seg_ce_odoc = ce_loss_odoc(outputs_odoc[:labeled_bs,...],odoc_label_batch)
 
+            loss_seg_ce_odoc = ce_loss_odoc(outputs_odoc[:labeled_bs,...],odoc_label_batch)
             loss_seg_ce_vessel = ce_loss_vessel(outputs_vessel[labeled_bs:,0, ...], vessel_label_batch.float())
 
-
-            loss = loss_seg_ce_odoc + get_vessel_loss_weight(iter_num) * loss_seg_ce_vessel
-            # loss = loss_seg_ce_odoc + loss_seg_ce_vessel
-            # loss =  loss_seg_dice
+            if args.with_dice:
+                outputs_odoc_soft = torch.argmax(outputs_odoc[:labeled_bs,...], dim=1)
+                loss_seg_dice_odoc = losses.dice_loss(outputs_odoc_soft, odoc_label_batch)
+                loss = loss_seg_ce_odoc + loss_seg_dice_odoc + get_vessel_loss_weight(iter_num) * loss_seg_ce_vessel
+            else:
+                loss_seg_dice_odoc = torch.zeros(1)
+                loss = loss_seg_ce_odoc + get_vessel_loss_weight(iter_num) * loss_seg_ce_vessel
+            if not args.with_ce:
+                loss_seg_ce_odoc = torch.zeros(1)
 
             optimizer.zero_grad()
             loss.backward()
@@ -241,6 +242,7 @@ if __name__ == '__main__':
             writer.add_scalar('loss/loss', loss, iter_num)
             writer.add_scalar('loss/vessel_loss_weight', get_vessel_loss_weight(iter_num), iter_num)
             writer.add_scalar('loss/loss_seg_ce_odoc', loss_seg_ce_odoc, iter_num)
+            writer.add_scalar('loss/loss_seg_dice_odoc', loss_seg_dice_odoc, iter_num)
             writer.add_scalar('loss/loss_seg_ce_vessel', loss_seg_ce_vessel, iter_num)
 
             logging.info(
@@ -249,6 +251,7 @@ if __name__ == '__main__':
             writer.add_scalar('loss/loss', loss, iter_num)
             logging.info('iteration %d : loss : %f' % (iter_num, loss.item()))
             logging.info('iteration %d : loss_seg_ce_odoc : %f' % (iter_num, loss_seg_ce_odoc.item()))
+            logging.info('iteration %d : loss_seg_dice_odoc : %f' % (iter_num, loss_seg_dice_odoc.item()))
             logging.info('iteration %d : loss_seg_ce_vessel : %f' % (iter_num, loss_seg_ce_vessel.item()))
 
             if iter_num % 50 == 0:

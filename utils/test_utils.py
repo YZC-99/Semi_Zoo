@@ -1,4 +1,4 @@
-from torchmetrics import JaccardIndex,Dice
+from torchmetrics import JaccardIndex,Dice,AUROC,ROC
 from utils.my_metrics import BoundaryIoU
 import torch
 
@@ -75,3 +75,55 @@ class ODOC_metrics(object):
                    "oc_iou":oc_iou,
                    "oc_biou":oc_biou,
         }
+
+
+class DR_metrics(object):
+    def __init__(self,device):
+        self.MA_auc = AUROC(task='binary').to(device)
+        self.HE_auc = AUROC(task='binary').to(device)
+        self.EX_auc = AUROC(task='binary').to(device)
+        self.SE_auc = AUROC(task='binary').to(device)
+
+    def add(self,preds,labels):
+        # 先分离不同类别的二值mask
+        MA_preds = torch.zeros_like(preds)
+        HE_preds = torch.zeros_like(preds)
+        EX_preds = torch.zeros_like(preds)
+        SE_preds = torch.zeros_like(preds)
+        #
+        MA_preds[preds == 1] = 1
+        HE_preds[preds == 2] = 1
+        EX_preds[preds == 3] = 1
+        SE_preds[preds == 4] = 1
+
+        MA_labels = torch.zeros_like(labels)
+        HE_labels = torch.zeros_like(labels)
+        EX_labels = torch.zeros_like(labels)
+        SE_labels = torch.zeros_like(labels)
+        #
+        MA_labels[labels == 1] = 1
+        HE_labels[labels == 2] = 1
+        EX_labels[labels == 3] = 1
+        SE_labels[labels == 4] = 1
+
+        #加入
+        self.MA_auc.update(MA_preds,MA_labels)
+        self.HE_auc.update(HE_preds,HE_labels)
+        self.EX_auc.update(EX_preds,EX_labels)
+        self.SE_auc.update(SE_preds,SE_labels)
+
+    def get_metrics(self):
+        MA_auc = self.MA_auc.compute()
+        HE_auc = self.HE_auc.compute()
+        EX_auc = self.EX_auc.compute()
+        SE_auc = self.SE_auc.compute()
+        self.MA_auc.reset()
+        self.HE_auc.reset()
+        self.EX_auc.reset()
+        self.SE_auc.reset()
+        return [{
+            'MA_auc':MA_auc,
+            'HE_auc':HE_auc,
+            'EX_auc':EX_auc,
+            'SE_auc':SE_auc,
+        }]

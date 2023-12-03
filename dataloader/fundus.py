@@ -14,9 +14,19 @@ from scipy import ndimage
 from torchvision.transforms import functional
 import scipy.io
 
+def CLAHE(image_path):
+    image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    # 创建CLAHE对象
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    # 应用CLAHE
+    clahe_result = clahe.apply(image)
+    # 将OpenCV数组转换为Pillow图像
+    clahe_rgb = Image.merge('RGB', [Image.fromarray(clahe_result)] * 3)
+    return  clahe_rgb
+
 class SemiDataset(Dataset):
     def __init__(self,name, root, mode, size,
-                 id_path=None,h5_file=False):
+                 id_path=None,h5_file=False,CLAHE = False):
         """
         :param name: dataset name, pascal or cityscapes
         :param root: root path of the dataset.
@@ -36,6 +46,7 @@ class SemiDataset(Dataset):
         self.mode = mode
         self.size = size
         self.h5_file = h5_file
+        self.CLAHE = CLAHE
 
         if mode == 'semi_train':
             id_path = '%s/%s' %(name,id_path)
@@ -50,7 +61,10 @@ class SemiDataset(Dataset):
     def get_item_nor(self,item):
         id = self.ids[item]
         img_path = os.path.join(self.root, id.split(' ')[0])
-        img = Image.open(img_path)
+        if self.CLAHE:
+            img = CLAHE(img_path)
+        else:
+            img = Image.open(img_path)
         if "DDR" in id or "G1020" in id or "ACRIMA" in id:
             mask = Image.fromarray(np.zeros((2, 2)))
         elif "HRF" in id:
@@ -65,6 +79,8 @@ class SemiDataset(Dataset):
             mask = Image.open(mask_path)
 
         if self.mode == 'semi_train':
+
+
             img, mask = hflip(img, mask, p=0.5)
             img, mask = vflip(img, mask, p=0.5)
             # img, mask = random_rotate(img, mask, p=0.5)
