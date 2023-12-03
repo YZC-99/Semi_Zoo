@@ -7,19 +7,35 @@ OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_supervised_2d_odoc_vessel.py \
         --model UNet_two_Decoder \
         --backbone org
 
+
 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_supervised_2d_odoc_vessel.py \
         --num_works 0 \
-        --device 1 \
+        --device 0 \
         --exp supervised/RIM-ONE_vessel \
         --dataset_name RIM-ONE \
-        --fuse_type none \
+        --fuse_type ccrtb3 \
         --model UNet_two_Decoder \
         --backbone resnet50 \
         --batch_size 8 \
         --labeled_bs 4 \
         --base_lr 0.0001 \
         --max_iterations 10000 \
-        --CLAHE
+        --ce_weight
+
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_supervised_2d_odoc_vessel.py \
+        --num_works 0 \
+        --device 1 \
+        --exp supervised/RIM-ONE_vessel \
+        --dataset_name RIM-ONE \
+        --fuse_type ccrtb3 \
+        --model UNet_two_Decoder \
+        --backbone resnet50 \
+        --batch_size 8 \
+        --labeled_bs 4 \
+        --base_lr 0.0001 \
+        --max_iterations 10000 \
+        --with_ce \
+        --with_softfocal
 
 
 

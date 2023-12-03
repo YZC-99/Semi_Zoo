@@ -14,7 +14,7 @@ def vflip(img, mask, p=0.5):
             mask = mask.transpose(Image.FLIP_TOP_BOTTOM)
     return img, mask
 
-def hflip(img, mask, p=0.5):
+def hflip(img, mask,p=0.5):
     if random.random() < p:
         img = img.transpose(Image.FLIP_LEFT_RIGHT)
         if mask is not None:

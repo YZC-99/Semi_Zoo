@@ -5,7 +5,7 @@ The implementation is borrowed from: https://github.com/HiLab-git/PyMIC
 from __future__ import division, print_function
 from model.backbone.mit import mit_b0, mit_b1, mit_b2, mit_b3, mit_b4, mit_b5
 from model.backbone.resnet import resnet18,resnet34,resnet50,resnet101,resnet152
-from model.compare_modules.rtb import RTB
+from model.compare_modules.rtb import RTB,CrissCrossRTB,CrissCrossRTB_v2
 import torch.nn.functional as F
 import torch
 import torch.nn as nn
@@ -412,6 +412,179 @@ class Decoder4Segformer_rtb_Decoder(nn.Module):
         return [x_up1,x_up2,x_up3,x_up4,output]
 
 
+class Decoder4Segformer_ccrtb_Decoder(nn.Module):
+    def __init__(self, params,rbt_layer = 4):
+        super(Decoder4Segformer_ccrtb_Decoder, self).__init__()
+        self.params = params
+        self.in_chns = self.params['in_chns']
+        self.ft_chns = self.params['feature_chns']
+        self.n_class = self.params['class_num']
+        self.up_type = self.params['up_type']
+        assert (len(self.ft_chns) == 5)
+
+
+        self.up1 = UpBlock(self.ft_chns[4], self.ft_chns[3], self.ft_chns[3], dropout_p=0.0, mode_upsampling=self.up_type)
+        self.up2 = UpBlock(self.ft_chns[3], self.ft_chns[2], self.ft_chns[2], dropout_p=0.0, mode_upsampling=self.up_type)
+        self.up3 = UpBlock(self.ft_chns[2], self.ft_chns[1], self.ft_chns[1], dropout_p=0.0, mode_upsampling=self.up_type)
+        self.up4 = nn.Sequential(
+            nn.Conv2d(self.ft_chns[1], self.ft_chns[1], kernel_size=1),
+            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
+            nn.BatchNorm2d(self.ft_chns[1]),
+            nn.Conv2d(self.ft_chns[1], self.ft_chns[0], kernel_size=1),
+            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
+        )
+
+        self.rbt_layer = rbt_layer
+        self.rbt = CrissCrossRTB(self.ft_chns[4 - rbt_layer])
+
+        self.out_conv = nn.Conv2d(self.ft_chns[0] , self.n_class, kernel_size=3, padding=1)
+    def forward(self, feature,decoder_feature):
+        x1 = feature[0]
+        x2 = feature[1]
+        x3 = feature[2]
+        x4 = feature[3]
+
+        x_up1 = self.up1(x4, x3)
+        if self.rbt_layer == 1:
+            other_up1 = F.interpolate(decoder_feature[0], size=x_up1.size()[2:], mode='bilinear')
+            x_up1 = self.rbt(x_up1,other_up1)
+
+
+        x_up2 = self.up2(x_up1, x2)
+        if self.rbt_layer == 2:
+            other_up2 = F.interpolate(decoder_feature[1], size=x_up2.size()[2:], mode='bilinear')
+            x_up2 = self.rbt(x_up2,other_up2)
+
+
+        x_up3 = self.up3(x_up2, x1)
+        if self.rbt_layer == 3:
+            other_up3 = F.interpolate(decoder_feature[2], size=x_up3.size()[2:], mode='bilinear')
+            x_up3= self.rbt(x_up3,other_up3)
+
+        x_up4 = self.up4(x_up3)
+        if self.rbt_layer == 4:
+            other_up4 = F.interpolate(decoder_feature[3], size=x_up4.size()[2:], mode='bilinear')
+            x_up4 = self.rbt(x_up4,other_up4)
+
+        output = self.out_conv(x_up4)
+        return [x_up1,x_up2,x_up3,x_up4,output]
+
+
+class Decoder4Segformer_ccrtbv2_Decoder(nn.Module):
+    def __init__(self, params,rbt_layer = 4):
+        super(Decoder4Segformer_ccrtbv2_Decoder, self).__init__()
+        self.params = params
+        self.in_chns = self.params['in_chns']
+        self.ft_chns = self.params['feature_chns']
+        self.n_class = self.params['class_num']
+        self.up_type = self.params['up_type']
+        assert (len(self.ft_chns) == 5)
+
+
+        self.up1 = UpBlock(self.ft_chns[4], self.ft_chns[3], self.ft_chns[3], dropout_p=0.0, mode_upsampling=self.up_type)
+        self.up2 = UpBlock(self.ft_chns[3], self.ft_chns[2], self.ft_chns[2], dropout_p=0.0, mode_upsampling=self.up_type)
+        self.up3 = UpBlock(self.ft_chns[2], self.ft_chns[1], self.ft_chns[1], dropout_p=0.0, mode_upsampling=self.up_type)
+        self.up4 = nn.Sequential(
+            nn.Conv2d(self.ft_chns[1], self.ft_chns[1], kernel_size=1),
+            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
+            nn.BatchNorm2d(self.ft_chns[1]),
+            nn.Conv2d(self.ft_chns[1], self.ft_chns[0], kernel_size=1),
+            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
+        )
+
+        self.rbt_layer = rbt_layer
+        self.rbt = CrissCrossRTB_v2(self.ft_chns[4 - rbt_layer])
+
+        self.out_conv = nn.Conv2d(self.ft_chns[0] , self.n_class, kernel_size=3, padding=1)
+    def forward(self, feature,decoder_feature):
+        x1 = feature[0]
+        x2 = feature[1]
+        x3 = feature[2]
+        x4 = feature[3]
+
+        x_up1 = self.up1(x4, x3)
+        if self.rbt_layer == 1:
+            other_up1 = F.interpolate(decoder_feature[0], size=x_up1.size()[2:], mode='bilinear')
+            x_up1 = self.rbt(x_up1,other_up1)
+
+
+        x_up2 = self.up2(x_up1, x2)
+        if self.rbt_layer == 2:
+            other_up2 = F.interpolate(decoder_feature[1], size=x_up2.size()[2:], mode='bilinear')
+            x_up2 = self.rbt(x_up2,other_up2)
+
+
+        x_up3 = self.up3(x_up2, x1)
+        if self.rbt_layer == 3:
+            other_up3 = F.interpolate(decoder_feature[2], size=x_up3.size()[2:], mode='bilinear')
+            x_up3= self.rbt(x_up3,other_up3)
+
+        x_up4 = self.up4(x_up3)
+        if self.rbt_layer == 4:
+            other_up4 = F.interpolate(decoder_feature[3], size=x_up4.size()[2:], mode='bilinear')
+            x_up4 = self.rbt(x_up4,other_up4)
+
+        output = self.out_conv(x_up4)
+        return [x_up1,x_up2,x_up3,x_up4,output]
+
+
+class Decoder4Segformer_ALLccrtb_Decoder(nn.Module):
+    def __init__(self, params):
+        super(Decoder4Segformer_ALLccrtb_Decoder, self).__init__()
+        self.params = params
+        self.in_chns = self.params['in_chns']
+        self.ft_chns = self.params['feature_chns']
+        self.n_class = self.params['class_num']
+        self.up_type = self.params['up_type']
+        assert (len(self.ft_chns) == 5)
+
+
+        self.up1 = UpBlock(self.ft_chns[4], self.ft_chns[3], self.ft_chns[3], dropout_p=0.0, mode_upsampling=self.up_type)
+        self.up2 = UpBlock(self.ft_chns[3], self.ft_chns[2], self.ft_chns[2], dropout_p=0.0, mode_upsampling=self.up_type)
+        self.up3 = UpBlock(self.ft_chns[2], self.ft_chns[1], self.ft_chns[1], dropout_p=0.0, mode_upsampling=self.up_type)
+        self.up4 = nn.Sequential(
+            nn.Conv2d(self.ft_chns[1], self.ft_chns[1], kernel_size=1),
+            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
+            nn.BatchNorm2d(self.ft_chns[1]),
+            nn.Conv2d(self.ft_chns[1], self.ft_chns[0], kernel_size=1),
+            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
+        )
+
+        self.rbt1 = CrissCrossRTB(self.ft_chns[4 - 1])
+        self.rbt2 = CrissCrossRTB(self.ft_chns[4 - 2])
+        self.rbt3 = CrissCrossRTB(self.ft_chns[4 - 3])
+        self.rbt4 = CrissCrossRTB(self.ft_chns[4 - 4])
+
+        self.out_conv = nn.Conv2d(self.ft_chns[0] , self.n_class, kernel_size=3, padding=1)
+    def forward(self, feature,decoder_feature):
+        x1 = feature[0]
+        x2 = feature[1]
+        x3 = feature[2]
+        x4 = feature[3]
+
+        x_up1 = self.up1(x4, x3)
+        other_up1 = F.interpolate(decoder_feature[0], size=x_up1.size()[2:], mode='bilinear')
+        x_up1 = self.rbt1(x_up1,other_up1)
+
+
+        x_up2 = self.up2(x_up1, x2)
+        other_up2 = F.interpolate(decoder_feature[1], size=x_up2.size()[2:], mode='bilinear')
+        x_up2 = self.rbt2(x_up2,other_up2)
+
+
+        x_up3 = self.up3(x_up2, x1)
+        other_up3 = F.interpolate(decoder_feature[2], size=x_up3.size()[2:], mode='bilinear')
+        x_up3= self.rbt3(x_up3,other_up3)
+
+        x_up4 = self.up4(x_up3)
+        other_up4 = F.interpolate(decoder_feature[3], size=x_up4.size()[2:], mode='bilinear')
+        x_up4 = self.rbt4(x_up4,other_up4)
+
+        output = self.out_conv(x_up4)
+        return [x_up1,x_up2,x_up3,x_up4,output]
+
+
+
 class Decoder_add_Decoder(nn.Module):
     def __init__(self, params):
         super(Decoder_add_Decoder, self).__init__()
@@ -701,7 +874,15 @@ class UNet_two_Decoder(nn.Module):
                 self.decoder2 = Decoder4Segformer_cat_Decoder(params2,backbone = phi)
             elif 'rtb' in fuse_type:
                 rbt_layer = int(fuse_type.split('rtb')[-1])
-                self.decoder2 = Decoder4Segformer_rtb_Decoder(params2,rbt_layer=rbt_layer)
+                if 'ccrtb' in fuse_type:
+                    if 'allccrtb' in fuse_type:
+                        self.decoder2 = Decoder4Segformer_ALLccrtb_Decoder(params2)
+                    elif 'v2_ccrtb' in fuse_type:
+                        self.decoder2 = Decoder4Segformer_ccrtbv2_Decoder(params2, rbt_layer=rbt_layer)
+                    else:
+                        self.decoder2 = Decoder4Segformer_ccrtb_Decoder(params2, rbt_layer=rbt_layer)
+                else:
+                    self.decoder2 = Decoder4Segformer_rtb_Decoder(params2,rbt_layer=rbt_layer)
             else:
                 self.decoder2 = Decoder4Segformer(params2)
 
@@ -711,7 +892,11 @@ class UNet_two_Decoder(nn.Module):
         else:
             feature = self.encoder.forward(x)
         output_decoder1 = self.decoder1(feature)
-        if self.fuse_type in ['add','cat','rtb1','rtb2','rtb3','rtb4'] :
+        if self.fuse_type in ['add','cat',
+                              'rtb1','rtb2','rtb3','rtb4',
+                              'ccrtb1','ccrtb2','ccrtb3','ccrtb4',
+                              'v2_ccrtb1','v2_ccrtb2','v2_ccrtb3','v2_ccrtb4',
+                              'allccrtb0'] :
             output_decoder2 = self.decoder2(feature,output_decoder1)
         else:
             output_decoder2 = self.decoder2(feature)
@@ -736,6 +921,6 @@ if __name__ == '__main__':
     # model = UNet_ResNet(in_chns=3, class_num=3,pretrained=False)
     # out = model(input_data)
 
-    model = UNet_two_Decoder(in_chns=3, class_num1=3,class_num2=2,phi='b2',pretrained=False,fuse_type='rtb1')
+    model = UNet_two_Decoder(in_chns=3, class_num1=3,class_num2=2,phi='b2',pretrained=False,fuse_type='v2_ccrtb1')
     out,_ = model(input_data)
     print(out.shape)

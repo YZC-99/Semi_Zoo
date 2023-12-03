@@ -53,6 +53,7 @@ parser.add_argument('--num_classes',type=int,default=3)
 parser.add_argument('--base_lr',type=float,default=0.005)
 parser.add_argument('--vessel_loss_weight',type=float,default=0.1)
 parser.add_argument('--CLAHE',action='store_true')
+parser.add_argument('--preprocess',action='store_true')
 
 parser.add_argument('--batch_size',type=int,default=16)
 parser.add_argument('--labeled_bs',type=int,default=8)
@@ -68,7 +69,9 @@ parser.add_argument('--scale_num',type=int,default=2)
 parser.add_argument('--max_iterations',type=int,default=10000)
 
 parser.add_argument('--ohem',type=float,default=-1.0)
+parser.add_argument('--ce_weight',action='store_true')
 parser.add_argument('--with_ce',action='store_false')
+parser.add_argument('--with_softfocal',action='store_true')
 parser.add_argument('--with_dice',action='store_true')
 
 
@@ -115,7 +118,7 @@ labeled_bs = args.labeled_bs
 
 
 if __name__ == '__main__':
-    assert args.with_ce  or args.with_dice,"ce 和 dice至少有一个！！！！！"
+    assert args.with_ce  or args.with_dice or args.with_softfocal,"ce , dice , focal至少有一个！！！！！"
 
 
     if not os.path.exists(snapshot_path):
@@ -141,13 +144,13 @@ if __name__ == '__main__':
                                   root="/home/gu721/yzc/data/odoc/{}".format(args.dataset_name),
                                   mode='semi_train',
                                   size=args.image_size,
-                                  id_path='train_addHRF.txt',CLAHE=args.CLAHE)
+                                  id_path='train_addHRF.txt',CLAHE=args.CLAHE,preprocess=args.preprocess)
 
     vessel_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
                                   root="/home/gu721/yzc/data/vessel/{}".format(''),
                                   mode='semi_train',
                                   size=args.image_size,
-                                  id_path='train_addHRF.txt',CLAHE=args.CLAHE)
+                                  id_path='train_addHRF.txt',CLAHE=args.CLAHE,preprocess=args.preprocess)
 
     odoc_idxs = list(range(args.labeled_num))
     vessel_idxs = list(range(args.labeled_num,args.total_num))
@@ -180,7 +183,9 @@ if __name__ == '__main__':
 
     ce_loss_vessel = BCEWithLogitsLoss()
     if args.ohem > 0:
-        ce_loss_odoc = OhemCrossEntropy(thres=args.ohem,weight=torch.tensor([1.0,2.8,3.0],device=device))
+        ce_loss_odoc = OhemCrossEntropy(thres=args.ohem,weight=torch.tensor([1.0,4.0,8.0],device=device))
+    if args.ce_weight:
+        ce_loss_odoc = CrossEntropyLoss(weight=torch.tensor([1.0,4.0,8.0],device=device))
     else:
         ce_loss_odoc = CrossEntropyLoss()
     # mse_loss = MSELoss()
@@ -192,7 +197,7 @@ if __name__ == '__main__':
                                     # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
                                   root="/home/gu721/yzc/data/odoc/{}".format(args.dataset_name),
                                   mode='val',
-                                  size=args.image_size,CLAHE=args.CLAHE)
+                                  size=args.image_size,CLAHE=args.CLAHE,preprocess=args.preprocess)
 
     val_labeledtrainloader = DataLoader(val_dataset,batch_size=1,num_workers=args.num_works)
     val_iteriter = tqdm(val_labeledtrainloader)
@@ -210,6 +215,11 @@ if __name__ == '__main__':
 
             odoc_labeled_batch, odoc_label_batch = odoc_sampled_batch['image'].to(device), odoc_sampled_batch['label'].to(device)
             vessel_labeled_batch, vessel_label_batch = vessel_sampled_batch['image'].to(device), vessel_sampled_batch['label'].to(device)
+            if args.preprocess:
+                odoc_labeled_batch_edges_info = odoc_sampled_batch['image_edges_info'].to(device)
+                vessel_labeled_batch_edges_info = vessel_sampled_batch['image_edges_info'].to(device)
+
+
 
 
             all_batch = torch.cat([odoc_labeled_batch,vessel_labeled_batch],dim=0)
@@ -219,18 +229,23 @@ if __name__ == '__main__':
             # calculate the loss of od and oc
             odoc_label_batch[odoc_label_batch > 2] = 0
 
+            loss_seg_softfocal_odoc = torch.zeros(1,device=device)
+            loss_seg_dice_odoc = torch.zeros(1,device=device)
             loss_seg_ce_odoc = ce_loss_odoc(outputs_odoc[:labeled_bs,...],odoc_label_batch)
             loss_seg_ce_vessel = ce_loss_vessel(outputs_vessel[labeled_bs:,0, ...], vessel_label_batch.float())
 
             if args.with_dice:
                 outputs_odoc_soft = torch.argmax(outputs_odoc[:labeled_bs,...], dim=1)
                 loss_seg_dice_odoc = losses.dice_loss(outputs_odoc_soft, odoc_label_batch)
-                loss = loss_seg_ce_odoc + loss_seg_dice_odoc + get_vessel_loss_weight(iter_num) * loss_seg_ce_vessel
-            else:
-                loss_seg_dice_odoc = torch.zeros(1)
-                loss = loss_seg_ce_odoc + get_vessel_loss_weight(iter_num) * loss_seg_ce_vessel
             if not args.with_ce:
-                loss_seg_ce_odoc = torch.zeros(1)
+                loss_seg_ce_odoc = torch.zeros(1,device=device)
+            if args.with_softfocal:
+                loss_seg_softfocal_odoc = losses.softmax_focalloss(outputs_odoc[:labeled_bs,...],odoc_label_batch)
+
+            loss = loss_seg_ce_odoc + \
+                   loss_seg_dice_odoc + \
+                   get_vessel_loss_weight(iter_num) * loss_seg_ce_vessel + \
+                   loss_seg_softfocal_odoc
 
             optimizer.zero_grad()
             loss.backward()
@@ -242,6 +257,7 @@ if __name__ == '__main__':
             writer.add_scalar('loss/loss', loss, iter_num)
             writer.add_scalar('loss/vessel_loss_weight', get_vessel_loss_weight(iter_num), iter_num)
             writer.add_scalar('loss/loss_seg_ce_odoc', loss_seg_ce_odoc, iter_num)
+            writer.add_scalar('loss/loss_seg_softfocal_odoc', loss_seg_softfocal_odoc, iter_num)
             writer.add_scalar('loss/loss_seg_dice_odoc', loss_seg_dice_odoc, iter_num)
             writer.add_scalar('loss/loss_seg_ce_vessel', loss_seg_ce_vessel, iter_num)
 
@@ -251,99 +267,99 @@ if __name__ == '__main__':
             writer.add_scalar('loss/loss', loss, iter_num)
             logging.info('iteration %d : loss : %f' % (iter_num, loss.item()))
             logging.info('iteration %d : loss_seg_ce_odoc : %f' % (iter_num, loss_seg_ce_odoc.item()))
+            logging.info('iteration %d : loss_seg_softfocal_odoc : %f' % (iter_num, loss_seg_softfocal_odoc.item()))
             logging.info('iteration %d : loss_seg_dice_odoc : %f' % (iter_num, loss_seg_dice_odoc.item()))
             logging.info('iteration %d : loss_seg_ce_vessel : %f' % (iter_num, loss_seg_ce_vessel.item()))
 
             if iter_num % 50 == 0:
-                image = all_batch[0]
-                writer.add_image('train/Image', image, iter_num)
+                with torch.no_grad():
+                    image = all_batch[0]
+                    writer.add_image('train/Image', image, iter_num)
 
 
-                image = torch.argmax(outputs_vessel,dim=1)
-                image = image[0]
-                writer.add_image('train/Predicted_label_vessel', image.unsqueeze(0), iter_num)
+                    image = torch.argmax(outputs_vessel,dim=1)
+                    image = image[0]
+                    writer.add_image('train/Predicted_label_vessel', image.unsqueeze(0), iter_num)
 
-                image = vessel_label_batch[0].unsqueeze(0)
-                image = image / 2
-                print("vessel")
-                print(torch.unique(image))
-                writer.add_image('train/Groundtruth_label_vessel',
-                                 image, iter_num)
+                    image = vessel_label_batch[0].unsqueeze(0)
+                    image = image / 2
+                    print("vessel")
+                    print(torch.unique(image))
+                    writer.add_image('train/Groundtruth_label_vessel',
+                                     image, iter_num)
 
-                image = torch.argmax(outputs_odoc,dim=1)
-                image = image[0] / (args.num_classes - 1)
-                writer.add_image('train/Predicted_label', image.unsqueeze(0), iter_num)
+                    image = torch.argmax(outputs_odoc,dim=1)
+                    image = image[0] / (args.num_classes - 1)
+                    writer.add_image('train/Predicted_label', image.unsqueeze(0), iter_num)
 
 
-                image = odoc_label_batch[0].unsqueeze(0)
-                image = image / (args.num_classes - 1)
-                writer.add_image('train/Groundtruth_label',
-                                 image, iter_num)
+                    image = odoc_label_batch[0].unsqueeze(0)
+                    image = image / (args.num_classes - 1)
+                    writer.add_image('train/Groundtruth_label',
+                                     image, iter_num)
 
 
             # eval
             if iter_num % args.val_period == 0:
-                model.eval()
-                show_id = random.randint(0,len(val_iteriter))
-                for id,data in enumerate(val_iteriter):
-                    img,label = data['image'].to(device),data['label'].to(device)
-                    outputs_odoc,_ = model(img)
+                with torch.no_grad():
+                    model.eval()
+                    show_id = random.randint(0,len(val_iteriter))
+                    for id,data in enumerate(val_iteriter):
+                        img,label = data['image'].to(device),data['label'].to(device)
+                        outputs_odoc,_ = model(img)
 
-                    ODOC_val_metrics.add_multi_class(outputs_odoc,label)
+                        ODOC_val_metrics.add_multi_class(outputs_odoc,label)
 
-                    if id == show_id:
-                        image = img[0]
-                        writer.add_image('val/image', image, iter_num)
-                        image = torch.argmax(outputs_odoc,dim=1)
-                        image = image[0] / (args.num_classes - 1)
-                        writer.add_image('val/pred', image.unsqueeze(0), iter_num)
-                        image = label
-                        image = image / (args.num_classes - 1)
-                        writer.add_image('val/Groundtruth_label',
-                                         image, iter_num)
+                        if id == show_id:
+                            image = img[0]
+                            writer.add_image('val/image', image, iter_num)
+                            image = torch.argmax(outputs_odoc,dim=1)
+                            image = image[0] / (args.num_classes - 1)
+                            writer.add_image('val/pred', image.unsqueeze(0), iter_num)
+                            image = label
+                            image = image / (args.num_classes - 1)
+                            writer.add_image('val/Groundtruth_label',
+                                             image, iter_num)
 
-                Dice_IoU = ODOC_val_metrics.get_metrics()
-                OD_DICE,OD_IOU,OC_DICE,OC_IOU =  Dice_IoU['od_dice'],Dice_IoU['od_iou'],Dice_IoU['oc_dice'],Dice_IoU['oc_iou']
-                OD_BIOU,OC_BIOU =  Dice_IoU['od_biou'],Dice_IoU['oc_biou']
-                logging.info("OD_Dice:{}--OD_IoU:--{}--OC_Dice:{}--OC_IoU:--{}".format(
-                                                                                        OD_DICE,
-                                                                                        OD_IOU,
-                                                                                        OC_DICE,
-                                                                                       OC_IOU,
-                                                                                       ))
-                writer.add_scalar('val/OD_Dice',OD_DICE, iter_num)
-                writer.add_scalar('val/OD_IOU',OD_IOU, iter_num)
-                writer.add_scalar('val/OD_BIOU',OD_BIOU, iter_num)
-                writer.add_scalar('val/OC_Dice',OC_DICE, iter_num)
-                writer.add_scalar('val/OC_IOU',OC_IOU, iter_num)
-                writer.add_scalar('val/OC_BIOU',OC_BIOU, iter_num)
+                    Dice_IoU = ODOC_val_metrics.get_metrics()
+                    OD_DICE,OD_IOU,OC_DICE,OC_IOU =  Dice_IoU['od_dice'],Dice_IoU['od_iou'],Dice_IoU['oc_dice'],Dice_IoU['oc_iou']
+                    OD_BIOU,OC_BIOU =  Dice_IoU['od_biou'],Dice_IoU['oc_biou']
+                    logging.info("OD_Dice:{}--OD_IoU:--{}--OC_Dice:{}--OC_IoU:--{}".format(
+                                                                                            OD_DICE,
+                                                                                            OD_IOU,
+                                                                                            OC_DICE,
+                                                                                           OC_IOU,
+                                                                                           ))
+                    writer.add_scalar('val/OD_Dice',OD_DICE, iter_num)
+                    writer.add_scalar('val/OD_IOU',OD_IOU, iter_num)
+                    writer.add_scalar('val/OD_BIOU',OD_BIOU, iter_num)
+                    writer.add_scalar('val/OC_Dice',OC_DICE, iter_num)
+                    writer.add_scalar('val/OC_IOU',OC_IOU, iter_num)
+                    writer.add_scalar('val/OC_BIOU',OC_BIOU, iter_num)
 
-                if OD_DICE > best_OD_DICE:
-                    best_OD_DICE = OD_DICE
-                    name = "OD_DICE" + str(round(best_OD_DICE.item(), 4)) +'_iter_' + str(iter_num)  + '.pth'
-                    save_mode_path = os.path.join(
-                        snapshot_path, name)
+                    if OD_DICE > best_OD_DICE:
+                        best_OD_DICE = OD_DICE
+                        name = "OD_DICE" + str(round(best_OD_DICE.item(), 4)) +'_iter_' + str(iter_num)  + '.pth'
+                        save_mode_path = os.path.join(
+                            snapshot_path, name)
 
-                    previous_files = glob.glob(os.path.join(snapshot_path, '*OD_DICE*.pth'))
-                    for file_path in previous_files:
-                        os.remove(file_path)
+                        previous_files = glob.glob(os.path.join(snapshot_path, '*OD_DICE*.pth'))
+                        for file_path in previous_files:
+                            os.remove(file_path)
 
-                    torch.save(model.state_dict(), save_mode_path)
-                    logging.info("save model to {}".format(save_mode_path))
+                        torch.save(model.state_dict(), save_mode_path)
+                        logging.info("save model to {}".format(save_mode_path))
 
-                if OC_DICE > best_OC_DICE:
-                    best_OC_DICE = OC_DICE
-                    previous_files = glob.glob(os.path.join(snapshot_path, '*OC_DICE*.pth'))
-                    for file_path in previous_files:
-                        os.remove(file_path)
-                    name = "OC_DICE" + str(round(best_OC_DICE.item(), 4)) +'_iter_' + str(iter_num)  + '.pth'
-                    save_mode_path = os.path.join(
-                        snapshot_path, name)
-                    torch.save(model.state_dict(), save_mode_path)
-                    logging.info("save model to {}".format(save_mode_path))
-
-
-
+                    if OC_DICE > best_OC_DICE:
+                        best_OC_DICE = OC_DICE
+                        previous_files = glob.glob(os.path.join(snapshot_path, '*OC_DICE*.pth'))
+                        for file_path in previous_files:
+                            os.remove(file_path)
+                        name = "OC_DICE" + str(round(best_OC_DICE.item(), 4)) +'_iter_' + str(iter_num)  + '.pth'
+                        save_mode_path = os.path.join(
+                            snapshot_path, name)
+                        torch.save(model.state_dict(), save_mode_path)
+                        logging.info("save model to {}".format(save_mode_path))
                 model.train()
             # change lr
             # if iter_num % 2500 == 0:

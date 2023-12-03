@@ -26,7 +26,7 @@ def CLAHE(image_path):
 
 class SemiDataset(Dataset):
     def __init__(self,name, root, mode, size,
-                 id_path=None,h5_file=False,CLAHE = False):
+                 id_path=None,h5_file=False,CLAHE = False,preprocess = False):
         """
         :param name: dataset name, pascal or cityscapes
         :param root: root path of the dataset.
@@ -47,6 +47,7 @@ class SemiDataset(Dataset):
         self.size = size
         self.h5_file = h5_file
         self.CLAHE = CLAHE
+        self.preprocess = preprocess
 
         if mode == 'semi_train':
             id_path = '%s/%s' %(name,id_path)
@@ -65,6 +66,7 @@ class SemiDataset(Dataset):
             img = CLAHE(img_path)
         else:
             img = Image.open(img_path)
+
         if "DDR" in id or "G1020" in id or "ACRIMA" in id:
             mask = Image.fromarray(np.zeros((2, 2)))
         elif "HRF" in id:
@@ -89,6 +91,12 @@ class SemiDataset(Dataset):
 
         img, mask = resize(img, mask, self.size)
         img, mask = normalize(img, mask)
+        if self.preprocess:
+            image_edges_info = np.load(img_path.replace('images_cropped','img2canny-dog2npy').replace('jpg','npy'),allow_pickle=True)
+            image_edges_info = image_edges_info / 255
+            image_edges_info = torch.from_numpy(image_edges_info)
+
+
         if mask is not None:
             mask[mask > 2] = 0
         return {'image': img, 'label': mask}
@@ -115,6 +123,7 @@ class SemiDataset(Dataset):
         # img, mask = resize(img, mask, self.size)
         img, mask, contour = resize_numpy(img, mask, contour, self.size)
         img, mask = normalize(img, mask)
+
         if mask is not None:
             mask[mask > 2] = 0
         return {'image': img, 'label': mask}

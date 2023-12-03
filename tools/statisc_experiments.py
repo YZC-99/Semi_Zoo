@@ -18,6 +18,8 @@ def logs2csv(ex_path=''):
             'model',
             'backbone',
             'with_ce',
+            'ce_weight',
+            'soft_focal',
             'with_dice',
             'ohem',
             'vessel_loss_weight',
@@ -62,6 +64,8 @@ def logs2csv(ex_path=''):
                     conf.get('model', 'N/A'),
                     conf.get('backbone', 'N/A'),
                     conf.get('with_ce', 'True'),  # 如果 'ohem' 不存在，返回 'N/A'
+                    conf.get('ce_weight', 'False'),  # 如果 'ohem' 不存在，返回 'N/A'
+                    conf.get('with_softfocal', 'False'),  # 如果 'ohem' 不存在，返回 'N/A'
                     conf.get('with_dice', 'False'),  # 如果 'ohem' 不存在，返回 'N/A'
                     conf.get('ohem', 'N/A'),  # 如果 'ohem' 不存在，返回 'N/A'
                     conf.get('vessel_loss_weight', 'N/A'),  # 如果 'ohem' 不存在，返回 'N/A'
