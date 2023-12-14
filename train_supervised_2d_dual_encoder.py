@@ -17,6 +17,7 @@ from model.netwotks.unet import UNet, MCNet2d_compete_v1,UNet_DTC2d
 from model.netwotks.segformer import SegFormer
 from model.netwotks.deeplabv3plus import DeepLabV3Plus
 from model.netwotks.unet_two_decoder import UNet_two_Decoder,UNet_MiT,UNet_ResNet
+from model.netwotks.unet_dual_encoder import UNet_Dual_Encoder
 from utils import ramps,losses
 from utils.losses import OhemCrossEntropy
 from utils.test_utils import ODOC_metrics
@@ -88,18 +89,19 @@ parser.add_argument('--cps_un_rampup', type=float,  default=40.0, help='cps_ramp
 parser.add_argument('--cps_un_with_dice', type=bool,  default=True, help='cps_un_with_dice')
 
 def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type):
-    if model == "UNet":
-        return UNet(in_chns=in_chns,class_num=class_num1)
-    elif model == 'UNet_ResNet':
-        return UNet_ResNet(in_chns=in_chns, class_num=class_num1, phi=backbone, pretrained=True)
-    elif model == 'UNet_MiT':
-        return UNet_MiT( in_chns=in_chns, class_num=class_num1,phi=backbone,pretrained=True)
-    elif model == 'Segformer':
-        return SegFormer(num_classes=class_num1,phi=backbone,pretrained=True)
-    elif model == 'Deeplabv3+':
-        return DeepLabV3Plus(backbone=backbone,nclass=class_num1)
-    elif model == 'UNet_two_Decoder':
-        return UNet_two_Decoder( in_chns=in_chns, class_num1=class_num1,class_num2=class_num2,fuse_type=fuse_type)
+    return UNet_Dual_Encoder(in_chns=3, class_num=3,phi=backbone,phi2='b2',pretrained=True)
+    # if model == "UNet":
+    #     return UNet(in_chns=in_chns,class_num=class_num1)
+    # elif model == 'UNet_ResNet':
+    #     return UNet_ResNet(in_chns=in_chns, class_num=class_num1, phi=backbone, pretrained=True)
+    # elif model == 'UNet_MiT':
+    #     return UNet_MiT( in_chns=in_chns, class_num=class_num1,phi=backbone,pretrained=True)
+    # elif model == 'Segformer':
+    #     return SegFormer(num_classes=class_num1,phi=backbone,pretrained=True)
+    # elif model == 'Deeplabv3+':
+    #     return DeepLabV3Plus(backbone=backbone,nclass=class_num1)
+    # elif model == 'UNet_two_Decoder':
+    #     return UNet_two_Decoder( in_chns=in_chns, class_num1=class_num1,class_num2=class_num2,fuse_type=fuse_type)
 
 
 
@@ -158,7 +160,7 @@ if __name__ == '__main__':
 
     # init dataset
     labeled_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
-                                  root="/home/gu721/yzc/data/odoc/SEG2859_h5/{}".format(args.dataset_name),
+                                  root="/home/gu721/yzc/data/odoc/{}".format(args.dataset_name),
                                   mode='semi_train',
                                   size=args.image_size,
                                   id_path='train.txt')
@@ -194,7 +196,7 @@ if __name__ == '__main__':
     # init dataset
     val_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
                                     # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
-                                  root="/home/gu721/yzc/data/odoc/SEG2859_h5/{}".format(args.dataset_name),
+                                  root="/home/gu721/yzc/data/odoc/{}".format(args.dataset_name),
                                   mode='val',
                                   size=args.image_size)
 

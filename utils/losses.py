@@ -6,6 +6,10 @@ from torch.autograd import Variable
 import math
 
 
+
+
+
+
 def cosine_annealing(lower_bound, upper_bound, _t, _t_max):
     return upper_bound + 0.5 * (lower_bound - upper_bound) * (math.cos(math.pi * _t / _t_max) + 1)
 

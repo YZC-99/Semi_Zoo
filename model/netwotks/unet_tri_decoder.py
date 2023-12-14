@@ -667,157 +667,11 @@ class Decoder_cat_Decoder(nn.Module):
         return [x_up1,x_up2,x_up3,x_up4,output]
 
 
-class UNet_MiT(nn.Module):
-    def __init__(self, in_chns, class_num,phi='b2',pretrained=True):
-        super(UNet_MiT, self).__init__()
-
-        self.in_channels = {
-            'b0': [32, 64, 160, 256], 'b1': [64, 128, 320, 512], 'b2': [64, 128, 320, 512],
-            'b3': [64, 128, 320, 512], 'b4': [64, 128, 320, 512], 'b5': [64, 128, 320, 512],
-        }[phi]
-        self.encoder = {
-            'b0': mit_b0, 'b1': mit_b1, 'b2': mit_b2,
-            'b3': mit_b3, 'b4': mit_b4, 'b5': mit_b5,
-        }[phi](pretrained)
 
 
-        params1 = {'in_chns': in_chns,
-                  'feature_chns': [16, 64, 128, 320, 512],
-                  'dropout': [0.05, 0.1, 0.2, 0.3, 0.5],
-                  'class_num': class_num,
-                  'up_type': 1,
-                  'acti_func': 'relu'}
-
-        self.decoder1 = Decoder4Segformer(params1)
-
-    def forward(self, x):
-        feature = self.encoder(x)
-        output1 = self.decoder1(feature)
-        return output1[-1]
-
-
-class UNet_ResNet(nn.Module):
-    def __init__(self, in_chns, class_num,phi='resnet50',pretrained=True):
-        super(UNet_ResNet, self).__init__()
-
-        self.in_channels = {
-            'resnet18': [64, 128, 256, 512], 'resnet34': [64, 128,256,512], 'resnet50': [256,512,1024,2048],
-            'resnet101': [256,512,1024,2048],
-        }[phi]
-        self.encoder = {
-            'resnet18': resnet18, 'resnet34': resnet34, 'resnet50': resnet50,
-            'resnet101': resnet101,
-        }[phi](pretrained)
-
-        feature_chns = [16]
-        feature_chns.extend(self.in_channels)
-        params1 = {'in_chns': in_chns,
-                  # 'feature_chns': [16].extend(self.in_channels),
-                  'feature_chns': feature_chns,
-                  'dropout': [0.05, 0.1, 0.2, 0.3, 0.5],
-                  'class_num': class_num,
-                  'up_type': 1,
-                  'acti_func': 'relu'}
-
-        self.decoder1 = Decoder4Segformer(params1)
-
-    def forward(self, x):
-        feature = self.encoder.base_forward(x)
-        output1 = self.decoder1(feature)
-        return output1[-1]
-
-
-# class UNet_two_Decoder(nn.Module):
-#     def __init__(self, in_chns, class_num1,class_num2,fuse_type=None):
-#         super(UNet_two_Decoder, self).__init__()
-#
-#         params1 = {'in_chns': in_chns,
-#                   'feature_chns': [16, 32, 64, 128, 256],
-#                   'dropout': [0.05, 0.1, 0.2, 0.3, 0.5],
-#                   'class_num': class_num2,
-#                   'up_type': 1,
-#                   'acti_func': 'relu'}
-#         params2 = {'in_chns': in_chns,
-#                   'feature_chns': [16, 32, 64, 128, 256],
-#                   'dropout': [0.05, 0.1, 0.2, 0.3, 0.5],
-#                   'class_num': class_num1,
-#                   'up_type': 1,
-#                   'acti_func': 'relu'}
-#
-#         self.fuse_type = fuse_type
-#         self.encoder = Encoder(params1)
-#         self.decoder1 = Decoder(params1)
-#         if fuse_type == 'add':
-#             self.decoder2 = Decoder_add_Decoder(params2)
-#         elif fuse_type == 'cat':
-#             self.decoder2 = Decoder_add_Decoder(params2)
-#         else:
-#             self.decoder2 = Decoder(params2)
-#
-#     def forward(self, x):
-#         feature = self.encoder(x)
-#         output_decoder1 = self.decoder1(feature)
-#         if self.fuse_type is not None:
-#             output_decoder2 = self.decoder2(feature,output_decoder1)
-#         else:
-#             output_decoder2 = self.decoder2(feature)
-#         return output_decoder2[-1],output_decoder1[-1]
-
-
-class UNet_MiT_two_Decoder(nn.Module):
+class UNet_tri_Decoder(nn.Module):
     def __init__(self, in_chns, class_num1,class_num2,phi='b2',fuse_type=None,pretrained=True):
-        super(UNet_MiT_two_Decoder, self).__init__()
-
-        self.in_channels = {
-            'b0': [32, 64, 160, 256], 'b1': [64, 128, 320, 512], 'b2': [64, 128, 320, 512],
-            'b3': [64, 128, 320, 512], 'b4': [64, 128, 320, 512], 'b5': [64, 128, 320, 512],
-        }[phi]
-        self.encoder = {
-            'b0': mit_b0, 'b1': mit_b1, 'b2': mit_b2,
-            'b3': mit_b3, 'b4': mit_b4, 'b5': mit_b5,
-        }[phi](pretrained)
-        self.embedding_dim = {
-            'b0': 256, 'b1': 256, 'b2': 768,
-            'b3': 768, 'b4': 768, 'b5': 768,
-        }[phi]
-
-
-        params1 = {'in_chns': in_chns,
-                  'feature_chns': [32, 64, 128, 320, 512],
-                  'dropout': [0.05, 0.1, 0.2, 0.3, 0.5],
-                  'class_num': class_num2,
-                  'up_type': 1,
-                  'acti_func': 'relu'}
-        params2 = {'in_chns': in_chns,
-                  'feature_chns': [32, 64, 128, 320, 512],
-                  'dropout': [0.05, 0.1, 0.2, 0.3, 0.5],
-                  'class_num': class_num1,
-                  'up_type': 1,
-                  'acti_func': 'relu'}
-
-        self.fuse_type = fuse_type
-
-        self.decoder1 = Decoder4Segformer(params1)
-        if fuse_type == 'add':
-            self.decoder2 = Decoder4Segformer_add_Decoder(params2)
-        elif fuse_type == 'cat':
-            self.decoder2 = Decoder_add_Decoder(params2)
-        else:
-            self.decoder2 = Decoder(params2)
-
-    def forward(self, x):
-        feature = self.encoder.forward(x)
-        output_decoder1 = self.decoder1(feature)
-        if self.fuse_type is not None:
-            output_decoder2 = self.decoder2(feature,output_decoder1)
-        else:
-            output_decoder2 = self.decoder2(feature)
-        return output_decoder2[-1],output_decoder1[-1]
-
-
-class UNet_two_Decoder(nn.Module):
-    def __init__(self, in_chns, class_num1,class_num2,phi='b2',fuse_type=None,pretrained=True):
-        super(UNet_two_Decoder, self).__init__()
+        super(UNet_tri_Decoder, self).__init__()
 
         self.phi = phi
         self.in_channels = {
@@ -842,65 +696,48 @@ class UNet_two_Decoder(nn.Module):
             feature_chns = [32]
             feature_chns.extend(self.in_channels)
 
+        # odoc
         params1 = {'in_chns': in_chns,
-                  'feature_chns': feature_chns,
-                  'dropout': [0.05, 0.1, 0.2, 0.3, 0.5],
-                  'class_num': class_num2,
-                  'up_type': 1,
-                  'acti_func': 'relu'}
-        params2 = {'in_chns': in_chns,
                   'feature_chns': feature_chns,
                   'dropout': [0.05, 0.1, 0.2, 0.3, 0.5],
                   'class_num': class_num1,
                   'up_type': 1,
                   'acti_func': 'relu'}
 
-        self.fuse_type = fuse_type
+        # vessel
+        params2 = {'in_chns': in_chns,
+                  'feature_chns': feature_chns,
+                  'dropout': [0.05, 0.1, 0.2, 0.3, 0.5],
+                  'class_num': class_num2,
+                  'up_type': 1,
+                  'acti_func': 'relu'}
 
-        if phi == 'org':
-            self.encoder = Encoder(params1)
-            self.decoder1 = Decoder(params1)
-            if fuse_type == 'add':
-                self.decoder2 = Decoder_add_Decoder(params2)
-            elif fuse_type == 'cat':
-                self.decoder2 = Decoder_cat_Decoder(params2)
-            else:
-                self.decoder2 = Decoder(params2)
-        else:
-            self.decoder1 = Decoder4Segformer(params1)
-            if fuse_type == 'add':
-                self.decoder2 = Decoder4Segformer_add_Decoder(params2)
-            elif fuse_type == 'cat':
-                self.decoder2 = Decoder4Segformer_cat_Decoder(params2,backbone = phi)
-            elif 'rtb' in fuse_type:
-                rbt_layer = int(fuse_type.split('rtb')[-1])
-                if 'ccrtb' in fuse_type:
-                    if 'allccrtb' in fuse_type:
-                        self.decoder2 = Decoder4Segformer_ALLccrtb_Decoder(params2)
-                    elif 'v2_ccrtb' in fuse_type:
-                        self.decoder2 = Decoder4Segformer_ccrtbv2_Decoder(params2, rbt_layer=rbt_layer)
-                    else:
-                        self.decoder2 = Decoder4Segformer_ccrtb_Decoder(params2, rbt_layer=rbt_layer)
-                else:
-                    self.decoder2 = Decoder4Segformer_rtb_Decoder(params2,rbt_layer=rbt_layer)
-            else:
-                self.decoder2 = Decoder4Segformer(params2)
+        #odoc-v2
+        params3 = {'in_chns': in_chns,
+                  'feature_chns': feature_chns,
+                  'dropout': [0.05, 0.1, 0.2, 0.3, 0.5],
+                  'class_num': class_num1,
+                  'up_type': 0,
+                  'acti_func': 'relu'}
+
+
+
+        self.decoder1 = Decoder4Segformer(params1)
+        self.decoder2 = Decoder4Segformer(params2)
+        self.decoder3 = Decoder4Segformer(params3)
 
     def forward(self, x):
         if 'resnet' in self.phi:
             feature = self.encoder.base_forward(x)
         else:
             feature = self.encoder.forward(x)
+        # od
         output_decoder1 = self.decoder1(feature)
-        if self.fuse_type in ['add','cat',
-                              'rtb1','rtb2','rtb3','rtb4',
-                              'ccrtb1','ccrtb2','ccrtb3','ccrtb4',
-                              'v2_ccrtb1','v2_ccrtb2','v2_ccrtb3','v2_ccrtb4',
-                              'allccrtb0'] :
-            output_decoder2 = self.decoder2(feature,output_decoder1)
-        else:
-            output_decoder2 = self.decoder2(feature)
-        return output_decoder2[-1],output_decoder1[-1]
+        # vessel
+        output_decoder2 = self.decoder2(feature)
+        # od-pseudo
+        output_decoder3 = self.decoder3(feature)
+        return output_decoder1[-1],output_decoder2[-1],output_decoder3[-1]
 
 
 

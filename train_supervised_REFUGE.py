@@ -34,15 +34,15 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--seed',type=int,default=42)
 parser.add_argument('--device',type=int,default=0)
 parser.add_argument('--num_works',type=int,default=0)
-parser.add_argument('--model',type=str,default='unet')
-parser.add_argument('--backbone',type=str,default='b2')
+parser.add_argument('--model',type=str,default='UNet_ResNet')
+parser.add_argument('--backbone',type=str,default='resnet34')
 parser.add_argument('--lr_decouple',action='store_true')
 
-parser.add_argument('--exp',type=str,default='supervised/RIM-ONE')
+parser.add_argument('--exp',type=str,default='supervised/REFUGE')
 parser.add_argument('--save_period',type=int,default=5000)
 parser.add_argument('--val_period',type=int,default=100)
 
-parser.add_argument('--dataset_name',type=str,default='RIM-ONE')
+parser.add_argument('--dataset_name',type=str,default='REFUGE')
 parser.add_argument('--unlabeled_txt',type=str,default='unlabeled_addDDR.txt')
 
 parser.add_argument('--optim',type=str,default='AdamW')
@@ -123,6 +123,7 @@ def create_version_folder(snapshot_path):
 
 
 args = parser.parse_args()
+# snapshot_path = "./exp_2d/" + args.exp + "/"
 snapshot_path = "./exp_2d/" + args.exp + "/"
 max_iterations = args.max_iterations
 base_lr = args.base_lr
@@ -158,7 +159,7 @@ if __name__ == '__main__':
 
     # init dataset
     labeled_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
-                                  root="/home/gu721/yzc/data/odoc/SEG2859_h5/{}".format(args.dataset_name),
+                                  root="/home/gu721/yzc/data/odoc/SEG2859_h5/{}".format("REFUGE"),
                                   mode='semi_train',
                                   size=args.image_size,
                                   id_path='train.txt')
@@ -183,7 +184,7 @@ if __name__ == '__main__':
 
     # ce_loss = BCEWithLogitsLoss()
     if args.ohem > 0:
-        ce_loss = OhemCrossEntropy(thres=args.ohem,weight=torch.tensor([1.0,4.0,8.0],device=device))
+        ce_loss = OhemCrossEntropy(thres=args.ohem,weight=torch.tensor([1.0,4.0,12.0],device=device))
     else:
         ce_loss = CrossEntropyLoss(ignore_index=255)
 
@@ -194,7 +195,7 @@ if __name__ == '__main__':
     # init dataset
     val_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
                                     # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
-                                  root="/home/gu721/yzc/data/odoc/SEG2859_h5/{}".format(args.dataset_name),
+                                  root="/home/gu721/yzc/data/odoc/SEG2859_h5/{}".format("REFUGE"),
                                   mode='val',
                                   size=args.image_size)
 

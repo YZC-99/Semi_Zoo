@@ -24,6 +24,9 @@ def CLAHE(image_path):
     clahe_rgb = Image.merge('RGB', [Image.fromarray(clahe_result)] * 3)
     return  clahe_rgb
 
+
+
+
 class SemiDataset(Dataset):
     def __init__(self,name, root, mode, size,
                  id_path=None,h5_file=False,CLAHE = False,preprocess = False):
@@ -101,38 +104,10 @@ class SemiDataset(Dataset):
             mask[mask > 2] = 0
         return {'image': img, 'label': mask}
 
-    def get_item_h5(self,item):
-        id = self.ids[item]
-        name = id.split(' ')[0].split('.')[0]
-        h5_path = os.path.join(self.root, (name + ".h5"))
-        h5f = h5py.File(h5_path,'r')
-        img = h5f['image']
-        if "DDR" in id or "G1020" in id or "ACRIMA" in id:
-            mask = Image.fromarray(np.zeros((2, 2)))
-            contour = Image.fromarray(np.zeros((2, 2)))
-        else:
-            mask = h5f['label']
-            contour = h5f['contour']
-
-        if self.mode == 'semi_train':
-            if random.random() > 0.5:
-                img,mask,contour =  random_rot_flip(img,mask,contour)
-            elif random.random() > 0.5:
-                img, mask, contour = random_rotate(img, mask, contour)
-
-        # img, mask = resize(img, mask, self.size)
-        img, mask, contour = resize_numpy(img, mask, contour, self.size)
-        img, mask = normalize(img, mask)
-
-        if mask is not None:
-            mask[mask > 2] = 0
-        return {'image': img, 'label': mask}
 
     def __getitem__(self, item):
-        if not self.h5_file:
-            sample = self.get_item_nor(item)
-        else:
-            sample = self.get_item_h5(item)
+        sample = self.get_item_nor(item)
+
         return sample
 
     def __len__(self):
@@ -140,51 +115,5 @@ class SemiDataset(Dataset):
 
 
 
-import cv2
-def resize_numpy(image, label, contour, new_shape):
-    image = cv2.resize(image, new_shape)
-    label = cv2.resize(label, new_shape)
-    contour = cv2.resize(contour, new_shape)
-    return image, label, contour
 
 
-def random_rot_flip(image, label, contour):
-    k = np.random.randint(0, 4)
-    image = np.rot90(image, k)
-    label = np.rot90(label, k)
-    contour = np.rot90(contour, k)
-    axis = np.random.randint(0, 2)
-    image = np.flip(image, axis=axis).copy()
-    label = np.flip(label, axis=axis).copy()
-    contour = np.flip(contour, axis=axis).copy()
-    return image, label, contour
-
-def random_rotate(image, label, contour):
-    angle = np.random.randint(-20, 20)
-    image = ndimage.rotate(image, angle, order=0, reshape=False)
-    label = ndimage.rotate(label, angle, order=0, reshape=False)
-    contour = ndimage.rotate(contour, angle, order=0, reshape=False)
-    return image, label, contour
-
-
-
-
-class RandomGenerator(object):
-    def __init__(self, output_size):
-        self.output_size = output_size
-
-    def __call__(self, sample):
-        image, label, contour = sample['image'], sample['label'], sample['con']#, sample['sdm']
-        if random.random() > 0.5:
-            image, label, contour = random_rot_flip(image, label, contour)
-        elif random.random() > 0.5:
-            image, label, contour = random_rotate(image, label, contour)
-        image = functional.to_tensor(
-            image.astype(np.float32))
-        label = functional.to_tensor(label.astype(np.uint8))
-
-        contour = functional.to_tensor(contour.astype(np.uint8))
-
-
-        sample = {'image': image, 'label': label, 'con': contour}
-        return sample

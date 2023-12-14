@@ -34,15 +34,15 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--seed',type=int,default=42)
 parser.add_argument('--device',type=int,default=0)
 parser.add_argument('--num_works',type=int,default=0)
-parser.add_argument('--model',type=str,default='unet')
-parser.add_argument('--backbone',type=str,default='b2')
+parser.add_argument('--model',type=str,default='UNet_ResNet')
+parser.add_argument('--backbone',type=str,default='resnet34')
 parser.add_argument('--lr_decouple',action='store_true')
 
-parser.add_argument('--exp',type=str,default='supervised/RIM-ONE')
+parser.add_argument('--exp',type=str,default='supervised/REFUGE')
 parser.add_argument('--save_period',type=int,default=5000)
 parser.add_argument('--val_period',type=int,default=100)
 
-parser.add_argument('--dataset_name',type=str,default='RIM-ONE')
+parser.add_argument('--dataset_name',type=str,default='REFUGE')
 parser.add_argument('--unlabeled_txt',type=str,default='unlabeled_addDDR.txt')
 
 parser.add_argument('--optim',type=str,default='AdamW')
@@ -122,7 +122,14 @@ def create_version_folder(snapshot_path):
     return new_folder
 
 
+def get_contour_loss_weight(iter):
+    # 发现训练容易塌陷，所以考虑对vessel的权重进行退火衰减
+    weight = args.vessel_loss_weight * ( 1 - iter / args.max_iterations)
+    return weight
+
+
 args = parser.parse_args()
+# snapshot_path = "./exp_2d/" + args.exp + "/"
 snapshot_path = "./exp_2d/" + args.exp + "/"
 max_iterations = args.max_iterations
 base_lr = args.base_lr
@@ -153,12 +160,12 @@ if __name__ == '__main__':
     logging.info(str(args))
 
     # init model
-    model = build_model(model=args.model,backbone=args.backbone,in_chns=3,class_num1=args.num_classes,class_num2=2,fuse_type=None)
+    model = build_model(model=args.model,backbone=args.backbone,in_chns=3,class_num1=args.num_classes,class_num2=2,fuse_type='None')
     model.to(device)
 
     # init dataset
     labeled_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
-                                  root="/home/gu721/yzc/data/odoc/SEG2859_h5/{}".format(args.dataset_name),
+                                  root="/home/gu721/yzc/data/odoc/SEG2859_h5/{}".format("REFUGE"),
                                   mode='semi_train',
                                   size=args.image_size,
                                   id_path='train.txt')
@@ -181,9 +188,9 @@ if __name__ == '__main__':
     lr_ = args.base_lr
     model.train()
 
-    # ce_loss = BCEWithLogitsLoss()
+    ce_loss_contour = BCEWithLogitsLoss()
     if args.ohem > 0:
-        ce_loss = OhemCrossEntropy(thres=args.ohem,weight=torch.tensor([1.0,4.0,8.0],device=device))
+        ce_loss = OhemCrossEntropy(thres=args.ohem,weight=torch.tensor([1.0,4.0,12.0],device=device))
     else:
         ce_loss = CrossEntropyLoss(ignore_index=255)
 
@@ -194,7 +201,7 @@ if __name__ == '__main__':
     # init dataset
     val_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
                                     # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
-                                  root="/home/gu721/yzc/data/odoc/SEG2859_h5/{}".format(args.dataset_name),
+                                  root="/home/gu721/yzc/data/odoc/SEG2859_h5/{}".format("REFUGE"),
                                   mode='val',
                                   size=args.image_size)
 
@@ -213,26 +220,34 @@ if __name__ == '__main__':
             time2 = time.time()
 
             labeled_batch, label_label_batch = labeled_sampled_batch['image'].to(device), labeled_sampled_batch['label'].to(device)
+            contour_label_batch = labeled_sampled_batch['contour'].to(device)
 
             all_batch = labeled_batch
             all_label_batch = label_label_batch
             all_label_batch[all_label_batch > 2] = 0
 
-            outputs = model(all_batch)
+            outputs,outputs_contours = model(all_batch)
 
             # calculate the loss
             # 这里需要注意，如果是分割三个类别以上，则需要分开计算dist和分开计算mse
             outputs_soft = torch.argmax(outputs,dim=1)
 
+            loss_seg_dice = torch.zeros(1,device=device)
+            loss_seg_ce_contour = ce_loss_contour(outputs_contours[:,0,...],contour_label_batch.float())
             loss_seg_ce = ce_loss(outputs,all_label_batch)
 
             if args.with_dice:
-                loss_seg_dice = losses.dice_loss(outputs_soft,all_label_batch)
-                loss = loss_seg_ce + loss_seg_dice
-            else:
-                loss = loss_seg_ce
-            if not args.with_ce:
-                loss_seg_ce = torch.zeros(1)
+                loss_seg_dice = losses.dice_loss(outputs_soft, all_label_batch)
+
+
+            # if args.with_dice:
+            #     loss = loss_seg_ce + loss_seg_dice
+            # else:
+            #     loss = loss_seg_ce
+            # if not args.with_ce:
+            #     loss_seg_ce = torch.zeros(1)
+
+            loss = get_contour_loss_weight(iter_num) * loss_seg_ce_contour + loss_seg_ce
 
             optimizer.zero_grad()
             loss.backward()
@@ -243,6 +258,7 @@ if __name__ == '__main__':
             writer.add_scalar('lr', optimizer.param_groups[0]['lr'], iter_num)
             writer.add_scalar('loss/loss', loss, iter_num)
             writer.add_scalar('loss/loss_seg', loss_seg_ce, iter_num)
+            writer.add_scalar('loss/loss_seg_ce_contour', loss_seg_ce_contour, iter_num)
             if args.with_dice:
                 writer.add_scalar('loss/loss_dice', loss_seg_dice, iter_num)
 
@@ -252,12 +268,23 @@ if __name__ == '__main__':
             writer.add_scalar('loss/loss', loss, iter_num)
             logging.info('iteration %d : loss : %f' % (iter_num, loss.item()))
             logging.info('iteration %d : loss_seg : %f' % (iter_num, loss_seg_ce.item()))
+            logging.info('iteration %d : loss_seg_ce_contour : %f' % (iter_num, loss_seg_ce_contour.item()))
             if args.with_dice:
                 logging.info('iteration %d : loss_dice : %f' % (iter_num, loss_seg_dice.item()))
 
             if iter_num % 50 == 0:
                 image = all_batch[0]
                 writer.add_image('train/Image', image, iter_num)
+
+                image = torch.argmax(outputs_contours, dim=1)
+                image = image[0]
+                writer.add_image('train/Predicted_label_contour', image.unsqueeze(0), iter_num)
+
+                image = contour_label_batch[0].unsqueeze(0)
+                image = image
+                writer.add_image('train/Groundtruth_label_contour',
+                                 image, iter_num)
+
 
                 image = torch.argmax(outputs,dim=1)
                 image = image[0] / (args.num_classes - 1)
@@ -276,7 +303,7 @@ if __name__ == '__main__':
                 show_id = random.randint(0,len(val_iteriter))
                 for id,data in enumerate(val_iteriter):
                     img,label = data['image'].to(device),data['label'].to(device)
-                    outputs = model(img)
+                    outputs,outputs_contours = model(img)
 
                     ODOC_val_metrics.add_multi_class(outputs,label)
 

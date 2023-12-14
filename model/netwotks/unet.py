@@ -244,6 +244,7 @@ class UNet(nn.Module):
         return output1
 
 
+
 class UNet_two_Decoder(nn.Module):
     def __init__(self, in_chns, class_num1,class_num2):
         super(UNet_two_Decoder, self).__init__()
@@ -260,6 +261,7 @@ class UNet_two_Decoder(nn.Module):
                   'class_num': class_num2,
                   'up_type': 1,
                   'acti_func': 'relu'}
+
 
         self.encoder = Encoder(params1)
         self.decoder1 = Decoder(params1)

@@ -15,6 +15,7 @@ import torch.nn.functional as F
 from tensorboardX import SummaryWriter
 from model.netwotks.unet import UNet, MCNet2d_compete_v1,UNet_DTC2d
 from model.netwotks.unet_two_decoder import UNet_two_Decoder,UNet_MiT,UNet_MiT_two_Decoder
+from model.netwotks.unet_tri_decoder import UNet_tri_Decoder
 from utils import ramps,losses
 from utils.losses import OhemCrossEntropy
 from utils.test_utils import ODOC_metrics
@@ -77,14 +78,8 @@ parser.add_argument('--with_dice',action='store_true')
 
 
 def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type):
-    if model == "UNet":
-        return UNet(in_chns=in_chns,class_num=class_num1)
-    elif model == 'UNet_MiT':
-        return UNet_MiT(in_chns=in_chns, class_num=class_num1,phi=backbone,pretrained=True)
-    elif model == 'UNet_two_Decoder':
-        return UNet_two_Decoder(in_chns=in_chns, class_num1=class_num1,class_num2=class_num2,phi=backbone,fuse_type=fuse_type)
-    # elif model == 'UNet_MiT_two_Decoder':
-    #     return UNet_MiT_two_Decoder(in_chns=in_chns, class_num1=class_num1,class_num2=class_num2,fuse_type=fuse_type)
+
+    return UNet_tri_Decoder(in_chns=in_chns, class_num1=class_num1,class_num2=class_num2,phi=backbone,fuse_type=fuse_type)
 
 def get_vessel_loss_weight(iter):
     # 发现训练容易塌陷，所以考虑对vessel的权重进行退火衰减
@@ -224,14 +219,27 @@ if __name__ == '__main__':
 
             all_batch = torch.cat([odoc_labeled_batch,vessel_labeled_batch],dim=0)
 
-            outputs_odoc,outputs_vessel = model(all_batch)
+            outputs_odoc,outputs_vessel,outputs_odoc_v2 = model(all_batch)
+
+            odoc_pseudo_v1 = torch.argmax(outputs_odoc[labeled_bs:,...],dim=1)
+            odoc_pseudo_v2 = torch.argmax(outputs_odoc_v2[labeled_bs:,...],dim=1)
+
+            # 交叉监督，伪标签
+            loss_seg_ce_odoc_pseudo = ce_loss_odoc(outputs_odoc[labeled_bs:,...],odoc_pseudo_v2) + \
+                                      ce_loss_odoc(outputs_odoc_v2[labeled_bs:,...],odoc_pseudo_v1)
+            # v2的监督
+            loss_seg_ce_v2 = ce_loss_odoc(outputs_odoc_v2[:labeled_bs,...],odoc_label_batch)
 
             # calculate the loss of od and oc
             odoc_label_batch[odoc_label_batch > 2] = 0
 
             loss_seg_softfocal_odoc = torch.zeros(1,device=device)
             loss_seg_dice_odoc = torch.zeros(1,device=device)
-            loss_seg_ce_odoc = ce_loss_odoc(outputs_odoc[:labeled_bs,...],odoc_label_batch)
+
+            loss_seg_ce_odoc = ce_loss_odoc(outputs_odoc[:labeled_bs,...],odoc_label_batch) + \
+                               loss_seg_ce_odoc_pseudo + \
+                               loss_seg_ce_v2
+
             loss_seg_ce_vessel = ce_loss_vessel(outputs_vessel[labeled_bs:,0, ...], vessel_label_batch.float())
 
             if args.with_dice:
@@ -283,6 +291,8 @@ if __name__ == '__main__':
 
                     image = vessel_label_batch[0].unsqueeze(0)
                     image = image / 2
+                    print("vessel")
+                    print(torch.unique(image))
                     writer.add_image('train/Groundtruth_label_vessel',
                                      image, iter_num)
 
@@ -304,7 +314,7 @@ if __name__ == '__main__':
                     show_id = random.randint(0,len(val_iteriter))
                     for id,data in enumerate(val_iteriter):
                         img,label = data['image'].to(device),data['label'].to(device)
-                        outputs_odoc,_ = model(img)
+                        outputs_odoc,_,outputs_odoc_v2 = model(img)
 
                         ODOC_val_metrics.add_multi_class(outputs_odoc,label)
 
