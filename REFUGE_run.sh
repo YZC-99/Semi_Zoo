@@ -23,9 +23,20 @@ OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_supervised_REFUGE.py \
         --batch_size 4
 
 
+
+
         --with_ce \
         --with_dice
 
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_supervised_REFUGE.py \
+        --num_works 0 \
+        --device 1 \
+        --dataset_name REFUGE \
+        --exp supervised/REFUGE \
+        --model SR_UNet_ResNet \
+        --backbone resnet34 \
+        --base_lr 0.0003 \
+        --batch_size 4
 
 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_supervised_REFUGE.py \
         --num_works 0 \
@@ -45,18 +56,23 @@ OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_supervised_2d_odoc_vessel.py \
         --device 0 \
         --exp supervised/REFUGE_vessel \
         --dataset_name REFUGE \
-        --fuse_type rtb4 \
-        --model UNet_two_Decoder \
+        --model UNet_two_Out \
         --labeled_num 400 \
         --total_num 445 \
-        --backbone resnet34 \
+        --backbone resnet50 \
         --batch_size 4 \
         --labeled_bs 2 \
         --base_lr 0.0003
 
+        \
+        --no_vessel_weight_decay
+
+
+        \
+
+      UNet_two_Out
+        --fuse_type v2_ccrtb4 \
         --with_dice
-
-
         --with_ce \
         --with_dice
 

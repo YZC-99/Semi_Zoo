@@ -85,7 +85,7 @@ def logs2csv(ex_path=''):
 
 
 
-path = "/home/gu721/yzc/segmentation/Semi_Zoo/exp_2d"
+path = "/home/gu721/yzc/segmentation/Semi_Zoo/exp_2d_dr"
 ex_num = logs2csv(path)
 print("收集成功")
 print("共计 {} 个实验".format(ex_num))

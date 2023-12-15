@@ -1,6 +1,7 @@
 import torch
 from dataloader.transform import  hflip,vflip, normalize, resize, random_scale_and_crop
 from dataloader.transform import random_rotate,random_translate
+from dataloader.transforms_np import resize_np,random_flip_np,random_rotate_np,normalize_np
 import cv2
 import math
 import os
@@ -88,7 +89,7 @@ class SemiDataset(Dataset):
 
             img, mask = hflip(img, mask, p=0.5)
             img, mask = vflip(img, mask, p=0.5)
-            # img, mask = random_rotate(img, mask, p=0.5)
+            img, mask = random_rotate(img, mask, p=0.5)
             img, mask = random_scale_and_crop(img, mask, target_size=(self.size, self.size), min_scale=0.8,
                                               max_scale=1.2, p=0.0)
 
@@ -98,10 +99,6 @@ class SemiDataset(Dataset):
             image_edges_info = np.load(img_path.replace('images_cropped','img2canny-dog2npy').replace('jpg','npy'),allow_pickle=True)
             image_edges_info = image_edges_info / 255
             image_edges_info = torch.from_numpy(image_edges_info)
-
-
-        if mask is not None:
-            mask[mask > 2] = 0
         return {'image': img, 'label': mask}
 
 
@@ -113,6 +110,54 @@ class SemiDataset(Dataset):
     def __len__(self):
         return len(self.ids)
 
+class IDRIDDataset(Dataset):
+    def __init__(self,name, root, mode, size,
+                 id_path=None,CLAHE = False):
+        self.name = name
+        self.root = root
+        self.mode = mode
+        self.size = size
+        self.CLAHE = CLAHE
+
+        if mode == 'semi_train':
+            id_path = '%s/%s' %(name,id_path)
+        elif mode == 'val':
+            id_path = '%s/val.txt' % name
+        elif mode == 'test':
+            id_path = '%s/test.txt' % name
+
+        with open(id_path, 'r') as f:
+            self.ids = f.read().splitlines()
+
+    def get_item_nor(self,item):
+        id = self.ids[item]
+        img_path = os.path.join(self.root, id.split(' ')[0])
+        if self.CLAHE:
+            img = CLAHE(img_path)
+        else:
+            img = Image.open(img_path)
+
+        mask_path = os.path.join(self.root, id.split(' ')[1])
+        mask = Image.open(mask_path)
+
+        if self.mode == 'semi_train':
+            img, mask = hflip(img, mask, p=0.5)
+            img, mask = vflip(img, mask, p=0.5)
+            img, mask = random_rotate(img, mask,p=0.5,max_rotation_angle=30)
+
+
+        img, mask = resize(img, mask, self.size)
+        img, mask = normalize(img, mask,mean=(116.51,56,437,16.31),std=(81.60,41.72,7.36))
+
+        return {'image': img, 'label': mask}
+
+    def __getitem__(self, item):
+        sample = self.get_item_nor(item)
+
+        return sample
+
+    def __len__(self):
+        return len(self.ids)
 
 
 

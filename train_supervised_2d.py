@@ -16,7 +16,7 @@ from tensorboardX import SummaryWriter
 from model.netwotks.unet import UNet, MCNet2d_compete_v1,UNet_DTC2d
 from model.netwotks.segformer import SegFormer
 from model.netwotks.deeplabv3plus import DeepLabV3Plus
-from model.netwotks.unet_two_decoder import UNet_two_Decoder,UNet_MiT,UNet_ResNet
+from model.netwotks.unet_two_decoder import UNet_two_Decoder,UNet_MiT,UNet_ResNet,SR_UNet_ResNet
 from utils import ramps,losses
 from utils.losses import OhemCrossEntropy
 from utils.test_utils import ODOC_metrics
@@ -92,6 +92,8 @@ def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type):
         return UNet(in_chns=in_chns,class_num=class_num1)
     elif model == 'UNet_ResNet':
         return UNet_ResNet(in_chns=in_chns, class_num=class_num1, phi=backbone, pretrained=True)
+    elif model == 'SR_UNet_ResNet':
+        return SR_UNet_ResNet(in_chns=in_chns, class_num=class_num1, phi=backbone, pretrained=True)
     elif model == 'UNet_MiT':
         return UNet_MiT( in_chns=in_chns, class_num=class_num1,phi=backbone,pretrained=True)
     elif model == 'Segformer':

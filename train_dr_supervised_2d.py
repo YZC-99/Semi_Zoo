@@ -1,6 +1,6 @@
 import random
 from tqdm import tqdm
-from dataloader.fundus import SemiDataset
+from dataloader.fundus import SemiDataset,IDRIDDataset
 from dataloader.samplers import TwoStreamBatchSampler, LabeledBatchSampler,UnlabeledBatchSampler
 import torch
 import glob
@@ -13,11 +13,13 @@ from torch.cuda.amp import autocast,GradScaler
 import torch.nn.functional as F
 # from torch.utils.tensorboard import SummaryWriter
 from tensorboardX import SummaryWriter
+from model.netwotks.deeplabv3plus import DeepLabV3Plus
 from model.netwotks.unet import UNet, MCNet2d_compete_v1,UNet_DTC2d
-from model.netwotks.unet_two_decoder import UNet_two_Decoder,UNet_MiT,UNet_ResNet
+from model.netwotks.unet_two_decoder import UNet_two_Decoder,UNet_MiT,UNet_ResNet,SR_UNet_ResNet
 from utils import ramps,losses
 from utils.losses import OhemCrossEntropy
 from utils.test_utils import DR_metrics
+from utils.util import color_map,gray_to_color
 import random
 from utils.util import get_optimizer,PolyLRwithWarmup, compute_sdf,compute_sdf_luoxd,compute_sdf_multi_class
 import time
@@ -26,6 +28,7 @@ import os
 import shutil
 import logging
 import sys
+
 
 
 parser = argparse.ArgumentParser()
@@ -46,14 +49,14 @@ parser.add_argument('--unlabeled_txt',type=str,default='unlabeled_addDDR.txt')
 parser.add_argument('--optim',type=str,default='AdamW')
 parser.add_argument('--amp',type=bool,default=True)
 parser.add_argument('--num_classes',type=int,default=5)
-parser.add_argument('--base_lr',type=float,default=0.0001)
+parser.add_argument('--base_lr',type=float,default=0.00025)
 
 parser.add_argument('--batch_size',type=int,default=4)
 parser.add_argument('--labeled_bs',type=int,default=16)
 
 parser.add_argument('--od_rim',type=bool,default=True)
 parser.add_argument('--oc_label',type=int,default=2)
-parser.add_argument('--image_size',type=int,default=1024)
+parser.add_argument('--image_size',type=int,default=512)
 
 parser.add_argument('--labeled_num',type=int,default=100,help="5%:100,")
 parser.add_argument('--total_num',type=int,default=11249,help="SEG:2859;SEG_add_DDR:11249")
@@ -93,7 +96,10 @@ def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type):
         return UNet_MiT( in_chns=in_chns, class_num=class_num1,phi=backbone,pretrained=True)
     elif model == 'UNet_two_Decoder':
         return UNet_two_Decoder( in_chns=in_chns, class_num1=class_num1,class_num2=class_num2,fuse_type=fuse_type)
-
+    elif model == 'Deeplabv3p':
+        return DeepLabV3Plus(backbone=backbone,nclass=class_num1)
+    elif model == 'SR_UNet_ResNet':
+        return SR_UNet_ResNet(in_chns=in_chns, class_num=class_num1, phi=backbone, pretrained=True)
 
 
 
@@ -147,7 +153,7 @@ if __name__ == '__main__':
     model.to(device)
 
     # init dataset
-    labeled_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
+    labeled_dataset = IDRIDDataset(name='./dataset/{}'.format(args.dataset_name),
                                   root="/home/gu721/yzc/data/dr/{}".format(args.dataset_name),
                                   mode='semi_train',
                                   size=args.image_size,
@@ -173,17 +179,18 @@ if __name__ == '__main__':
 
     # ce_loss = BCEWithLogitsLoss()
     if args.ohem > 0:
-        ce_loss = OhemCrossEntropy(thres=args.ohem,weight=torch.tensor([1.0,2.8,3.0],device=device))
+        # online hard example mining
+        ce_loss = OhemCrossEntropy(thres=args.ohem,weight=torch.tensor([0.001,1.0,0.1,0.01,0.1],device=device))
     else:
-        ce_loss = CrossEntropyLoss(ignore_index=255)
+        ce_loss = CrossEntropyLoss(ignore_index=255,weight=torch.tensor([0.001,1.0,0.1,0.01,0.1],device=device))
     # mse_loss = MSELoss()
 
 
     # 验证集
     # init dataset
-    val_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
+    val_dataset = IDRIDDataset(name='./dataset/{}'.format(args.dataset_name),
                                     # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
-                                  root="/home/gu721/yzc/data/odoc/{}".format(args.dataset_name),
+                                  root="/home/gu721/yzc/data/dr/{}".format(args.dataset_name),
                                   mode='val',
                                   size=args.image_size)
 
@@ -205,18 +212,14 @@ if __name__ == '__main__':
 
             all_batch = labeled_batch
             all_label_batch = label_label_batch
-            all_label_batch[all_label_batch > 2] = 0
 
             outputs = model(all_batch)
 
             # calculate the loss
-            # 这里需要注意，如果是分割三个类别以上，则需要分开计算dist和分开计算mse
             outputs_soft = torch.argmax(outputs,dim=1)
+            all_label_batch[all_label_batch > 4] = 4
             loss_seg_ce = ce_loss(outputs,all_label_batch)
-            # loss_seg_dice = losses.dice_loss(outputs_soft,all_label_batch)
-            # loss = loss_seg_ce + loss_seg_dice
             loss = loss_seg_ce
-            # loss =  loss_seg_dice
 
             optimizer.zero_grad()
             loss.backward()
@@ -237,79 +240,88 @@ if __name__ == '__main__':
             logging.info('iteration %d : loss_seg : %f' % (iter_num, loss_seg_ce.item()))
             # logging.info('iteration %d : loss_dice : %f' % (iter_num, loss_seg_dice.item()))
 
-            if iter_num % 1 == 0:
-                image = all_batch[0]
-                writer.add_image('train/Image', image, iter_num)
+            with torch.no_grad():
+                if iter_num % 50 == 0:
+                    image = all_batch[0]
+                    writer.add_image('train/Image', image, iter_num)
 
-                image = torch.argmax(outputs,dim=1)
-                # image = image[0] / (args.num_classes - 1)
-                image = image[0]
-                # 将单通道张量转换为 RGB 通道
-                w,h = image.size()
-                image_rgb = torch.zeros(3, w,h)
-                for i in range(3):
-                    image_rgb[i, :, :] = (image == i).float()
-                writer.add_image('train/Predicted_label', image_rgb, iter_num)
+                    image = torch.argmax(outputs,dim=1)
+                    image = image[0]
+                    colored_image = gray_to_color(image, color_map)
+                    writer.add_image('train/Predicted_label', colored_image, iter_num,dataformats='CHW')
 
 
-                image = all_label_batch[0]
-                w,h = image.size()
-                image_rgb = torch.zeros(3, w,h)
-                for i in range(3):
-                    image_rgb[i, :, :] = (image == i).float()
-                # image = image / (args.num_classes - 1)
-                writer.add_image('train/Groundtruth_label',
-                                 image_rgb, iter_num)
+                    image = all_label_batch[0]
+                    colored_image = gray_to_color(image, color_map)
+                    writer.add_image('train/Groundtruth_label',
+                                     colored_image, iter_num,dataformats='CHW')
 
 
             # eval
-            if iter_num % args.val_period == 0:
-                model.eval()
-                show_id = random.randint(0,len(val_iteriter))
-                for id,data in enumerate(val_iteriter):
-                    img,label = data['image'].to(device),data['label'].to(device)
-                    outputs = model(img)
+            with torch.no_grad():
+                if iter_num % args.val_period == 0:
+                    model.eval()
+                    show_id = random.randint(0,len(val_iteriter))
+                    for id,data in enumerate(val_iteriter):
+                        img,label = data['image'].to(device),data['label'].to(device)
+                        outputs = model(img)
 
-                    DR_val_metrics.add(outputs,label)
+                        DR_val_metrics.add(outputs,label)
 
-                    if id == show_id:
-                        image = img[0]
-                        writer.add_image('val/image', image, iter_num)
-                        image = torch.argmax(outputs,dim=1)
-                        image = image[0] / (args.num_classes - 1)
-                        writer.add_image('val/pred', image.unsqueeze(0), iter_num)
-                        image = label
-                        image = image / (args.num_classes - 1)
-                        writer.add_image('val/Groundtruth_label',
-                                         image, iter_num)
+                        if id == show_id:
+                            image = img[0]
+                            writer.add_image('val/image', image, iter_num)
 
-                val_metrics = DR_val_metrics.get_metrics()
-                AUC = val_metrics[0]
-                MA_auc, HE_auc, EX_auc, SE_auc = AUC['MA_auc'],AUC['HE_auc'],AUC['EX_auc'],AUC['SE_auc']
+                            image = torch.argmax(outputs,dim=1)
+                            image = gray_to_color(image,color_map)
+                            writer.add_image('val/pred', image, iter_num,dataformats='CHW')
+                            image = label
+                            image = gray_to_color(image,color_map)
+                            writer.add_image('val/Groundtruth_label',
+                                             image, iter_num,dataformats='CHW')
+
+                    val_metrics = DR_val_metrics.get_metrics()
+                    AUC_PR = val_metrics[0]
+                    AUC_ROC = val_metrics[1]
+                    MA_AUC_PR, HE_AUC_PR, EX_AUC_PR, SE_AUC_PR = AUC_PR['MA_AUC_PR'],AUC_PR['HE_AUC_PR'],AUC_PR['EX_AUC_PR'],AUC_PR['SE_AUC_PR']
+                    MA_AUC_ROC, HE_AUC_ROC, EX_AUC_ROC, SE_AUC_ROC = AUC_ROC['MA_AUC_ROC'],AUC_ROC['HE_AUC_ROC'],AUC_ROC['EX_AUC_ROC'],AUC_ROC['SE_AUC_ROC']
 
 
 
-                logging.info("MA_auc:{}--HE_auc:--{}--EX_auc:{}--SE_auc:--{}".format(
-                                                                                        MA_auc,
-                                                                                        HE_auc,
-                                                                                        EX_auc,
-                                                                                       SE_auc,
-                                                                                       ))
-                writer.add_scalar('val/MA_auc',MA_auc, iter_num)
-                writer.add_scalar('val/HE_auc',HE_auc, iter_num)
-                writer.add_scalar('val/EX_auc',EX_auc, iter_num)
-                writer.add_scalar('val/SE_auc',SE_auc, iter_num)
-                model.train()
+                    logging.info("MA_AUC_PR:{}--HE_AUC_PR:{}--EX_AUC_PR:{}--SE_AUC_PR:{}".format(
+                                                                                            MA_AUC_PR,
+                                                                                            HE_AUC_PR,
+                                                                                            EX_AUC_PR,
+                                                                                           SE_AUC_PR,
+                                                                                           ))
+                    logging.info("MA_AUC_ROC:{}--HE_AUC_ROC:{}--EX_AUC_ROC:{}--SE_AUC_ROC:{}".format(
+                                                                                            MA_AUC_ROC,
+                                                                                            HE_AUC_ROC,
+                                                                                            EX_AUC_ROC,
+                                                                                           SE_AUC_ROC,
+                                                                                           ))
 
-            if iter_num % args.save_period == 0:
-                save_mode_path = os.path.join(
-                    snapshot_path, 'iter_' + str(iter_num) + '.pth')
-                torch.save(model.state_dict(), save_mode_path)
-                logging.info("save model to {}".format(save_mode_path))
+                    writer.add_scalar('val_AUC_PR/MA',MA_AUC_PR, iter_num)
+                    writer.add_scalar('val_AUC_PR/HE',HE_AUC_PR, iter_num)
+                    writer.add_scalar('val_AUC_PR/EX',EX_AUC_PR, iter_num)
+                    writer.add_scalar('val_AUC_PR/SE',SE_AUC_PR, iter_num)
 
-            if iter_num >= max_iterations:
-                break
-            time1 = time.time()
+                    writer.add_scalar('val_AUC_ROC/MA',MA_AUC_ROC, iter_num)
+                    writer.add_scalar('val_AUC_ROC/HE',HE_AUC_ROC, iter_num)
+                    writer.add_scalar('val_AUC_ROC/EX',EX_AUC_ROC, iter_num)
+                    writer.add_scalar('val_AUC_ROC/SE',SE_AUC_ROC, iter_num)
+
+                    model.train()
+
+                if iter_num % args.save_period == 0:
+                    save_mode_path = os.path.join(
+                        snapshot_path, 'iter_' + str(iter_num) + '.pth')
+                    torch.save(model.state_dict(), save_mode_path)
+                    logging.info("save model to {}".format(save_mode_path))
+
+                if iter_num >= max_iterations:
+                    break
+                time1 = time.time()
         if iter_num >= max_iterations:
             iterator.close()
             break

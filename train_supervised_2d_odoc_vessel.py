@@ -14,7 +14,7 @@ import torch.nn.functional as F
 # from torch.utils.tensorboard import SummaryWriter
 from tensorboardX import SummaryWriter
 from model.netwotks.unet import UNet, MCNet2d_compete_v1,UNet_DTC2d
-from model.netwotks.unet_two_decoder import UNet_two_Decoder,UNet_MiT,UNet_MiT_two_Decoder
+from model.netwotks.unet_two_decoder import UNet_two_Decoder,UNet_MiT,SR_UNet_two_Decoder,UNet_two_Out
 from utils import ramps,losses
 from utils.losses import OhemCrossEntropy
 from utils.test_utils import ODOC_metrics
@@ -52,6 +52,7 @@ parser.add_argument('--amp',type=bool,default=True)
 parser.add_argument('--num_classes',type=int,default=3)
 parser.add_argument('--base_lr',type=float,default=0.005)
 parser.add_argument('--vessel_loss_weight',type=float,default=0.1)
+parser.add_argument('--no_vessel_weight_decay',action='store_false')
 parser.add_argument('--CLAHE',action='store_true')
 parser.add_argument('--preprocess',action='store_true')
 
@@ -83,8 +84,10 @@ def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type):
         return UNet_MiT(in_chns=in_chns, class_num=class_num1,phi=backbone,pretrained=True)
     elif model == 'UNet_two_Decoder':
         return UNet_two_Decoder(in_chns=in_chns, class_num1=class_num1,class_num2=class_num2,phi=backbone,fuse_type=fuse_type)
-    # elif model == 'UNet_MiT_two_Decoder':
-    #     return UNet_MiT_two_Decoder(in_chns=in_chns, class_num1=class_num1,class_num2=class_num2,fuse_type=fuse_type)
+    elif model == 'SR_UNet_two_Decoder':
+        return SR_UNet_two_Decoder(in_chns=in_chns, class_num1=class_num1,class_num2=class_num2,phi=backbone)
+    elif model == 'UNet_two_Out':
+        return UNet_two_Out(in_chns=in_chns, class_num1=class_num1,class_num2=class_num2,phi=backbone,fuse_type=fuse_type)
 
 def get_vessel_loss_weight(iter):
     # 发现训练容易塌陷，所以考虑对vessel的权重进行退火衰减
@@ -242,9 +245,13 @@ if __name__ == '__main__':
             if args.with_softfocal:
                 loss_seg_softfocal_odoc = losses.softmax_focalloss(outputs_odoc[:labeled_bs,...],odoc_label_batch)
 
+            if not args.no_vessel_weight_decay:
+                vessel_loss_weight = args.vessel_loss_weight
+            else:
+                vessel_loss_weight = get_vessel_loss_weight(iter_num)
             loss = loss_seg_ce_odoc + \
                    loss_seg_dice_odoc + \
-                   get_vessel_loss_weight(iter_num) * loss_seg_ce_vessel + \
+                   vessel_loss_weight * loss_seg_ce_vessel + \
                    loss_seg_softfocal_odoc
 
             optimizer.zero_grad()
@@ -255,7 +262,7 @@ if __name__ == '__main__':
             iter_num = iter_num + 1
             writer.add_scalar('lr', optimizer.param_groups[0]['lr'], iter_num)
             writer.add_scalar('loss/loss', loss, iter_num)
-            writer.add_scalar('loss/vessel_loss_weight', get_vessel_loss_weight(iter_num), iter_num)
+            writer.add_scalar('loss/vessel_loss_weight', vessel_loss_weight, iter_num)
             writer.add_scalar('loss/loss_seg_ce_odoc', loss_seg_ce_odoc, iter_num)
             writer.add_scalar('loss/loss_seg_softfocal_odoc', loss_seg_softfocal_odoc, iter_num)
             writer.add_scalar('loss/loss_seg_dice_odoc', loss_seg_dice_odoc, iter_num)

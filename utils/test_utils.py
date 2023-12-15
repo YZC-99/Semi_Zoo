@@ -1,4 +1,6 @@
-from torchmetrics import JaccardIndex,Dice,AUROC,ROC
+from torchmetrics import JaccardIndex,Dice
+from sklearn.metrics import auc,roc_auc_score
+from torcheval.metrics import MulticlassAUROC,MulticlassAUPRC
 from utils.my_metrics import BoundaryIoU
 import torch
 
@@ -77,53 +79,97 @@ class ODOC_metrics(object):
         }
 
 
+
 class DR_metrics(object):
     def __init__(self,device):
-        self.MA_auc = AUROC(task='binary').to(device)
-        self.HE_auc = AUROC(task='binary').to(device)
-        self.EX_auc = AUROC(task='binary').to(device)
-        self.SE_auc = AUROC(task='binary').to(device)
+        self.AUC_PR = MulticlassAUPRC(num_classes=5,average=None).to(device)
+        self.AUC_ROC = MulticlassAUROC(num_classes=5,average=None).to(device)
 
     def add(self,preds,labels):
-        # 先分离不同类别的二值mask
-        MA_preds = torch.zeros_like(preds)
-        HE_preds = torch.zeros_like(preds)
-        EX_preds = torch.zeros_like(preds)
-        SE_preds = torch.zeros_like(preds)
-        #
-        MA_preds[preds == 1] = 1
-        HE_preds[preds == 2] = 1
-        EX_preds[preds == 3] = 1
-        SE_preds[preds == 4] = 1
+        preds, labels = preds.squeeze(),labels.squeeze()
+        preds = preds.permute(1,2,0)
+        preds = preds.view(-1,5)
+        labels = labels.view(-1)
+        # num_classes = len(torch.unique(labels))
+        # num_classes = 5
+        # one_hot_tensor = torch.nn.functional.one_hot(labels,num_classes)
+        # labels = one_hot_tensor.permute(0,3,1,2)
+        self.AUC_PR.update(preds,labels)
+        self.AUC_ROC.update(preds,labels)
 
-        MA_labels = torch.zeros_like(labels)
-        HE_labels = torch.zeros_like(labels)
-        EX_labels = torch.zeros_like(labels)
-        SE_labels = torch.zeros_like(labels)
-        #
-        MA_labels[labels == 1] = 1
-        HE_labels[labels == 2] = 1
-        EX_labels[labels == 3] = 1
-        SE_labels[labels == 4] = 1
 
-        #加入
-        self.MA_auc.update(MA_preds,MA_labels)
-        self.HE_auc.update(HE_preds,HE_labels)
-        self.EX_auc.update(EX_preds,EX_labels)
-        self.SE_auc.update(SE_preds,SE_labels)
 
     def get_metrics(self):
-        MA_auc = self.MA_auc.compute()
-        HE_auc = self.HE_auc.compute()
-        EX_auc = self.EX_auc.compute()
-        SE_auc = self.SE_auc.compute()
-        self.MA_auc.reset()
-        self.HE_auc.reset()
-        self.EX_auc.reset()
-        self.SE_auc.reset()
+        auc_pr = self.AUC_PR.compute()
+        self.AUC_PR.reset()
+        auc_roc = self.AUC_ROC.compute()
+        self.AUC_ROC.reset()
+
+
+
+
         return [{
-            'MA_auc':MA_auc,
-            'HE_auc':HE_auc,
-            'EX_auc':EX_auc,
-            'SE_auc':SE_auc,
-        }]
+            'MA_AUC_PR': auc_pr[1],
+            'HE_AUC_PR': auc_pr[2],
+            'EX_AUC_PR': auc_pr[3],
+            'SE_AUC_PR': auc_pr[4],
+        },
+        {   'MA_AUC_ROC': auc_roc[1],
+            'HE_AUC_ROC': auc_roc[2],
+            'EX_AUC_ROC': auc_roc[3],
+            'SE_AUC_ROC': auc_roc[4],
+        },
+        ]
+
+
+# class DR_metrics(object):
+#     def __init__(self,device):
+#         self.MA_PR_Curve = PrecisionRecallCurve(task='binary').to(device)
+#         self.HE_PR_Curve = PrecisionRecallCurve(task='binary').to(device)
+#         self.EX_PR_Curve = PrecisionRecallCurve(task='binary').to(device)
+#         self.SE_PR_Curve = PrecisionRecallCurve(task='binary').to(device)
+#
+#     def add(self,preds,labels):
+#         # 先分离不同类别的二值mask
+#         MA_preds = torch.zeros_like(preds)
+#         HE_preds = torch.zeros_like(preds)
+#         EX_preds = torch.zeros_like(preds)
+#         SE_preds = torch.zeros_like(preds)
+#         #
+#         MA_preds[preds == 1] = 1
+#         HE_preds[preds == 2] = 1
+#         EX_preds[preds == 3] = 1
+#         SE_preds[preds == 4] = 1
+#
+#         MA_labels = torch.zeros_like(labels)
+#         HE_labels = torch.zeros_like(labels)
+#         EX_labels = torch.zeros_like(labels)
+#         SE_labels = torch.zeros_like(labels)
+#         #
+#         MA_labels[labels == 1] = 1
+#         HE_labels[labels == 2] = 1
+#         EX_labels[labels == 3] = 1
+#         SE_labels[labels == 4] = 1
+#
+#         #加入
+#         self.MA_PR_Curve.update(MA_preds,MA_labels)
+#         self.HE_PR_Curve.update(HE_preds,HE_labels)
+#         self.EX_PR_Curve.update(EX_preds,EX_labels)
+#         self.SE_PR_Curve.update(SE_preds,SE_labels)
+#
+#     def get_metrics(self):
+#         MA_precision,MA_recall,MA_thresholds = self.MA_PR_Curve.compute()
+#         HE_precision,HE_recall,HE_thresholds = self.HE_PR_Curve.compute()
+#         EX_precision,EX_recall,EX_thresholds = self.EX_PR_Curve.compute()
+#         SE_precision,SE_recall,SE_thresholds = self.SE_PR_Curve.compute()
+#
+#         self.MA_PR_Curve.reset()
+#         self.HE_PR_Curve.reset()
+#         self.EX_PR_Curve.reset()
+#         self.SE_PR_Curve.reset()
+#         return [{
+#             'MA_PR_Curve':MA_PR_Curve,
+#             'HE_PR_Curve':HE_PR_Curve,
+#             'EX_PR_Curve':EX_PR_Curve,
+#             'SE_PR_Curve':SE_PR_Curve,
+#         }]

@@ -6,6 +6,11 @@ from __future__ import division, print_function
 from model.backbone.mit import mit_b0, mit_b1, mit_b2, mit_b3, mit_b4, mit_b5
 from model.backbone.resnet import resnet18,resnet34,resnet50,resnet101,resnet152
 from model.compare_modules.rtb import RTB,CrissCrossRTB,CrissCrossRTB_v2
+from model.module.gap import GlobalAvgPool2D
+from model.module import fpn
+from model.module.farseg import SceneRelation
+from model.module.RTNET import Global_Transformer_Block
+
 import torch.nn.functional as F
 import torch
 import torch.nn as nn
@@ -241,6 +246,21 @@ class Decoder4Segformer(nn.Module):
         )
 
         self.out_conv = nn.Conv2d(self.ft_chns[0], self.n_class, kernel_size=3, padding=1)
+
+    def base_forward(self, feature):
+        x1 = feature[0]
+        x2 = feature[1]
+        x3 = feature[2]
+        x4 = feature[3]
+
+        x_up1 = self.up1(x4, x3)
+        x_up2 = self.up2(x_up1, x2)
+        x_up3 = self.up3(x_up2, x1)
+        x_up4 = self.up4(x_up3)
+        return [x_up1,x_up2,x_up3,x_up4]
+    def seg_forward(self,x_up4):
+        output = self.out_conv(x_up4)
+        return output
     def forward(self, feature):
         x1 = feature[0]
         x2 = feature[1]
@@ -727,6 +747,53 @@ class UNet_ResNet(nn.Module):
         return output1[-1]
 
 
+class SR_UNet_ResNet(nn.Module):
+    def __init__(self, in_chns, class_num,phi='resnet50',pretrained=True):
+        super(SR_UNet_ResNet, self).__init__()
+
+        self.in_channels = {
+            'resnet18': [64, 128, 256, 512], 'resnet34': [64, 128,256,512], 'resnet50': [256,512,1024,2048],
+            'resnet101': [256,512,1024,2048],
+        }[phi]
+        self.encoder = {
+            'resnet18': resnet18, 'resnet34': resnet34, 'resnet50': resnet50,
+            'resnet101': resnet101,
+        }[phi](pretrained)
+
+        feature_chns = [16]
+        feature_chns.extend(self.in_channels)
+        params1 = {'in_chns': in_chns,
+                  # 'feature_chns': [16].extend(self.in_channels),
+                  # 'feature_chns': feature_chns,
+                  'feature_chns': [16,256,256,256,256],
+                  'dropout': [0.05, 0.1, 0.2, 0.3, 0.5],
+                  'class_num': class_num,
+                  'up_type': 1,
+                  'acti_func': 'relu'}
+
+        self.gap = GlobalAvgPool2D()
+        self.fpn = fpn.FPN(
+                            in_channels_list=(64, 128,256,512),
+                            out_channels=512,
+                            conv_block=fpn.default_conv_block,
+                            top_blocks=None,)
+        self.sr = SceneRelation(
+                            in_channels=512,
+                            channel_list=(512, 512, 512, 512),
+                            out_channels=256,
+                            scale_aware_proj=True,
+                        )
+
+        self.decoder1 = Decoder4Segformer(params1)
+
+    def forward(self, x):
+        feature = self.encoder.base_forward(x)
+        c5 = self.gap(feature[-1])
+        fpn_feature = self.fpn(feature)
+        refined_fpn_feature = self.sr(c5,fpn_feature)
+        output1 = self.decoder1(refined_fpn_feature)
+        return output1[-1]
+
 # class UNet_two_Decoder(nn.Module):
 #     def __init__(self, in_chns, class_num1,class_num2,fuse_type=None):
 #         super(UNet_two_Decoder, self).__init__()
@@ -903,6 +970,142 @@ class UNet_two_Decoder(nn.Module):
         return output_decoder2[-1],output_decoder1[-1]
 
 
+class UNet_two_Out(nn.Module):
+    def __init__(self, in_chns, class_num1,class_num2,phi='b2',pretrained=True,fuse_type=None):
+        super(UNet_two_Out, self).__init__()
+
+        self.phi = phi
+        self.in_channels = {
+            'b0': [32, 64, 160, 256], 'b1': [64, 128, 320, 512], 'b2': [64, 128, 320, 512],
+            'b3': [64, 128, 320, 512], 'b4': [64, 128, 320, 512], 'b5': [64, 128, 320, 512],
+            'resnet18': [64, 128, 256, 512], 'resnet34': [64, 128, 256, 512],
+            'resnet50': [256, 512, 1024, 2048],'resnet101': [256, 512, 1024, 2048],
+            'org': [16, 32, 64, 128, 256],
+        }[phi]
+
+        self.encoder = {
+            'b0': mit_b0, 'b1': mit_b1, 'b2': mit_b2,
+            'b3': mit_b3, 'b4': mit_b4, 'b5': mit_b5,
+            'resnet18': resnet18, 'resnet34': resnet34,
+            'resnet50': resnet50, 'resnet101': resnet101,
+            'org': resnet50,
+        }[phi](pretrained)
+
+        if phi == 'org':
+            feature_chns = self.in_channels
+        else:
+            feature_chns = [32]
+            feature_chns.extend(self.in_channels)
+
+        params1 = {'in_chns': in_chns,
+                  'feature_chns': feature_chns,
+                  'dropout': [0.05, 0.1, 0.2, 0.3, 0.5],
+                  'class_num': class_num1,
+                  'up_type': 1,
+                  'acti_func': 'relu'}
+
+        self.decoder1 = Decoder4Segformer(params1)
+
+        self.GTB_vessel = Global_Transformer_Block(feature_chns[0])
+        self.out_conv_vessel = nn.Conv2d(feature_chns[0], class_num2, kernel_size=3, padding=1)
+        self.GTB_odoc = Global_Transformer_Block(feature_chns[0])
+        self.RTB = ''
+
+
+    def forward(self, x):
+        if 'resnet' in self.phi:
+            feature = self.encoder.base_forward(x)
+        else:
+            feature = self.encoder.forward(x)
+
+        base_output_decoder1 = self.decoder1.base_forward(feature)
+        feature_GTB_vessel = self.GTB_vessel(base_output_decoder1[-1])
+        feature_GTB_odoc = self.GTB_odoc(base_output_decoder1[-1])
+
+        output_odoc = self.decoder1.seg_forward(feature_GTB_odoc)
+        output_vessel = self.out_conv_vessel(feature_GTB_vessel)
+
+        return output_odoc,output_vessel
+
+
+
+class SR_UNet_two_Decoder(nn.Module):
+    def __init__(self, in_chns, class_num1,class_num2,phi='resnet34',pretrained=True):
+        super(SR_UNet_two_Decoder, self).__init__()
+
+        self.phi = phi
+        self.in_channels = {
+            'b0': [32, 64, 160, 256], 'b1': [64, 128, 320, 512], 'b2': [64, 128, 320, 512],
+            'b3': [64, 128, 320, 512], 'b4': [64, 128, 320, 512], 'b5': [64, 128, 320, 512],
+            'resnet18': [64, 128, 256, 512], 'resnet34': [64, 128, 256, 512],
+            'resnet50': [256, 512, 1024, 2048],'resnet101': [256, 512, 1024, 2048],
+            'org': [16, 32, 64, 128, 256],
+        }[phi]
+
+        self.encoder = {
+            'b0': mit_b0, 'b1': mit_b1, 'b2': mit_b2,
+            'b3': mit_b3, 'b4': mit_b4, 'b5': mit_b5,
+            'resnet18': resnet18, 'resnet34': resnet34,
+            'resnet50': resnet50, 'resnet101': resnet101,
+            'org': resnet50,
+        }[phi](pretrained)
+
+
+        self.gap = GlobalAvgPool2D()
+        self.fpn = fpn.FPN(
+                            in_channels_list=(64, 128,256,512),
+                            out_channels=512,
+                            conv_block=fpn.default_conv_block,
+                            top_blocks=None,)
+        self.sr = SceneRelation(
+                            in_channels=512,
+                            channel_list=(512, 512, 512, 512),
+                            out_channels=256,
+                            scale_aware_proj=True,
+                        )
+
+        if phi == 'org':
+            feature_chns = self.in_channels
+        else:
+            feature_chns = [32]
+            feature_chns.extend(self.in_channels)
+
+        params1 = {'in_chns': in_chns,
+                  'feature_chns': feature_chns,
+                  'dropout': [0.05, 0.1, 0.2, 0.3, 0.5],
+                  'class_num': class_num2,
+                  'up_type': 1,
+                  'acti_func': 'relu'}
+        params2 = {'in_chns': in_chns,
+                  'feature_chns': [16,256,256,256,256],
+                  'dropout': [0.05, 0.1, 0.2, 0.3, 0.5],
+                  'class_num': class_num1,
+                  'up_type': 1,
+                  'acti_func': 'relu'}
+
+
+        # vessel
+        self.decoder1 = Decoder4Segformer(params1)
+        # odoc
+        self.decoder2 = Decoder4Segformer(params2)
+
+
+
+    def forward(self, x):
+        if 'resnet' in self.phi:
+            feature = self.encoder.base_forward(x)
+        else:
+            feature = self.encoder.forward(x)
+        c5 = self.gap(feature[-1])
+        fpn_feature = self.fpn(feature)
+        refined_fpn_feature = self.sr(c5, fpn_feature)
+
+        output_decoder1 = self.decoder1(feature)
+
+        output_decoder2 = self.decoder2(refined_fpn_feature)
+        return output_decoder2[-1],output_decoder1[-1]
+
+
 
 if __name__ == '__main__':
     # compute FLOPS & PARAMETERS
@@ -921,6 +1124,7 @@ if __name__ == '__main__':
     # model = UNet_ResNet(in_chns=3, class_num=3,pretrained=False)
     # out = model(input_data)
 
-    model = UNet_two_Decoder(in_chns=3, class_num1=3,class_num2=2,phi='b2',pretrained=False,fuse_type='v2_ccrtb1')
-    out,_ = model(input_data)
+    model = UNet_two_Out(in_chns=3, class_num1=3,class_num2=2,phi='resnet34',pretrained=False)
+    out,out_vessel= model(input_data)
     print(out.shape)
+    print(out_vessel.shape)

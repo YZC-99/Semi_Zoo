@@ -132,5 +132,17 @@ OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_supervised_2d.py \
 #############################IDRID#########################
 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_dr_supervised_2d.py \
         --num_works 0 \
-        --device 1 \
+        --device 0 \
+        --val_period 10 \
         --model UNet
+
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_dr_supervised_2d.py \
+        --num_works 0 \
+        --device 1 \
+        --val_period 20 \
+        --model SR_UNet_ResNet \
+        --batch_size 4 \
+        --base_lr 0.00005 \
+        --backbone resnet34
+
+        UNet_ResNet Deeplabv3p SR_UNet_ResNet

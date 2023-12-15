@@ -16,7 +16,7 @@ from tensorboardX import SummaryWriter
 from model.netwotks.unet import UNet, MCNet2d_compete_v1,UNet_DTC2d
 from model.netwotks.segformer import SegFormer
 from model.netwotks.deeplabv3plus import DeepLabV3Plus
-from model.netwotks.unet_two_decoder import UNet_two_Decoder,UNet_MiT,UNet_ResNet
+from model.netwotks.unet_two_decoder import UNet_two_Decoder,UNet_MiT,UNet_ResNet,SR_UNet_ResNet
 from utils import ramps,losses
 from utils.losses import OhemCrossEntropy
 from utils.test_utils import ODOC_metrics
@@ -92,6 +92,8 @@ def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type):
         return UNet(in_chns=in_chns,class_num=class_num1)
     elif model == 'UNet_ResNet':
         return UNet_ResNet(in_chns=in_chns, class_num=class_num1, phi=backbone, pretrained=True)
+    elif model == 'SR_UNet_ResNet':
+        return SR_UNet_ResNet(in_chns=in_chns, class_num=class_num1, phi=backbone, pretrained=True)
     elif model == 'UNet_MiT':
         return UNet_MiT( in_chns=in_chns, class_num=class_num1,phi=backbone,pretrained=True)
     elif model == 'Segformer':
@@ -159,7 +161,7 @@ if __name__ == '__main__':
 
     # init dataset
     labeled_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
-                                  root="/home/gu721/yzc/data/odoc/SEG2859_h5/{}".format("REFUGE"),
+                                  root="/home/gu721/yzc/data/odoc/{}".format("REFUGE"),
                                   mode='semi_train',
                                   size=args.image_size,
                                   id_path='train.txt')
@@ -195,7 +197,7 @@ if __name__ == '__main__':
     # init dataset
     val_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
                                     # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
-                                  root="/home/gu721/yzc/data/odoc/SEG2859_h5/{}".format("REFUGE"),
+                                  root="/home/gu721/yzc/data/odoc/{}".format("REFUGE"),
                                   mode='val',
                                   size=args.image_size)
 

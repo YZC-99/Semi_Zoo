@@ -14,6 +14,27 @@ from torch.utils.data.sampler import Sampler
 from torch.optim.lr_scheduler import _LRScheduler,LambdaLR
 import torch.optim as optim
 
+
+color_map = {
+    1: [255, 0, 0],  # 红色
+    2: [0, 255, 0],  # 绿色
+    3: [0, 0, 255],  # 蓝色
+    4: [255, 255, 0]  # 黄色
+}
+
+# 将灰度图像转换为彩色图像
+def gray_to_color(image, color_map):
+    image = image.squeeze()
+    colored_image = torch.zeros((3, image.shape[0], image.shape[1]), dtype=torch.uint8)
+
+    for value, color in color_map.items():
+        mask = (image == value)
+        for i in range(3):
+            colored_image[i, mask] = color[i]
+
+    return colored_image
+
+
 def get_optimizer(model,name,base_lr,lr_decouple):
     if name == 'SGD':
         if lr_decouple:
