@@ -1,4 +1,4 @@
-from torchmetrics import JaccardIndex,Dice
+from torchmetrics import JaccardIndex,Dice,PrecisionRecallCurve
 from sklearn.metrics import auc,roc_auc_score
 from torcheval.metrics import MulticlassAUROC,MulticlassAUPRC
 from utils.my_metrics import BoundaryIoU
@@ -84,42 +84,103 @@ class DR_metrics(object):
     def __init__(self,device):
         self.AUC_PR = MulticlassAUPRC(num_classes=5,average=None).to(device)
         self.AUC_ROC = MulticlassAUROC(num_classes=5,average=None).to(device)
+        self.Dice = Dice(num_classes=1, multiclass=False,average='samples').to(device)
+        self.IoU = JaccardIndex(num_classes=2, task='binary', average='micro').to(device)
+
+        self.background_count = 0
+        self.MA_count = 0
+        self.HE_count = 0
+        self.EX_count = 0
+        self.SE_count = 0
+        self.auc_pr = torch.zeros(5,device=device)
+        self.auc_roc = torch.zeros(5,device=device)
+        self.dice = torch.zeros(1)
+        self.iou = torch.zeros(1)
 
     def add(self,preds,labels):
+
+        region_preds = preds.copy()
+        region_preds = torch.argmax(region_preds,dim=1)
+        region_labels = torch.zeros_like(labels)
+        region_labels[labels > 0] =1
+        self.Dice.update(region_preds, region_labels)
+        self.IoU.update(region_preds, region_labels)
+        current_dice = self.Dice.compute()
+        self.Dice.reset()
+        current_iou = self.IoU.compute()
+        self.IoU.reset()
+        self.dice += current_dice
+        self.iou += current_iou
+
+
+        current_labels = torch.unique(labels)
+
         preds, labels = preds.squeeze(),labels.squeeze()
         preds = preds.permute(1,2,0)
         preds = preds.view(-1,5)
         labels = labels.view(-1)
-        # num_classes = len(torch.unique(labels))
-        # num_classes = 5
-        # one_hot_tensor = torch.nn.functional.one_hot(labels,num_classes)
-        # labels = one_hot_tensor.permute(0,3,1,2)
         self.AUC_PR.update(preds,labels)
         self.AUC_ROC.update(preds,labels)
 
-
-
-    def get_metrics(self):
-        auc_pr = self.AUC_PR.compute()
+        current_auc_pr = self.AUC_PR.compute()
         self.AUC_PR.reset()
-        auc_roc = self.AUC_ROC.compute()
+        current_auc_roc = self.AUC_ROC.compute()
         self.AUC_ROC.reset()
 
 
+        for i in range(5):
+            if i in labels:
+                self.auc_pr[i] += current_auc_pr[i]
+                self.auc_roc[i] += current_auc_roc[i]
 
+        self.background_count += 1
+        if 1 in current_labels:
+            self.MA_count += 1
+        if 2 in current_labels:
+            self.HE_count += 1
+        if 3 in current_labels:
+            self.EX_count += 1
+        if 4 in current_labels:
+            self.SE_count += 1
 
-        return [{
-            'MA_AUC_PR': auc_pr[1],
-            'HE_AUC_PR': auc_pr[2],
-            'EX_AUC_PR': auc_pr[3],
-            'SE_AUC_PR': auc_pr[4],
+    def my_reset(self):
+        self.background_count = 0
+        self.MA_count = 0
+        self.HE_count = 0
+        self.EX_count = 0
+        self.SE_count = 0
+        self.auc_pr = torch.zeros_like(self.auc_pr)
+        self.auc_roc = torch.zeros_like(self.auc_roc)
+        self.dice = torch.zeros(1)
+        self.iou = torch.zeros(1)
+
+    def get_metrics(self):
+        auc_pr = self.auc_pr
+        auc_roc = self.auc_roc
+        Dice = self.dice /self.background_count
+        IoU = self.iou /self.background_count
+
+        results = [{
+            'MA_AUC_PR': auc_pr[1] / self.MA_count,
+            'HE_AUC_PR': auc_pr[2] / self.HE_count,
+            'EX_AUC_PR': auc_pr[3] / self.EX_count,
+            'SE_AUC_PR': auc_pr[4] / self.SE_count,
         },
-        {   'MA_AUC_ROC': auc_roc[1],
-            'HE_AUC_ROC': auc_roc[2],
-            'EX_AUC_ROC': auc_roc[3],
-            'SE_AUC_ROC': auc_roc[4],
+        {   'MA_AUC_ROC': auc_roc[1] / self.MA_count,
+            'HE_AUC_ROC': auc_roc[2] / self.HE_count,
+            'EX_AUC_ROC': auc_roc[3] / self.EX_count,
+            'SE_AUC_ROC': auc_roc[4] / self.SE_count,
         },
+            {'Dice': Dice,
+             'IoU': IoU,
+
+        }
         ]
+
+
+        self.my_reset()
+
+        return results
 
 
 # class DR_metrics(object):

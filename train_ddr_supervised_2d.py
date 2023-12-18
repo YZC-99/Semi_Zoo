@@ -1,6 +1,6 @@
 import random
 from tqdm import tqdm
-from dataloader.fundus import SemiDataset,IDRIDDataset
+from dataloader.fundus import SemiDataset,IDRIDDataset,DDRDataset
 from dataloader.samplers import TwoStreamBatchSampler, LabeledBatchSampler,UnlabeledBatchSampler
 import torch
 import glob
@@ -39,11 +39,11 @@ parser.add_argument('--model',type=str,default='unet')
 parser.add_argument('--backbone',type=str,default='b2')
 parser.add_argument('--lr_decouple',action='store_true')
 
-parser.add_argument('--exp',type=str,default='IDRID')
+parser.add_argument('--exp',type=str,default='DDR')
 parser.add_argument('--save_period',type=int,default=5000)
 parser.add_argument('--val_period',type=int,default=100)
 
-parser.add_argument('--dataset_name',type=str,default='IDRID')
+parser.add_argument('--dataset_name',type=str,default='DDR')
 parser.add_argument('--unlabeled_txt',type=str,default='unlabeled_addDDR.txt')
 
 parser.add_argument('--optim',type=str,default='AdamW')
@@ -153,7 +153,7 @@ if __name__ == '__main__':
     model.to(device)
 
     # init dataset
-    labeled_dataset = IDRIDDataset(name='./dataset/{}'.format(args.dataset_name),
+    labeled_dataset = DDRDataset(name='./dataset/{}'.format(args.dataset_name),
                                   root="/home/gu721/yzc/data/dr/{}".format(args.dataset_name),
                                   mode='semi_train',
                                   size=args.image_size,
@@ -188,7 +188,7 @@ if __name__ == '__main__':
 
     # 验证集
     # init dataset
-    val_dataset = IDRIDDataset(name='./dataset/{}'.format(args.dataset_name),
+    val_dataset = DDRDataset(name='./dataset/{}'.format(args.dataset_name),
                                     # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
                                   root="/home/gu721/yzc/data/dr/{}".format(args.dataset_name),
                                   mode='val',
@@ -204,6 +204,7 @@ if __name__ == '__main__':
     DR_val_metrics = DR_metrics(device)
     AUC = {}
     for epoch_num in iterator:
+        torch.cuda.empty_cache()
         time1 = time.time()
         for i_batch,labeled_sampled_batch in enumerate(labeledtrainloader):
             time2 = time.time()
@@ -266,7 +267,7 @@ if __name__ == '__main__':
                         img,label = data['image'].to(device),data['label'].to(device)
                         outputs = model(img)
 
-                        DR_val_metrics.add(outputs,label)
+                        DR_val_metrics.add(outputs.detach(),label)
 
                         if id == show_id:
                             image = img[0]
@@ -279,8 +280,9 @@ if __name__ == '__main__':
                             image = gray_to_color(image,color_map)
                             writer.add_image('val/Groundtruth_label',
                                              image, iter_num,dataformats='CHW')
-
+                    torch.cuda.empty_cache()
                     val_metrics = DR_val_metrics.get_metrics()
+
                     AUC_PR = val_metrics[0]
                     AUC_ROC = val_metrics[1]
                     MA_AUC_PR, HE_AUC_PR, EX_AUC_PR, SE_AUC_PR = AUC_PR['MA_AUC_PR'],AUC_PR['HE_AUC_PR'],AUC_PR['EX_AUC_PR'],AUC_PR['SE_AUC_PR']

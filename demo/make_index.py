@@ -219,4 +219,16 @@ def IDRID():
             name = i.replace(data_path,'')
             f.write(name + ' ' + name.replace('.jpg','_fuse.png').replace('images','labels_fused') + '\n')
 
-IDRID()
+def DDR_seg():
+    data_path = "/home/gu721/yzc/data/dr/DDR/"  # 数据路径
+    save_path = "/home/gu721/yzc/data/dr/DDR/all_index.txt"
+    img_path = []
+    for root,dir,files in os.walk(data_path):
+        if 'images' in root:
+            img_path.extend([os.path.join(root,i) for i in files])
+    with open(save_path,'w') as f:
+        for i in img_path:
+            name = i.replace(data_path,'')
+            f.write(name + ' ' + name.replace('.jpg','.png').replace('images','labels_fused') + '\n')
+
+DDR_seg()

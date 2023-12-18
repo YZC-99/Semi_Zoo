@@ -1,4 +1,4 @@
-from model.backbone.resnet import resnet50, resnet101
+from model.backbone.resnet import resnet34,resnet50, resnet101
 
 from torch import nn
 import torch.nn.functional as F
@@ -7,7 +7,7 @@ import torch.nn.functional as F
 class BaseNet(nn.Module):
     def __init__(self, backbone):
         super(BaseNet, self).__init__()
-        backbone_zoo = {'resnet50': resnet50, 'resnet101': resnet101}
+        backbone_zoo = {'resnet34': resnet34,'resnet50': resnet50, 'resnet101': resnet101}
         self.encoder = backbone_zoo[backbone](pretrained=True)
 
     def base_forward(self, x):

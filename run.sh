@@ -130,19 +130,83 @@ OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_supervised_2d.py \
 
 
 #############################IDRID#########################
-OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_dr_supervised_2d.py \
+
+# aux
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 nohup python train_idrid_supervised_2d_aux.py \
+        --num_works 0 \
+        --device 1 \
+        --exp IDRID_AUX \
+        --dataset_name IDRID \
+        --val_period 54 \
+        --image_size 1440 \
+        --model UNet_efficient_aux \
+        --batch_size 1 \
+        --base_lr 0.0001 \
+        --CLAHE \
+        --backbone b0 \
+        --aux_weight 0.5 &
+
+# no-aux
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_idrid_supervised_2d.py \
         --num_works 0 \
         --device 0 \
         --val_period 10 \
         --model UNet
 
-OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_dr_supervised_2d.py \
+
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_idrid_supervised_2d.py \
+        --num_works 0 \
+        --device 0 \
+        --exp IDRID \
+        --dataset_name IDRID \
+        --val_period 54 \
+        --image_size 1440 \
+        --model UNet_efficient_SR \
+        --batch_size 1 \
+        --base_lr 0.0001 \
+        --CLAHE \
+        --backbone b0
+
+        --annealing_softmax_focalloss
+
+UNet_ResNet Deeplabv3p SR_UNet_ResNet UNet_efficient UNet_MiT UNet_efficient_SR
+
+        --ce_weight 1.0 1.0 1.0 1.0 1.0
+
+        --ce_weight 1.0 2.0 2.0 2.0 2.0
+        --ce_weight 0.013692409236879956 24.390243902439025 5.747126436781609 6.493506493506494 27.027027027027028
+        --ce_weight 1.0 1.0 1.0 1.0 1.0
+        \
+        --annealing_softmax_focalloss
+        --CLAHE \
+
+
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 nohup  python train_idrid_supervised_2d.py \
         --num_works 0 \
         --device 1 \
-        --val_period 20 \
-        --model SR_UNet_ResNet \
+        --exp IDRID \
+        --dataset_name IDRID \
+        --val_period 54 \
+        --image_size 1440 \
+        --model UNet_ResNet \
+        --batch_size 1 \
+        --base_lr 0.0001 \
+        --ohem 0.5 \
+        --backbone resnet34  &
+
+
+# DDR
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_ddr_supervised_2d.py \
+        --num_works 0 \
+        --device 1 \
+        --exp DDR \
+        --dataset_name DDR \
+        --val_period 90 \
+        --model UNet_ResNet \
         --batch_size 4 \
         --base_lr 0.00005 \
         --backbone resnet34
 
-        UNet_ResNet Deeplabv3p SR_UNet_ResNet
+        UNet_ResNet Deeplabv3p SR_UNet_ResNet UNet_efficient UNet_MiT
+        --dataset_name DDR
+        --exp DDR

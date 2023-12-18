@@ -108,6 +108,7 @@ class UpBlock(nn.Module):
         x = self.conv(x)
         return x
 
+
 class UpBlock_3input(nn.Module):
     """Upssampling followed by ConvBlock"""
     def __init__(self, in_channels1, in_channels2,in_channels3, out_channels, dropout_p, mode_upsampling=1,backbone='b2'):
@@ -773,13 +774,13 @@ class SR_UNet_ResNet(nn.Module):
 
         self.gap = GlobalAvgPool2D()
         self.fpn = fpn.FPN(
-                            in_channels_list=(64, 128,256,512),
-                            out_channels=512,
+                            in_channels_list=self.in_channels,
+                            out_channels=self.in_channels[-1],
                             conv_block=fpn.default_conv_block,
                             top_blocks=None,)
         self.sr = SceneRelation(
-                            in_channels=512,
-                            channel_list=(512, 512, 512, 512),
+                            in_channels=self.in_channels[-1],
+                            channel_list=(self.in_channels[-1], self.in_channels[-1], self.in_channels[-1], self.in_channels[-1]),
                             out_channels=256,
                             scale_aware_proj=True,
                         )

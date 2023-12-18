@@ -21,6 +21,19 @@ def hflip(img, mask,p=0.5):
             mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
     return img, mask
 
+def random_scale(img, mask, min_scale=0.8, max_scale=1.2 ,p=0.5):
+    if random.random() < p:
+        w_scale_factor = random.uniform(min_scale, max_scale)
+        h_scale_factor = random.uniform(min_scale, max_scale)
+        new_width = int(img.width * w_scale_factor)
+        new_height = int(img.height * h_scale_factor)
+
+        img = img.resize((new_width, new_height), Image.BILINEAR)
+        mask = mask.resize((new_width, new_height), Image.NEAREST)
+
+    return img, mask
+
+
 
 def random_scale_and_crop(img, mask, target_size=(256, 256), min_scale=0.8, max_scale=1.2,p=0.5):
     if random.random() < p:
@@ -101,6 +114,11 @@ def resize(img, mask,size):
         mask = mask.resize((size, size), Image.NEAREST)
     return img, mask
 
+def resize1440(img, mask):
+    img = img.resize((1440,960), Image.BILINEAR)
+    if mask is not None:
+        mask = mask.resize((1440,960), Image.NEAREST)
+    return img, mask
 
 
 

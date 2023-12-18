@@ -51,7 +51,12 @@ def logs2csv(ex_path=''):
                         with open(os.path.join(root,pth),'r') as f:
                             conf_str = f.readlines(1)[0].split('Namespace')[-1]
                             # 使用正则表达式提取键值对
-                            pairs = re.findall(r'(\w+)=(.*?)(?:,|\))', conf_str)
+                            """
+                            下面这个正则表达式有问题，如果我的str出现了：max_iterations=10000, ce_weight=[0.001, 1.0, 0.1, 0.01, 0.1], ohem=-1.0,
+                            这就导致ce_weight=[0.001, 1.0, 0.1, 0.01, 0.1],的匹配有问题，我希望你帮助我重写一个正则表达式
+                            """
+                            # pairs = re.findall(r'(\w+)=(.*?)(?:,|\))', conf_str)
+                            pairs = re.findall(r'(\w+)\s*=\s*((?:\[[^\]]*\]|[^,]+))(?:,|$)', conf_str)
                             # 构建字典
                             conf = dict(pairs)
 
@@ -64,7 +69,7 @@ def logs2csv(ex_path=''):
                     conf.get('model', 'N/A'),
                     conf.get('backbone', 'N/A'),
                     conf.get('with_ce', 'True'),  # 如果 'ohem' 不存在，返回 'N/A'
-                    conf.get('ce_weight', 'False'),  # 如果 'ohem' 不存在，返回 'N/A'
+                    conf.get('ce_weight', 'False'),
                     conf.get('with_softfocal', 'False'),  # 如果 'ohem' 不存在，返回 'N/A'
                     conf.get('with_dice', 'False'),  # 如果 'ohem' 不存在，返回 'N/A'
                     conf.get('ohem', 'N/A'),  # 如果 'ohem' 不存在，返回 'N/A'

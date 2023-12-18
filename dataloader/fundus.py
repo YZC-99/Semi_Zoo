@@ -1,6 +1,6 @@
 import torch
-from dataloader.transform import  hflip,vflip, normalize, resize, random_scale_and_crop
-from dataloader.transform import random_rotate,random_translate
+from dataloader.transform import  hflip,vflip, normalize, resize, random_scale_and_crop,resize1440
+from dataloader.transform import random_rotate,random_translate,random_scale
 from dataloader.transforms_np import resize_np,random_flip_np,random_rotate_np,normalize_np
 import cv2
 import math
@@ -15,15 +15,7 @@ from scipy import ndimage
 from torchvision.transforms import functional
 import scipy.io
 
-def CLAHE(image_path):
-    image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-    # 创建CLAHE对象
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    # 应用CLAHE
-    clahe_result = clahe.apply(image)
-    # 将OpenCV数组转换为Pillow图像
-    clahe_rgb = Image.merge('RGB', [Image.fromarray(clahe_result)] * 3)
-    return  clahe_rgb
+
 
 
 
@@ -66,10 +58,10 @@ class SemiDataset(Dataset):
     def get_item_nor(self,item):
         id = self.ids[item]
         img_path = os.path.join(self.root, id.split(' ')[0])
-        if self.CLAHE:
-            img = CLAHE(img_path)
-        else:
-            img = Image.open(img_path)
+        # if self.CLAHE:
+        #     img = CLAHE(img_path)
+        # else:
+        img = Image.open(img_path)
 
         if "DDR" in id or "G1020" in id or "ACRIMA" in id:
             mask = Image.fromarray(np.zeros((2, 2)))
@@ -133,7 +125,65 @@ class IDRIDDataset(Dataset):
         id = self.ids[item]
         img_path = os.path.join(self.root, id.split(' ')[0])
         if self.CLAHE:
-            img = CLAHE(img_path)
+            img_path = img_path.replace('/images','/images_clahe')
+            img = Image.open(img_path)
+        else:
+            img = Image.open(img_path)
+
+        mask_path = os.path.join(self.root, id.split(' ')[1])
+        mask = Image.open(mask_path)
+
+        if self.mode == 'semi_train':
+            img, mask = hflip(img, mask, p=0.5)
+            img, mask = vflip(img, mask, p=0.5)
+            img, mask = random_rotate(img, mask,p=0.5,max_rotation_angle=30)
+            img, mask = random_scale(img,mask,p=0.5)
+
+        if self.size == 1440:
+            img, mask = resize1440(img, mask)
+        else:
+            img, mask = resize(img, mask, self.size)
+        if self.CLAHE:
+            img, mask = normalize(img, mask, mean=(0.0,), std=(1.0,))
+        else:
+            img, mask = normalize(img, mask,mean=(116.51,56,437,16.31),std=(81.60,41.72,7.36))
+
+        return {'image': img, 'label': mask}
+
+    def __getitem__(self, item):
+        sample = self.get_item_nor(item)
+
+        return sample
+
+    def __len__(self):
+        return len(self.ids)
+
+
+class DDRDataset(Dataset):
+    def __init__(self,name, root, mode, size,
+                 id_path=None,CLAHE = False):
+        self.name = name
+        self.root = root
+        self.mode = mode
+        self.size = size
+        self.CLAHE = CLAHE
+
+        if mode == 'semi_train':
+            id_path = '%s/%s' %(name,id_path)
+        elif mode == 'val':
+            id_path = '%s/val.txt' % name
+        elif mode == 'test':
+            id_path = '%s/test.txt' % name
+
+        with open(id_path, 'r') as f:
+            self.ids = f.read().splitlines()
+
+    def get_item_nor(self,item):
+        id = self.ids[item]
+        img_path = os.path.join(self.root, id.split(' ')[0])
+        if self.CLAHE:
+            img_path = img_path.replace('/images','/images_clahe')
+            img = Image.open(img_path)
         else:
             img = Image.open(img_path)
 
@@ -147,7 +197,7 @@ class IDRIDDataset(Dataset):
 
 
         img, mask = resize(img, mask, self.size)
-        img, mask = normalize(img, mask,mean=(116.51,56,437,16.31),std=(81.60,41.72,7.36))
+        img, mask = normalize(img, mask,mean=(91.78,56.94,25.83),std=(124.97,83.84,36.79))
 
         return {'image': img, 'label': mask}
 
@@ -158,7 +208,6 @@ class IDRIDDataset(Dataset):
 
     def __len__(self):
         return len(self.ids)
-
 
 
 
