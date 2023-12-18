@@ -95,17 +95,18 @@ class DR_metrics(object):
         self.SE_count = 0
         self.auc_pr = torch.zeros(5,device=device)
         self.auc_roc = torch.zeros(5,device=device)
-        self.dice = torch.zeros(1)
-        self.iou = torch.zeros(1)
+        self.dice = 0
+        self.iou = 0
 
     def add(self,preds,labels):
 
         region_preds = copy(preds)
         region_preds = torch.argmax(region_preds,dim=1)
+        region_preds[region_preds > 0] = 1
         region_labels = torch.zeros_like(labels)
         region_labels[labels > 0] =1
-        self.Dice.update(region_preds, region_labels)
-        self.IoU.update(region_preds, region_labels)
+        self.Dice.update(region_preds.long(), region_labels)
+        self.IoU.update(region_preds.long(), region_labels)
         current_dice = self.Dice.compute()
         self.Dice.reset()
         current_iou = self.IoU.compute()
@@ -152,8 +153,8 @@ class DR_metrics(object):
         self.SE_count = 0
         self.auc_pr = torch.zeros_like(self.auc_pr)
         self.auc_roc = torch.zeros_like(self.auc_roc)
-        self.dice = torch.zeros(1)
-        self.iou = torch.zeros(1)
+        self.dice = 0
+        self.iou = 0
 
     def get_metrics(self):
         auc_pr = self.auc_pr
