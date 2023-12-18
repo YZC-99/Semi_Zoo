@@ -137,7 +137,7 @@ class IDRIDDataset(Dataset):
             img, mask = hflip(img, mask, p=0.5)
             img, mask = vflip(img, mask, p=0.5)
             img, mask = random_rotate(img, mask,p=0.5,max_rotation_angle=30)
-            img, mask = random_scale(img,mask,p=0.5)
+            # img, mask = random_scale(img,mask,p=0.5)
 
         if self.size == 1440:
             img, mask = resize1440(img, mask)

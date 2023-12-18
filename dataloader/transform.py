@@ -51,7 +51,7 @@ def random_scale_and_crop(img, mask, target_size=(256, 256), min_scale=0.8, max_
             mask = mask.resize((ow, oh), Image.NEAREST)
         # pad crop
         if short_size < target_size[0]:
-            padh = target_size[0] - oh if oh < target_size[0] else 0
+            padh = target_size[1] - oh if oh < target_size[1] else 0
             padw = target_size[0] - ow if ow < target_size[0] else 0
             img = ImageOps.expand(img, border=(0, 0, padw, padh), fill=0)
             if mask is not None:
@@ -59,10 +59,10 @@ def random_scale_and_crop(img, mask, target_size=(256, 256), min_scale=0.8, max_
         # random crop crop_size
         w, h = img.size
         x1 = random.randint(0, w - target_size[0])
-        y1 = random.randint(0, h - target_size[0])
-        img = img.crop((x1, y1, x1 + target_size[0], y1 + target_size[0]))
+        y1 = random.randint(1, h - target_size[1])
+        img = img.crop((x1, y1, x1 + target_size[0], y1 + target_size[1]))
         if mask is not None:
-            mask = mask.crop((x1, y1, x1 + target_size[0], y1 + target_size[0]))
+            mask = mask.crop((x1, y1, x1 + target_size[0], y1 + target_size[1]))
     return img, mask
 
 

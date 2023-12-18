@@ -134,7 +134,7 @@ OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_supervised_2d.py \
 # aux
 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 nohup python train_idrid_supervised_2d_aux.py \
         --num_works 0 \
-        --device 1 \
+        --device 0 \
         --exp IDRID_AUX \
         --dataset_name IDRID \
         --val_period 54 \
@@ -144,7 +144,7 @@ OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 nohup python train_idrid_supervised_2d_aux.p
         --base_lr 0.0001 \
         --CLAHE \
         --backbone b0 \
-        --aux_weight 0.5 &
+        --aux_weight 0.2 &
 
 # no-aux
 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_idrid_supervised_2d.py \
