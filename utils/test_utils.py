@@ -3,6 +3,7 @@ from sklearn.metrics import auc,roc_auc_score
 from torcheval.metrics import MulticlassAUROC,MulticlassAUPRC
 from utils.my_metrics import BoundaryIoU
 import torch
+from copy import copy
 
 class ODOC_metrics(object):
     def __init__(self,device):
@@ -99,7 +100,7 @@ class DR_metrics(object):
 
     def add(self,preds,labels):
 
-        region_preds = preds.copy()
+        region_preds = copy(preds)
         region_preds = torch.argmax(region_preds,dim=1)
         region_labels = torch.zeros_like(labels)
         region_labels[labels > 0] =1

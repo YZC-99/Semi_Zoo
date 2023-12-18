@@ -161,7 +161,7 @@ OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_idrid_supervised_2d.py \
         --dataset_name IDRID \
         --val_period 54 \
         --image_size 1440 \
-        --model UNet_efficient_SR \
+        --model UNet_efficient \
         --batch_size 1 \
         --base_lr 0.0001 \
         --CLAHE \
