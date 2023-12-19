@@ -67,7 +67,7 @@ parser.add_argument('--total_num',type=int,default=11249,help="SEG:2859;SEG_add_
 parser.add_argument('--scale_num',type=int,default=2)
 parser.add_argument('--max_iterations',type=int,default=10000)
 
-parser.add_argument('--ce_weight', type=float, nargs='+', default=[0.001,1.0,0.1,0.01,0.1], help='List of floating-point values')
+parser.add_argument('--ce_weight', type=float, nargs='+', default=[0.001,1.0,0.1,0.1,0.1], help='List of floating-point values')
 parser.add_argument('--ohem',type=float,default=-1.0)
 parser.add_argument('--annealing_softmax_focalloss',action='store_true')
 parser.add_argument('--aux_weight',type=float,default=1.0)
@@ -280,6 +280,7 @@ if __name__ == '__main__':
 
                     AUC_PR = val_metrics[0]
                     AUC_ROC = val_metrics[1]
+                    Dice, IoU = val_metrics[2]['Dice'], val_metrics[2]['IoU']
                     MA_AUC_PR, HE_AUC_PR, EX_AUC_PR, SE_AUC_PR = AUC_PR['MA_AUC_PR'],AUC_PR['HE_AUC_PR'],AUC_PR['EX_AUC_PR'],AUC_PR['SE_AUC_PR']
                     MA_AUC_ROC, HE_AUC_ROC, EX_AUC_ROC, SE_AUC_ROC = AUC_ROC['MA_AUC_ROC'],AUC_ROC['HE_AUC_ROC'],AUC_ROC['EX_AUC_ROC'],AUC_ROC['SE_AUC_ROC']
 
@@ -307,6 +308,9 @@ if __name__ == '__main__':
                     writer.add_scalar('val_AUC_ROC/HE',HE_AUC_ROC, iter_num)
                     writer.add_scalar('val_AUC_ROC/EX',EX_AUC_ROC, iter_num)
                     writer.add_scalar('val_AUC_ROC/SE',SE_AUC_ROC, iter_num)
+
+                    writer.add_scalar('val_Region/Dice',Dice, iter_num)
+                    writer.add_scalar('val_Region/IoU',IoU, iter_num)
 
                     model.train()
 

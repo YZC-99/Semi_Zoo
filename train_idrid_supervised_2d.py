@@ -18,7 +18,7 @@ from model.netwotks.unet import UNet, MCNet2d_compete_v1,UNet_DTC2d
 from model.netwotks.unet_two_decoder import UNet_two_Decoder,UNet_MiT,UNet_ResNet,SR_UNet_ResNet
 from model.netwotks.efficientunet import get_efficientunet,get_efficientunet_SR
 from utils import ramps,losses
-from utils.losses import OhemCrossEntropy,annealing_softmax_focalloss
+from utils.losses import OhemCrossEntropy,annealing_softmax_focalloss,softmax_focalloss,weight_softmax_focalloss
 from utils.test_utils import DR_metrics
 from utils.util import color_map,gray_to_color
 import random
@@ -46,7 +46,7 @@ parser.add_argument('--val_period',type=int,default=100)
 
 parser.add_argument('--dataset_name',type=str,default='IDRID')
 parser.add_argument('--unlabeled_txt',type=str,default='unlabeled_addDDR.txt')
-parser.add_argument('--CLAHE',action='store_true')
+parser.add_argument('--CLAHE',type=int,default=2)
 
 parser.add_argument('--optim',type=str,default='AdamW')
 parser.add_argument('--amp',type=bool,default=True)
@@ -67,9 +67,11 @@ parser.add_argument('--total_num',type=int,default=11249,help="SEG:2859;SEG_add_
 parser.add_argument('--scale_num',type=int,default=2)
 parser.add_argument('--max_iterations',type=int,default=10000)
 
-parser.add_argument('--ce_weight', type=float, nargs='+', default=[0.001,1.0,0.1,0.01,0.1], help='List of floating-point values')
+parser.add_argument('--ce_weight', type=float, nargs='+', default=[0.001,1.0,0.1,0.1,0.1], help='List of floating-point values')
 parser.add_argument('--ohem',type=float,default=-1.0)
 parser.add_argument('--annealing_softmax_focalloss',action='store_true')
+parser.add_argument('--softmax_focalloss',action='store_true')
+parser.add_argument('--weight_softmax_focalloss',action='store_true')
 parser.add_argument('--with_dice',type=bool,default=False)
 
 
@@ -217,7 +219,11 @@ if __name__ == '__main__':
             all_label_batch[all_label_batch > 4] = 4
             if args.annealing_softmax_focalloss:
                 loss_seg_ce = annealing_softmax_focalloss(outputs,all_label_batch,
-                                                          t=iter_num,t_max=args.max_iterations * 0.6)
+                                                         t=iter_num,t_max=args.max_iterations * 0.6)
+            elif args.softmax_focalloss:
+                loss_seg_ce = softmax_focalloss(outputs,all_label_batch)
+            elif args.weight_softmax_focalloss:
+                loss_seg_ce = weight_softmax_focalloss(outputs,all_label_batch,weight=torch.tensor(class_weights,device=device))
             else:
                 loss_seg_ce = ce_loss(outputs,all_label_batch)
             loss = loss_seg_ce

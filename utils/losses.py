@@ -42,6 +42,7 @@ def softmax_focalloss(y_pred, y_true, ignore_index=255, gamma=2.0, normalize=Tru
 
     Returns:
     """
+    # 非常关键 reduction='none'，这样他会把每个像素的loss值计算了返回回来
     losses = F.cross_entropy(y_pred, y_true, ignore_index=ignore_index, reduction='none')
     with torch.no_grad():
         p = y_pred.softmax(dim=1)
@@ -56,6 +57,29 @@ def softmax_focalloss(y_pred, y_true, ignore_index=255, gamma=2.0, normalize=Tru
 
     return losses
 
+def weight_softmax_focalloss(y_pred, y_true, ignore_index=255, gamma=2.0, normalize=True,weight=None):
+    """
+    Args:
+        y_pred: [N, #class, H, W]
+        y_true: [N, H, W] from 0 to #class
+        gamma: scalar
+
+    Returns:
+    """
+    # 非常关键 reduction='none'，这样他会把每个像素的loss值计算了返回回来
+    losses = F.cross_entropy(y_pred, y_true, ignore_index=ignore_index, reduction='none',weight=weight)
+    with torch.no_grad():
+        p = y_pred.softmax(dim=1)
+        modulating_factor = (1 - p).pow(gamma)
+        valid_mask = ~ y_true.eq(ignore_index)
+        masked_y_true = torch.where(valid_mask, y_true, torch.zeros_like(y_true))
+        modulating_factor = torch.gather(modulating_factor, dim=1, index=masked_y_true.unsqueeze(dim=1)).squeeze_(dim=1)
+        scale = 1.
+        if normalize:
+            scale = losses.sum() / (losses * modulating_factor).sum()
+    losses = scale * (losses * modulating_factor).sum() / (valid_mask.sum() + p.size(0))
+
+    return losses
 
 
 

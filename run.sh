@@ -154,22 +154,30 @@ OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_idrid_supervised_2d.py \
         --model UNet
 
 
-OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_idrid_supervised_2d.py \
+
+
+#
+
+OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 nohup python train_idrid_supervised_2d.py \
         --num_works 0 \
-        --device 0 \
-        --exp IDRID \
+        --device 1 \
+        --exp IDRID_weight1 \
         --dataset_name IDRID \
         --val_period 54 \
         --image_size 1440 \
         --model UNet_efficient \
         --batch_size 1 \
         --base_lr 0.0001 \
-        --CLAHE \
-        --backbone b0
+        --CLAHE 3 \
+        --backbone b0 &
 
-        --annealing_softmax_focalloss
+
+        --ce_weight 0.001 0.1 0.1 0.1 0.1 \
+        --annealing_softmax_focalloss UNet_MiT
 
 UNet_ResNet Deeplabv3p SR_UNet_ResNet UNet_efficient UNet_MiT UNet_efficient_SR
+
+        --ce_weight 0.001 1.0 0.1 0.1 0.1
 
         --ce_weight 1.0 1.0 1.0 1.0 1.0
 
@@ -198,7 +206,7 @@ OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 nohup  python train_idrid_supervised_2d.py \
 # DDR
 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_ddr_supervised_2d.py \
         --num_works 0 \
-        --device 1 \
+        --device 0 \
         --exp DDR \
         --dataset_name DDR \
         --val_period 90 \

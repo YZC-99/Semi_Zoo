@@ -104,11 +104,11 @@ class SemiDataset(Dataset):
 
 class IDRIDDataset(Dataset):
     def __init__(self,name, root, mode, size,
-                 id_path=None,CLAHE = False):
+                 id_path=None,CLAHE = 2):
         self.name = name
         self.root = root
         self.mode = mode
-        self.size = size
+        self.size = int(size)
         self.CLAHE = CLAHE
 
         if mode == 'semi_train':
@@ -124,8 +124,8 @@ class IDRIDDataset(Dataset):
     def get_item_nor(self,item):
         id = self.ids[item]
         img_path = os.path.join(self.root, id.split(' ')[0])
-        if self.CLAHE:
-            img_path = img_path.replace('/images','/images_clahe')
+        if self.CLAHE > 0:
+            img_path = img_path.replace('/images','/images_clahe_{}'.format(self.CLAHE))
             img = Image.open(img_path)
         else:
             img = Image.open(img_path)
@@ -134,15 +134,26 @@ class IDRIDDataset(Dataset):
         mask = Image.open(mask_path)
 
         if self.mode == 'semi_train':
-            img, mask = hflip(img, mask, p=0.5)
-            img, mask = vflip(img, mask, p=0.5)
-            img, mask = random_rotate(img, mask,p=0.5,max_rotation_angle=30)
-            # img, mask = random_scale(img,mask,p=0.5)
-
-        if self.size == 1440:
-            img, mask = resize1440(img, mask)
+            if random.random() < 0.5:
+                img, mask = hflip(img, mask)
+            if random.random() < 0.5:
+                img, mask = vflip(img, mask)
+            if random.random() < 0.5:
+                img, mask = random_rotate(img, mask,max_rotation_angle=30)
+            if self.size == 1440:
+                img, mask = resize1440(img, mask)
+                if random.random() < 0.5:
+                    img, mask = random_scale_and_crop(img,mask,target_size=(1440,960))
+            else:
+                img, mask = resize(img, mask, self.size,self.size)
+                if random.random() < 0.5:
+                    img, mask = random_scale_and_crop(img, mask, target_size=(self.size, self.size))
         else:
-            img, mask = resize(img, mask, self.size)
+            if self.size == 1440:
+                img, mask = resize1440(img, mask)
+            else:
+                img, mask = resize(img, mask, self.size,self.size)
+
         if self.CLAHE:
             img, mask = normalize(img, mask, mean=(0.0,), std=(1.0,))
         else:
