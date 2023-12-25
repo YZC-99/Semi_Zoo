@@ -209,7 +209,7 @@ class Sklearn_DR_metrics(object):
         return y_pred, y_true
 
     def PR_AUC(self,pred,label):
-        y_pred,y_true = self.get_scores(pred.cpu(),label.cpu())
+        y_pred,y_true = self.get_scores(pred.cpu().numpy(),label.cpu().numpy())
         precision, recall, thresholds = precision_recall_curve(y_true, y_pred)
 
         sorted_indices = np.argsort(recall)
