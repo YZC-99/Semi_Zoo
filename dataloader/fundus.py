@@ -1,3 +1,5 @@
+import copy
+
 import torch
 from dataloader.transform import  hflip,vflip, normalize, resize, random_scale_and_crop,resize1440
 from dataloader.transform import random_rotate,random_translate,random_scale
@@ -101,6 +103,94 @@ class SemiDataset(Dataset):
 
     def __len__(self):
         return len(self.ids)
+
+class BinaryIDRIDDataset(Dataset):
+    def __init__(self,name, root, mode, size,
+                 id_path=None,CLAHE = 2):
+        self.name = name
+        self.root = root
+        self.mode = mode
+        self.size = int(size)
+        self.CLAHE = CLAHE
+
+        if mode == 'semi_train':
+            id_path = '%s/%s' %(name,id_path)
+        elif mode == 'val':
+            id_path = '%s/val.txt' % name
+        elif mode == 'test':
+            id_path = '%s/test.txt' % name
+
+        with open(id_path, 'r') as f:
+            self.ids = f.read().splitlines()
+
+    def get_item_nor(self,item):
+        id = self.ids[item]
+        img_path = os.path.join(self.root, id.split(' ')[0])
+        if self.CLAHE > 0:
+            img_path = img_path.replace('/images','/images_clahe_{}'.format(self.CLAHE))
+            img = Image.open(img_path)
+        else:
+            img = Image.open(img_path)
+        org_img = copy.copy(img)
+        fused_mask_path = os.path.join(self.root, id.split(' ')[1])
+        MA_mask_path = fused_mask_path.replace("labels_fused","labels_indiv").\
+                                        replace("/IDRiD","/1. Microaneurysms/IDRiD").\
+                                        replace("_fuse.png","_MA.tif")
+        HE_mask_path = fused_mask_path.replace("labels_fused","labels_indiv").\
+                                        replace("/IDRiD","/2. Haemorrhages/IDRiD").\
+                                        replace("_fuse.png","_HE.tif")
+        EX_mask_path = fused_mask_path.replace("labels_fused","labels_indiv").\
+                                        replace("/IDRiD","/3. Hard Exudates/IDRiD").\
+                                        replace("_fuse.png","_EX.tif")
+        SE_mask_path = fused_mask_path.replace("labels_fused","labels_indiv").\
+                                        replace("/IDRiD","/4. Soft Exudates/IDRiD").\
+                                        replace("_fuse.png","_SE.tif")
+        sample = {'image': img,
+                'MA_mask': torch.zeros(1),
+                'HE_mask': torch.zeros(1),
+                'EX_mask': torch.zeros(1),
+                'SE_mask': torch.zeros(1),
+                }
+
+        if os.path.exists(MA_mask_path):
+            MA_mask = Image.open(MA_mask_path)
+            img, MA_mask = resize1440(org_img, MA_mask)
+            img, MA_mask = normalize(img, MA_mask, mean=(0.0,), std=(1.0,))
+            sample['MA_mask'] = MA_mask
+        if os.path.exists(HE_mask_path):
+            HE_mask = Image.open(HE_mask_path)
+            img, HE_mask = resize1440(org_img, HE_mask)
+            img, HE_mask = normalize(img, HE_mask, mean=(0.0,), std=(1.0,))
+            sample['HE_mask'] = HE_mask
+        if os.path.exists(EX_mask_path):
+            EX_mask = Image.open(EX_mask_path)
+            img, EX_mask = resize1440(org_img, EX_mask)
+            img, EX_mask = normalize(img, EX_mask, mean=(0.0,), std=(1.0,))
+            sample['EX_mask'] = EX_mask
+        if os.path.exists(SE_mask_path):
+            SE_mask = Image.open(SE_mask_path)
+            img, SE_mask = resize1440(org_img, SE_mask)
+            img, SE_mask = normalize(img, SE_mask, mean=(0.0,), std=(1.0,))
+            sample['SE_mask'] = SE_mask
+
+        # if len(sample['HE_mask'].shape) == 1:
+        #     sample['HE_mask'] = torch.zeros_like(sample['MA_mask'])
+        # if len(sample['EX_mask'].shape) == 1:
+        #     sample['EX_mask'] = torch.zeros_like(sample['EX_mask'])
+        # if len(sample['SE_mask'].shape) == 1:
+        #     sample['SE_mask'] = torch.zeros_like(sample['SE_mask'])
+
+        sample['image'] = img
+        return sample
+
+    def __getitem__(self, item):
+        sample = self.get_item_nor(item)
+
+        return sample
+
+    def __len__(self):
+        return len(self.ids)
+
 
 class IDRIDDataset(Dataset):
     def __init__(self,name, root, mode, size,

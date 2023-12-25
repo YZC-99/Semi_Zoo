@@ -1,6 +1,6 @@
 import random
 from tqdm import tqdm
-from dataloader.fundus import SemiDataset,IDRIDDataset
+from dataloader.fundus import SemiDataset,IDRIDDataset,BinaryIDRIDDataset
 from dataloader.samplers import TwoStreamBatchSampler, LabeledBatchSampler,UnlabeledBatchSampler
 import torch
 import glob
@@ -16,7 +16,7 @@ from tensorboardX import SummaryWriter
 import segmentation_models_pytorch as smp
 from utils import ramps,losses
 from utils.losses import OhemCrossEntropy,annealing_softmax_focalloss,softmax_focalloss,weight_softmax_focalloss
-from utils.test_utils import DR_metrics,Sklearn_DR_metrics
+from utils.test_utils import DR_metrics,Binary_DR_metrics
 from utils.util import color_map,gray_to_color
 import random
 from utils.util import get_optimizer,PolyLRwithWarmup, compute_sdf,compute_sdf_luoxd,compute_sdf_multi_class
@@ -49,7 +49,7 @@ parser.add_argument('--CLAHE',type=int,default=2)
 
 parser.add_argument('--optim',type=str,default='AdamW')
 parser.add_argument('--amp',type=bool,default=True)
-parser.add_argument('--num_classes',type=int,default=5)
+parser.add_argument('--num_classes',type=int,default=4)
 parser.add_argument('--base_lr',type=float,default=0.00025)
 
 parser.add_argument('--batch_size',type=int,default=4)
@@ -148,7 +148,7 @@ if __name__ == '__main__':
     if args.autodl:
         root_base = '/root/autodl-tmp/'
 
-    labeled_dataset = IDRIDDataset(name='./dataset/{}'.format(args.dataset_name),
+    labeled_dataset = BinaryIDRIDDataset(name='./dataset/{}'.format(args.dataset_name),
                                   root="{}{}".format(root_base,args.dataset_name),
                                   mode='semi_train',
                                   size=args.image_size,
@@ -173,20 +173,19 @@ if __name__ == '__main__':
     lr_ = args.base_lr
     model.train()
 
-    # ce_loss = BCEWithLogitsLoss()
-    # class_weights = [0.001,1.0,0.1,0.01,0.1]
-    class_weights = args.ce_weight
-    if args.ohem > 0:
-        # online hard example mining
-        ce_loss = OhemCrossEntropy(thres=args.ohem,weight=torch.tensor(class_weights,device=device))
-    else:
-        ce_loss = CrossEntropyLoss(ignore_index=255,weight=torch.tensor(class_weights,device=device))
-    # mse_loss = MSELoss()
+    # MA_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([2274],device=device))
+    # HE_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([684],device=device))
+    # EX_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([789],device=device))
+    # SE_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([607],device=device))
+    MA_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([600],device=device))
+    HE_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([600],device=device))
+    EX_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([600],device=device))
+    SE_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([600],device=device))
 
 
     # 验证集
     # init dataset
-    val_dataset = IDRIDDataset(name='./dataset/{}'.format(args.dataset_name),
+    val_dataset = BinaryIDRIDDataset(name='./dataset/{}'.format(args.dataset_name),
                                     # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
                                   root="{}{}".format(root_base,args.dataset_name),
                                   mode='val',
@@ -200,8 +199,7 @@ if __name__ == '__main__':
     # 开始训练
     iterator = tqdm(range(max_epoch), ncols=70)
 
-    # DR_val_metrics = DR_metrics(device)
-    DR_val_metrics = Sklearn_DR_metrics()
+    DR_val_metrics = Binary_DR_metrics(device)
     best_AUC_PR_EX = 0
     for epoch_num in iterator:
         torch.cuda.empty_cache()
@@ -209,25 +207,40 @@ if __name__ == '__main__':
         for i_batch,labeled_sampled_batch in enumerate(labeledtrainloader):
             time2 = time.time()
 
-            labeled_batch, label_label_batch = labeled_sampled_batch['image'].to(device), labeled_sampled_batch['label'].to(device)
+            labeled_batch = labeled_sampled_batch['image'].to(device)
 
-            all_batch = labeled_batch
-            all_label_batch = label_label_batch
+            MA_label_batch = labeled_sampled_batch['MA_mask'].to(device)
+            HE_label_batch = labeled_sampled_batch['HE_mask'].to(device)
+            EX_label_batch = labeled_sampled_batch['EX_mask'].to(device)
+            SE_label_batch = labeled_sampled_batch['SE_mask'].to(device)
 
-            outputs = model(all_batch)
+            outputs = model(labeled_batch)
+            MA_loss = 0
+            HE_loss = 0
+            EX_loss = 0
+            SE_loss = 0
 
-            # calculate the loss
-            outputs_soft = torch.argmax(outputs,dim=1)
-            all_label_batch[all_label_batch > 4] = 4
-            if args.annealing_softmax_focalloss:
-                loss_seg_ce = annealing_softmax_focalloss(outputs,all_label_batch,
-                                                         t=iter_num,t_max=args.max_iterations * 0.6)
-            elif args.softmax_focalloss:
-                loss_seg_ce = softmax_focalloss(outputs,all_label_batch)
-            elif args.weight_softmax_focalloss:
-                loss_seg_ce = weight_softmax_focalloss(outputs,all_label_batch,weight=torch.tensor(class_weights,device=device))
-            else:
-                loss_seg_ce = ce_loss(outputs,all_label_batch)
+
+            if len(torch.unique(MA_label_batch)) > 1:
+                MA_loss = MA_ce_loss(outputs[:,0,...],MA_label_batch.float())
+            if len(torch.unique(HE_label_batch)) > 1:
+                HE_loss = HE_ce_loss(outputs[:,1,...],HE_label_batch.float())
+            if len(torch.unique(EX_label_batch)) > 1:
+                EX_loss = EX_ce_loss(outputs[:,2,...],EX_label_batch.float())
+            if len(torch.unique(SE_label_batch)) > 1:
+                SE_loss = SE_ce_loss(outputs[:,3,...],SE_label_batch.float())
+
+
+            # loss_seg_ce = args.ce_weight[1] * MA_loss + \
+            #               args.ce_weight[2] * HE_loss + \
+            #               args.ce_weight[3] * EX_loss +\
+            #               args.ce_weight[4] * SE_loss
+
+            loss_seg_ce = MA_loss + \
+                          HE_loss + \
+                          EX_loss + \
+                          SE_loss
+
             loss = loss_seg_ce
 
             optimizer.zero_grad()
@@ -251,16 +264,28 @@ if __name__ == '__main__':
 
             with torch.no_grad():
                 if iter_num % 50 == 0:
-                    image = all_batch[0]
+                    image = labeled_batch[0]
                     writer.add_image('train/Image', image, iter_num)
 
-                    image = torch.argmax(outputs,dim=1)
-                    image = image[0]
-                    colored_image = gray_to_color(image, color_map)
-                    writer.add_image('train/Predicted_label', colored_image, iter_num,dataformats='CHW')
+                    outputs = torch.sigmoid(outputs[0])
+
+                    MA_img = (outputs[0,...] > 0.5).to(torch.int8)
+                    HE_img = (outputs[1,...] > 0.5).to(torch.int8) * 2
+                    EX_img = (outputs[2,...] > 0.5).to(torch.int8) * 3
+                    SE_img = (outputs[3,...] > 0.5).to(torch.int8) * 4
 
 
-                    image = all_label_batch[0]
+                    MA_colored_image = gray_to_color(MA_img, color_map)
+                    writer.add_image('train/MA_Predicted_label', MA_colored_image, iter_num,dataformats='CHW')
+                    HE_colored_image = gray_to_color(HE_img, color_map)
+                    writer.add_image('train/HE_Predicted_label', HE_colored_image, iter_num,dataformats='CHW')
+                    EX_colored_image = gray_to_color(EX_img, color_map)
+                    writer.add_image('train/EX_Predicted_label', EX_colored_image, iter_num,dataformats='CHW')
+                    SE_colored_image = gray_to_color(SE_img, color_map)
+                    writer.add_image('train/SE_Predicted_label', SE_colored_image, iter_num,dataformats='CHW')
+
+
+                    image = MA_label_batch[0]+ 2* HE_label_batch[0]+ 3 * EX_label_batch[0]+ 4 *SE_label_batch[0]
                     colored_image = gray_to_color(image, color_map)
                     writer.add_image('train/Groundtruth_label',
                                      colored_image, iter_num,dataformats='CHW')
@@ -272,18 +297,39 @@ if __name__ == '__main__':
                     model.eval()
                     show_id = random.randint(0,len(val_iteriter))
                     for id,data in enumerate(val_iteriter):
-                        img,label = data['image'].to(device),data['label'].to(device)
-                        outputs = model(img)
+                        img = data['image'].to(device)
+                        MA_mask = data['MA_mask'].to(device)
+                        HE_mask = data['HE_mask'].to(device)
+                        EX_mask = data['EX_mask'].to(device)
+                        SE_mask = data['SE_mask'].to(device)
 
-                        DR_val_metrics.add(outputs.detach(),label)
+                        label = MA_mask + 2 * HE_mask + 3 * EX_mask + 4 * SE_mask
+
+                        # one_hot_label = torch.nn.functional.one_hot(torch.cat([MA_mask,HE_mask,EX_mask,SE_mask],dim=1)).permute(3,0,1,2)
+
+                        outputs = model(img)
+                        outputs = torch.sigmoid(outputs)
+                        DR_val_metrics.add_noback(outputs.detach(),MA_mask , HE_mask , EX_mask , SE_mask)
 
                         if id == show_id:
                             image = img[0]
                             writer.add_image('val/image', image, iter_num)
 
-                            image = torch.argmax(outputs,dim=1)
-                            image = gray_to_color(image,color_map)
-                            writer.add_image('val/pred', image, iter_num,dataformats='CHW')
+                            outputs = outputs[0]
+                            MA_img = (outputs[0, ...] > 0.5).to(torch.int8)
+                            HE_img = (outputs[1, ...] > 0.5).to(torch.int8) * 2
+                            EX_img = (outputs[2, ...] > 0.5).to(torch.int8) * 3
+                            SE_img = (outputs[3, ...] > 0.5).to(torch.int8) * 4
+
+                            MA_colored_image = gray_to_color(MA_img, color_map)
+                            writer.add_image('val/MA_Predicted_label', MA_colored_image, iter_num, dataformats='CHW')
+                            HE_colored_image = gray_to_color(HE_img, color_map)
+                            writer.add_image('val/HE_Predicted_label', HE_colored_image, iter_num, dataformats='CHW')
+                            EX_colored_image = gray_to_color(EX_img, color_map)
+                            writer.add_image('val/EX_Predicted_label', EX_colored_image, iter_num, dataformats='CHW')
+                            SE_colored_image = gray_to_color(SE_img, color_map)
+                            writer.add_image('val/SE_Predicted_label', SE_colored_image, iter_num, dataformats='CHW')
+
                             image = label
                             image = gray_to_color(image,color_map)
                             writer.add_image('val/Groundtruth_label',
@@ -302,13 +348,13 @@ if __name__ == '__main__':
                                                                                             MA_AUC_PR,
                                                                                             HE_AUC_PR,
                                                                                             EX_AUC_PR,
-                                                                                           SE_AUC_PR,
+                                                                                            SE_AUC_PR,
                                                                                            ))
                     logging.info("MA_AUC_ROC:{}--HE_AUC_ROC:{}--EX_AUC_ROC:{}--SE_AUC_ROC:{}".format(
                                                                                             MA_AUC_ROC,
                                                                                             HE_AUC_ROC,
                                                                                             EX_AUC_ROC,
-                                                                                           SE_AUC_ROC,
+                                                                                            SE_AUC_ROC,
                                                                                            ))
 
                     writer.add_scalar('val_AUC_PR/MA',MA_AUC_PR, iter_num)

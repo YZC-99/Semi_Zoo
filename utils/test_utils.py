@@ -1,9 +1,11 @@
 from torchmetrics import JaccardIndex,Dice,PrecisionRecallCurve
-from sklearn.metrics import auc,roc_auc_score
-from torcheval.metrics import MulticlassAUROC,MulticlassAUPRC
+from sklearn.metrics import auc,roc_auc_score,precision_recall_curve,roc_curve
+from torcheval.metrics import MulticlassAUROC,MulticlassAUPRC,MultilabelAUPRC
+from torcheval.metrics import BinaryAUPRC,BinaryAUROC
 from utils.my_metrics import BoundaryIoU
 import torch
 from copy import copy
+import numpy as np
 
 class ODOC_metrics(object):
     def __init__(self,device):
@@ -99,6 +101,7 @@ class DR_metrics(object):
         self.iou = 0
 
     def add(self,preds,labels):
+        preds = torch.softmax(preds,dim=1)
 
         region_preds = copy(preds)
         region_preds = torch.argmax(region_preds,dim=1)
@@ -175,6 +178,224 @@ class DR_metrics(object):
         },
             {'Dice': Dice,
              'IoU': IoU,
+
+        }
+        ]
+
+
+        self.my_reset()
+
+        return results
+
+
+class Sklearn_DR_metrics(object):
+    def __init__(self):
+        self.background_count = 0
+        self.MA_count = 0
+        self.HE_count = 0
+        self.EX_count = 0
+        self.SE_count = 0
+        self.MA = 0
+        self.HE = 0
+        self.EX = 0
+        self.SE = 0
+
+        self.dice = 0
+        self.iou = 0
+
+    def get_scores(self,pred,label):
+        y_pred = pred.flatten()
+        y_true = label.flatten()
+        return y_pred, y_true
+
+    def PR_AUC(self,pred,label):
+        y_pred,y_true = self.get_scores(pred.cpu(),label.cpu())
+        precision, recall, thresholds = precision_recall_curve(y_true, y_pred)
+
+        sorted_indices = np.argsort(recall)
+        recall = recall[sorted_indices]
+        precision = precision[sorted_indices]
+
+        pr_auc = auc(recall, precision)
+        return pr_auc
+
+    def add(self,probs,labels):
+        probs = torch.softmax(probs,dim=1)
+
+        assert torch.all((labels == 0) | (labels == 1) | (labels == 2) | (labels == 3) | (
+                    labels == 4)), "labels should only contain values 1, 2, 3, or 4,now unique:==>{}<==".format(torch.unique(labels))
+
+        current_labels = torch.unique(labels)
+
+        MA_labels = torch.zeros_like(labels)
+        MA_labels[labels == 1] = 1
+        HE_labels = torch.zeros_like(labels)
+        HE_labels[labels == 2] = 1
+        EX_labels = torch.zeros_like(labels)
+        EX_labels[labels == 3] = 1
+        SE_labels = torch.zeros_like(labels)
+        SE_labels[labels == 4] = 1
+
+        if 1 in current_labels:
+            self.MA += self.PR_AUC(probs[:,1,...],MA_labels)
+            self.MA_count += 1
+        if 2 in current_labels:
+            self.HE += self.PR_AUC(probs[:,2,...],HE_labels)
+            self.HE_count += 1
+        if 3 in current_labels:
+            self.EX += self.PR_AUC(probs[:,3,...],EX_labels)
+            self.EX_count += 1
+        if 4 in current_labels:
+            self.SE += self.PR_AUC(probs[:,4,...],SE_labels)
+            self.SE_count += 1
+
+    def my_reset(self):
+        self.background_count = 0
+        self.MA_count = 0
+        self.HE_count = 0
+        self.EX_count = 0
+        self.SE_count = 0
+        self.MA = 0
+        self.HE = 0
+        self.EX = 0
+        self.SE = 0
+        self.dice = 0
+        self.iou = 0
+
+    def get_metrics(self):
+
+        results = [{
+            'MA_AUC_PR': self.MA / self.MA_count,
+            'HE_AUC_PR': self.HE / self.HE_count,
+            'EX_AUC_PR': self.EX / self.EX_count,
+            'SE_AUC_PR': self.SE / self.SE_count,
+        },
+        {   'MA_AUC_ROC': 0,
+            'HE_AUC_ROC': 0,
+            'EX_AUC_ROC': 0,
+            'SE_AUC_ROC': 0,
+        },
+            {'Dice': 0,
+             'IoU': 0,
+
+        }
+        ]
+
+
+        self.my_reset()
+
+        return results
+
+
+
+class Binary_DR_metrics(object):
+    def __init__(self,device):
+        self.AUC_PR = BinaryAUPRC().to(device)
+        self.AUC_ROC = BinaryAUROC().to(device)
+        self.Dice = Dice(num_classes=1, multiclass=False,average='samples').to(device)
+        self.IoU = JaccardIndex(num_classes=2, task='binary', average='micro').to(device)
+
+        self.background_count = 0
+        self.MA_count = 0
+        self.HE_count = 0
+        self.EX_count = 0
+        self.SE_count = 0
+        self.auc_pr = torch.zeros(4,device=device)
+        self.auc_roc = torch.zeros(4,device=device)
+        self.dice = 0
+        self.iou = 0
+
+    def add(self,preds,MA_mask , HE_mask , EX_mask , SE_mask):
+        # preds[preds > 0.5] = 1
+        _,num,_,_ = preds.size()
+        preds = preds.squeeze()
+        preds = preds.view(num,-1)
+
+        MA_mask = MA_mask.squeeze().view(-1)
+        HE_mask = HE_mask.squeeze().view(-1)
+        EX_mask = EX_mask.squeeze().view(-1)
+        SE_mask = SE_mask.squeeze().view(-1)
+
+        if len(torch.unique((MA_mask))) > 1:
+            self.AUC_PR.update(preds[1],MA_mask)
+            self.auc_pr[0] += self.AUC_PR.compute()
+            self.AUC_PR.reset()
+            self.MA_count += 1
+        if len(torch.unique((HE_mask))) > 1:
+            self.AUC_PR.update(preds[2],HE_mask)
+            self.auc_pr[1] += self.AUC_PR.compute()
+            self.AUC_PR.reset()
+            self.HE_count += 1
+        if len(torch.unique((EX_mask))) > 1:
+            self.AUC_PR.update(preds[3],EX_mask)
+            self.auc_pr[2] += self.AUC_PR.compute()
+            self.AUC_PR.reset()
+            self.EX_count += 1
+        if len(torch.unique((SE_mask))) > 1:
+            self.AUC_PR.update(preds[4],SE_mask)
+            self.auc_pr[3] += self.AUC_PR.compute()
+            self.AUC_PR.reset()
+            self.SE_count += 1
+
+    def add_noback(self,preds,MA_mask , HE_mask , EX_mask , SE_mask):
+        # preds[preds > 0.5] = 1
+        _,num,_,_ = preds.size()
+        preds = preds.squeeze()
+        preds = preds.view(num,-1)
+
+        MA_mask = MA_mask.squeeze().view(-1)
+        HE_mask = HE_mask.squeeze().view(-1)
+        EX_mask = EX_mask.squeeze().view(-1)
+        SE_mask = SE_mask.squeeze().view(-1)
+
+        if len(MA_mask) > 2:
+            self.AUC_PR.update(preds[0],MA_mask)
+            self.auc_pr[0] += self.AUC_PR.compute()
+            self.AUC_PR.reset()
+            self.MA_count += 1
+        if len(HE_mask) > 2:
+            self.AUC_PR.update(preds[1],HE_mask)
+            self.auc_pr[1] += self.AUC_PR.compute()
+            self.AUC_PR.reset()
+            self.HE_count += 1
+        if len(EX_mask) > 2:
+            self.AUC_PR.update(preds[2],EX_mask)
+            self.auc_pr[2] += self.AUC_PR.compute()
+            self.AUC_PR.reset()
+            self.EX_count += 1
+        if len(SE_mask) > 2:
+            self.AUC_PR.update(preds[3],SE_mask)
+            self.auc_pr[3] += self.AUC_PR.compute()
+            self.AUC_PR.reset()
+            self.SE_count += 1
+    def my_reset(self):
+        self.background_count = 0
+        self.MA_count = 0
+        self.HE_count = 0
+        self.EX_count = 0
+        self.SE_count = 0
+        self.auc_pr = torch.zeros_like(self.auc_pr)
+        self.auc_roc = torch.zeros_like(self.auc_roc)
+        self.dice = 0
+        self.iou = 0
+
+    def get_metrics(self):
+        auc_pr = self.auc_pr
+        auc_roc = self.auc_roc
+
+        results = [{
+            'MA_AUC_PR': auc_pr[0] / self.MA_count,
+            'HE_AUC_PR': auc_pr[1] / self.HE_count,
+            'EX_AUC_PR': auc_pr[2] / self.EX_count,
+            'SE_AUC_PR': auc_pr[3] / self.SE_count,
+        },
+        {   'MA_AUC_ROC': auc_roc[0] / self.MA_count,
+            'HE_AUC_ROC': auc_roc[1] / self.HE_count,
+            'EX_AUC_ROC': auc_roc[2] / self.EX_count,
+            'SE_AUC_ROC': auc_roc[3] / self.SE_count,
+        },
+            {'Dice': 0,
+             'IoU': 0,
 
         }
         ]

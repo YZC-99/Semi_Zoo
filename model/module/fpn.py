@@ -120,8 +120,13 @@ class FPN(nn.Module):
         ):
             if not inner_block:
                 continue
-            inner_top_down = F.interpolate(last_inner, scale_factor=2, mode="nearest")
             inner_lateral = getattr(self, inner_block)(feature)
+
+            scale_factor = inner_lateral.shape[-1] / last_inner.shape[-1]
+
+            inner_top_down = F.interpolate(last_inner, scale_factor=scale_factor, mode="nearest")
+
+
             last_inner = inner_lateral + inner_top_down
             results.insert(0, getattr(self, layer_block)(last_inner))
 
