@@ -1,7 +1,5 @@
-from torchmetrics import JaccardIndex,Dice,PrecisionRecallCurve
+from torchmetrics import JaccardIndex,Dice,PrecisionRecallCurve,AveragePrecision,AUROC
 from sklearn.metrics import auc,roc_auc_score,precision_recall_curve,roc_curve
-from torcheval.metrics import MulticlassAUROC,MulticlassAUPRC,MultilabelAUPRC
-from torcheval.metrics import BinaryAUPRC,BinaryAUROC
 from utils.my_metrics import BoundaryIoU
 import torch
 from copy import copy
@@ -85,8 +83,8 @@ class ODOC_metrics(object):
 
 class DR_metrics(object):
     def __init__(self,device):
-        self.AUC_PR = MulticlassAUPRC(num_classes=5,average=None).to(device)
-        self.AUC_ROC = MulticlassAUROC(num_classes=5,average=None).to(device)
+        self.AUC_PR = AveragePrecision(num_classes=5, average=None).to(device)
+        self.AUC_ROC = AUROC(num_classes=5, average=None).to(device)
         self.Dice = Dice(num_classes=1, multiclass=False,average='samples').to(device)
         self.IoU = JaccardIndex(num_classes=2, task='binary', average='micro').to(device)
 
@@ -220,6 +218,8 @@ class Sklearn_DR_metrics(object):
         precision = precision[sorted_indices]
 
         pr_auc = auc(recall, precision)
+
+
         return pr_auc
 
     def add(self,probs,labels):
@@ -291,123 +291,123 @@ class Sklearn_DR_metrics(object):
 
 
 
-class Binary_DR_metrics(object):
-    def __init__(self,device):
-        self.AUC_PR = BinaryAUPRC().to(device)
-        self.AUC_ROC = BinaryAUROC().to(device)
-        self.Dice = Dice(num_classes=1, multiclass=False,average='samples').to(device)
-        self.IoU = JaccardIndex(num_classes=2, task='binary', average='micro').to(device)
-
-        self.background_count = 0
-        self.MA_count = 0
-        self.HE_count = 0
-        self.EX_count = 0
-        self.SE_count = 0
-        self.auc_pr = torch.zeros(4,device=device)
-        self.auc_roc = torch.zeros(4,device=device)
-        self.dice = 0
-        self.iou = 0
-
-    def add(self,preds,MA_mask , HE_mask , EX_mask , SE_mask):
-        # preds[preds > 0.5] = 1
-        _,num,_,_ = preds.size()
-        preds = preds.squeeze()
-        preds = preds.view(num,-1)
-
-        MA_mask = MA_mask.squeeze().view(-1)
-        HE_mask = HE_mask.squeeze().view(-1)
-        EX_mask = EX_mask.squeeze().view(-1)
-        SE_mask = SE_mask.squeeze().view(-1)
-
-        if len(torch.unique((MA_mask))) > 1:
-            self.AUC_PR.update(preds[1],MA_mask)
-            self.auc_pr[0] += self.AUC_PR.compute()
-            self.AUC_PR.reset()
-            self.MA_count += 1
-        if len(torch.unique((HE_mask))) > 1:
-            self.AUC_PR.update(preds[2],HE_mask)
-            self.auc_pr[1] += self.AUC_PR.compute()
-            self.AUC_PR.reset()
-            self.HE_count += 1
-        if len(torch.unique((EX_mask))) > 1:
-            self.AUC_PR.update(preds[3],EX_mask)
-            self.auc_pr[2] += self.AUC_PR.compute()
-            self.AUC_PR.reset()
-            self.EX_count += 1
-        if len(torch.unique((SE_mask))) > 1:
-            self.AUC_PR.update(preds[4],SE_mask)
-            self.auc_pr[3] += self.AUC_PR.compute()
-            self.AUC_PR.reset()
-            self.SE_count += 1
-
-    def add_noback(self,preds,MA_mask , HE_mask , EX_mask , SE_mask):
-        # preds[preds > 0.5] = 1
-        _,num,_,_ = preds.size()
-        preds = preds.squeeze()
-        preds = preds.view(num,-1)
-
-        MA_mask = MA_mask.squeeze().view(-1)
-        HE_mask = HE_mask.squeeze().view(-1)
-        EX_mask = EX_mask.squeeze().view(-1)
-        SE_mask = SE_mask.squeeze().view(-1)
-
-        if len(MA_mask) > 2:
-            self.AUC_PR.update(preds[0],MA_mask)
-            self.auc_pr[0] += self.AUC_PR.compute()
-            self.AUC_PR.reset()
-            self.MA_count += 1
-        if len(HE_mask) > 2:
-            self.AUC_PR.update(preds[1],HE_mask)
-            self.auc_pr[1] += self.AUC_PR.compute()
-            self.AUC_PR.reset()
-            self.HE_count += 1
-        if len(EX_mask) > 2:
-            self.AUC_PR.update(preds[2],EX_mask)
-            self.auc_pr[2] += self.AUC_PR.compute()
-            self.AUC_PR.reset()
-            self.EX_count += 1
-        if len(SE_mask) > 2:
-            self.AUC_PR.update(preds[3],SE_mask)
-            self.auc_pr[3] += self.AUC_PR.compute()
-            self.AUC_PR.reset()
-            self.SE_count += 1
-    def my_reset(self):
-        self.background_count = 0
-        self.MA_count = 0
-        self.HE_count = 0
-        self.EX_count = 0
-        self.SE_count = 0
-        self.auc_pr = torch.zeros_like(self.auc_pr)
-        self.auc_roc = torch.zeros_like(self.auc_roc)
-        self.dice = 0
-        self.iou = 0
-
-    def get_metrics(self):
-        auc_pr = self.auc_pr
-        auc_roc = self.auc_roc
-
-        results = [{
-            'MA_AUC_PR': auc_pr[0] / self.MA_count,
-            'HE_AUC_PR': auc_pr[1] / self.HE_count,
-            'EX_AUC_PR': auc_pr[2] / self.EX_count,
-            'SE_AUC_PR': auc_pr[3] / self.SE_count,
-        },
-        {   'MA_AUC_ROC': auc_roc[0] / self.MA_count,
-            'HE_AUC_ROC': auc_roc[1] / self.HE_count,
-            'EX_AUC_ROC': auc_roc[2] / self.EX_count,
-            'SE_AUC_ROC': auc_roc[3] / self.SE_count,
-        },
-            {'Dice': 0,
-             'IoU': 0,
-
-        }
-        ]
-
-
-        self.my_reset()
-
-        return results
-
+# class Binary_DR_metrics(object):
+#     def __init__(self,device):
+#         self.AUC_PR = BinaryAUPRC().to(device)
+#         self.AUC_ROC = BinaryAUROC().to(device)
+#         self.Dice = Dice(num_classes=1, multiclass=False,average='samples').to(device)
+#         self.IoU = JaccardIndex(num_classes=2, task='binary', average='micro').to(device)
+#
+#         self.background_count = 0
+#         self.MA_count = 0
+#         self.HE_count = 0
+#         self.EX_count = 0
+#         self.SE_count = 0
+#         self.auc_pr = torch.zeros(4,device=device)
+#         self.auc_roc = torch.zeros(4,device=device)
+#         self.dice = 0
+#         self.iou = 0
+#
+#     def add(self,preds,MA_mask , HE_mask , EX_mask , SE_mask):
+#         # preds[preds > 0.5] = 1
+#         _,num,_,_ = preds.size()
+#         preds = preds.squeeze()
+#         preds = preds.view(num,-1)
+#
+#         MA_mask = MA_mask.squeeze().view(-1)
+#         HE_mask = HE_mask.squeeze().view(-1)
+#         EX_mask = EX_mask.squeeze().view(-1)
+#         SE_mask = SE_mask.squeeze().view(-1)
+#
+#         if len(torch.unique((MA_mask))) > 1:
+#             self.AUC_PR.update(preds[1],MA_mask)
+#             self.auc_pr[0] += self.AUC_PR.compute()
+#             self.AUC_PR.reset()
+#             self.MA_count += 1
+#         if len(torch.unique((HE_mask))) > 1:
+#             self.AUC_PR.update(preds[2],HE_mask)
+#             self.auc_pr[1] += self.AUC_PR.compute()
+#             self.AUC_PR.reset()
+#             self.HE_count += 1
+#         if len(torch.unique((EX_mask))) > 1:
+#             self.AUC_PR.update(preds[3],EX_mask)
+#             self.auc_pr[2] += self.AUC_PR.compute()
+#             self.AUC_PR.reset()
+#             self.EX_count += 1
+#         if len(torch.unique((SE_mask))) > 1:
+#             self.AUC_PR.update(preds[4],SE_mask)
+#             self.auc_pr[3] += self.AUC_PR.compute()
+#             self.AUC_PR.reset()
+#             self.SE_count += 1
+#
+#     def add_noback(self,preds,MA_mask , HE_mask , EX_mask , SE_mask):
+#         # preds[preds > 0.5] = 1
+#         _,num,_,_ = preds.size()
+#         preds = preds.squeeze()
+#         preds = preds.view(num,-1)
+#
+#         MA_mask = MA_mask.squeeze().view(-1)
+#         HE_mask = HE_mask.squeeze().view(-1)
+#         EX_mask = EX_mask.squeeze().view(-1)
+#         SE_mask = SE_mask.squeeze().view(-1)
+#
+#         if len(MA_mask) > 2:
+#             self.AUC_PR.update(preds[0],MA_mask)
+#             self.auc_pr[0] += self.AUC_PR.compute()
+#             self.AUC_PR.reset()
+#             self.MA_count += 1
+#         if len(HE_mask) > 2:
+#             self.AUC_PR.update(preds[1],HE_mask)
+#             self.auc_pr[1] += self.AUC_PR.compute()
+#             self.AUC_PR.reset()
+#             self.HE_count += 1
+#         if len(EX_mask) > 2:
+#             self.AUC_PR.update(preds[2],EX_mask)
+#             self.auc_pr[2] += self.AUC_PR.compute()
+#             self.AUC_PR.reset()
+#             self.EX_count += 1
+#         if len(SE_mask) > 2:
+#             self.AUC_PR.update(preds[3],SE_mask)
+#             self.auc_pr[3] += self.AUC_PR.compute()
+#             self.AUC_PR.reset()
+#             self.SE_count += 1
+#     def my_reset(self):
+#         self.background_count = 0
+#         self.MA_count = 0
+#         self.HE_count = 0
+#         self.EX_count = 0
+#         self.SE_count = 0
+#         self.auc_pr = torch.zeros_like(self.auc_pr)
+#         self.auc_roc = torch.zeros_like(self.auc_roc)
+#         self.dice = 0
+#         self.iou = 0
+#
+#     def get_metrics(self):
+#         auc_pr = self.auc_pr
+#         auc_roc = self.auc_roc
+#
+#         results = [{
+#             'MA_AUC_PR': auc_pr[0] / self.MA_count,
+#             'HE_AUC_PR': auc_pr[1] / self.HE_count,
+#             'EX_AUC_PR': auc_pr[2] / self.EX_count,
+#             'SE_AUC_PR': auc_pr[3] / self.SE_count,
+#         },
+#         {   'MA_AUC_ROC': auc_roc[0] / self.MA_count,
+#             'HE_AUC_ROC': auc_roc[1] / self.HE_count,
+#             'EX_AUC_ROC': auc_roc[2] / self.EX_count,
+#             'SE_AUC_ROC': auc_roc[3] / self.SE_count,
+#         },
+#             {'Dice': 0,
+#              'IoU': 0,
+#
+#         }
+#         ]
+#
+#
+#         self.my_reset()
+#
+#         return results
+#
 
 # class DR_metrics(object):
 #     def __init__(self,device):
