@@ -173,11 +173,15 @@ if __name__ == '__main__':
     lr_ = args.base_lr
     model.train()
 
-    MA_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([2274],device=device))
-    HE_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([684],device=device))
-    EX_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([789],device=device))
-    SE_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([607],device=device))
+    # MA_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([2274],device=device))
+    # HE_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([684],device=device))
+    # EX_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([789],device=device))
+    # SE_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([607],device=device))
 
+    MA_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([100],device=device))
+    HE_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([100],device=device))
+    EX_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([100],device=device))
+    SE_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([100],device=device))
     Background_ce_loss = BCEWithLogitsLoss()
 
 
@@ -206,6 +210,26 @@ if __name__ == '__main__':
         for i_batch,labeled_sampled_batch in enumerate(labeledtrainloader):
             time2 = time.time()
 
+            target_part_name = 'segmentation_head'
+            for name, param in model.named_parameters():
+                if target_part_name in name and param.grad is not None:
+                    # print(param.grad[0].norm())
+                    writer.add_scalar(f'gradients/{name}', param.grad.norm(), global_step=iter_num)
+
+                    for class_index in range(args.num_classes):
+                        class_gradient = param.grad[class_index]
+                        writer.add_scalar(f'gradients/{target_part_name}_class_{class_index}', class_gradient.norm(),
+                                          global_step=iter_num)
+
+            # target_part_name = 'segmentation_head'
+            # for name, param in model.named_parameters():
+            #     if target_part_name in name and param.grad is not None:
+            #         # Assuming the gradient tensor has shape (batch_size, num_classes, width, height)
+            #         for class_index in range(args.num_classes):
+            #             class_gradient = param.grad[:, class_index, :, :]
+            #             writer.add_scalar(f'gradients/{target_part_name}_class_{class_index}', class_gradient.norm(),
+            #                               global_step=iter_num)
+
             labeled_batch = labeled_sampled_batch['image'].to(device)
 
             MA_label_batch = labeled_sampled_batch['MA_mask'].to(device)
@@ -215,36 +239,49 @@ if __name__ == '__main__':
 
             outputs = model(labeled_batch)
             # outputs_prob = torch.sigmoid(outputs)
-            MA_loss = 0
-            HE_loss = 0
-            EX_loss = 0
-            SE_loss = 0
+            loss_seg_ce = 0
+            # MA_loss = 0
+            # HE_loss = 0
+            # EX_loss = 0
+            # SE_loss = 0
 
             background_label_batch = torch.ones_like(MA_label_batch,device=device)
 
             if len(torch.unique(MA_label_batch)) > 1:
                 background_label_batch[MA_label_batch > 0] = 0
                 MA_loss = MA_ce_loss(outputs[:,1,...],MA_label_batch.float())
+                loss_seg_ce += MA_loss
             if len(torch.unique(HE_label_batch)) > 1:
                 background_label_batch[HE_label_batch > 0] = 0
                 HE_loss = HE_ce_loss(outputs[:,2,...],HE_label_batch.float())
+                loss_seg_ce += HE_loss
             if len(torch.unique(EX_label_batch)) > 1:
                 background_label_batch[EX_label_batch > 0] = 0
                 EX_loss = EX_ce_loss(outputs[:,3,...],EX_label_batch.float())
+                loss_seg_ce += EX_loss
             if len(torch.unique(SE_label_batch)) > 1:
                 background_label_batch[SE_label_batch > 0] = 0
                 SE_loss = SE_ce_loss(outputs[:,4,...],SE_label_batch.float())
+                loss_seg_ce += SE_loss
 
             background_loss = Background_ce_loss(outputs[:,0,...],background_label_batch.float())
-
-            loss_seg_ce = args.ce_weight[0] * background_loss + \
-                          args.ce_weight[1] * MA_loss + \
-                          args.ce_weight[2] * HE_loss + \
-                          args.ce_weight[3] * EX_loss +\
-                          args.ce_weight[4] * SE_loss
+            loss_seg_ce += background_loss
+            # loss_seg_ce = args.ce_weight[0] * background_loss + \
+            #               args.ce_weight[1] * MA_loss + \
+            #               args.ce_weight[2] * HE_loss + \
+            #               args.ce_weight[3] * EX_loss +\
+            #               args.ce_weight[4] * SE_loss
 
             # loss_seg_ce = background_loss + \
             #               MA_loss + \
+            #               HE_loss + \
+            #               EX_loss + \
+            #               SE_loss
+            # loss_seg_ce = 0.25 * MA_loss + \
+            #               0.25 * HE_loss + \
+            #               0.25 * EX_loss + \
+            #               0.25 * SE_loss
+            # loss_seg_ce = MA_loss + \
             #               HE_loss + \
             #               EX_loss + \
             #               SE_loss

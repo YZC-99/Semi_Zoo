@@ -3,7 +3,7 @@ import copy
 import torch
 from dataloader.transform import  hflip,vflip, normalize, resize, random_scale_and_crop,resize1440
 from dataloader.transform import random_rotate,random_translate,random_scale
-from dataloader.transforms_np import resize_np,random_flip_np,random_rotate_np,normalize_np
+from dataloader.transform_dr import *
 import cv2
 import math
 import os
@@ -145,42 +145,85 @@ class BinaryIDRIDDataset(Dataset):
         SE_mask_path = fused_mask_path.replace("labels_fused","labels_indiv").\
                                         replace("/IDRiD","/4. Soft Exudates/IDRiD").\
                                         replace("_fuse.png","_SE.tif")
+        # sample = {'image': img,
+        #         'MA_mask': torch.zeros(1),
+        #         'HE_mask': torch.zeros(1),
+        #         'EX_mask': torch.zeros(1),
+        #         'SE_mask': torch.zeros(1),
+        #         }
         sample = {'image': img,
-                'MA_mask': torch.zeros(1),
-                'HE_mask': torch.zeros(1),
-                'EX_mask': torch.zeros(1),
-                'SE_mask': torch.zeros(1),
+                'MA_mask': None,
+                'HE_mask': None,
+                'EX_mask': None,
+                'SE_mask': None,
                 }
 
-        if os.path.exists(MA_mask_path):
-            MA_mask = Image.open(MA_mask_path)
-            img, MA_mask = resize1440(org_img, MA_mask)
-            img, MA_mask = normalize(img, MA_mask, mean=(0.0,), std=(1.0,))
-            sample['MA_mask'] = MA_mask
-        if os.path.exists(HE_mask_path):
-            HE_mask = Image.open(HE_mask_path)
-            img, HE_mask = resize1440(org_img, HE_mask)
-            img, HE_mask = normalize(img, HE_mask, mean=(0.0,), std=(1.0,))
-            sample['HE_mask'] = HE_mask
-        if os.path.exists(EX_mask_path):
-            EX_mask = Image.open(EX_mask_path)
-            img, EX_mask = resize1440(org_img, EX_mask)
-            img, EX_mask = normalize(img, EX_mask, mean=(0.0,), std=(1.0,))
-            sample['EX_mask'] = EX_mask
-        if os.path.exists(SE_mask_path):
-            SE_mask = Image.open(SE_mask_path)
-            img, SE_mask = resize1440(org_img, SE_mask)
-            img, SE_mask = normalize(img, SE_mask, mean=(0.0,), std=(1.0,))
-            sample['SE_mask'] = SE_mask
+        MEAN_RGB = [0.485 * 255, 0.456 * 255, 0.406 * 255]
+        STDDEV_RGB = [0.229 * 255, 0.224 * 255, 0.225 * 255]
 
-        # if len(sample['HE_mask'].shape) == 1:
-        #     sample['HE_mask'] = torch.zeros_like(sample['MA_mask'])
-        # if len(sample['EX_mask'].shape) == 1:
-        #     sample['EX_mask'] = torch.zeros_like(sample['EX_mask'])
-        # if len(sample['SE_mask'].shape) == 1:
-        #     sample['SE_mask'] = torch.zeros_like(sample['SE_mask'])
+        # if os.path.exists(MA_mask_path):
+        #     MA_mask = Image.open(MA_mask_path)
+        #     img, MA_mask = resize1440(org_img, MA_mask)
+        #     img, MA_mask = normalize(img, MA_mask, mean=MEAN_RGB, std=STDDEV_RGB)
+        #     sample['MA_mask'] = MA_mask
+        # if os.path.exists(HE_mask_path):
+        #     HE_mask = Image.open(HE_mask_path)
+        #     img, HE_mask = resize1440(org_img, HE_mask)
+        #     img, HE_mask = normalize(img, HE_mask, mean=MEAN_RGB, std=STDDEV_RGB)
+        #     sample['HE_mask'] = HE_mask
+        # if os.path.exists(EX_mask_path):
+        #     EX_mask = Image.open(EX_mask_path)
+        #     img, EX_mask = resize1440(org_img, EX_mask)
+        #     img, EX_mask = normalize(img, EX_mask, mean=MEAN_RGB, std=STDDEV_RGB)
+        #     sample['EX_mask'] = EX_mask
+        # if os.path.exists(SE_mask_path):
+        #     SE_mask = Image.open(SE_mask_path)
+        #     img, SE_mask = resize1440(org_img, SE_mask)
+        #     img, SE_mask = normalize(img, SE_mask, mean=MEAN_RGB, std=STDDEV_RGB)
+        #     sample['SE_mask'] = SE_mask
 
+
+
+
+        MA_mask = Image.open(MA_mask_path) if os.path.exists(MA_mask_path) else None
+
+        HE_mask = Image.open(HE_mask_path) if os.path.exists(HE_mask_path) else None
+
+        EX_mask = Image.open(EX_mask_path) if os.path.exists(EX_mask_path) else None
+
+        SE_mask = Image.open(SE_mask_path) if os.path.exists(SE_mask_path) else None
+
+        if self.mode == 'semi_train':
+            if random.random() < 0.5:
+                img,MA_mask,HE_mask,EX_mask,SE_mask = hflip_four(img,MA_mask,HE_mask,EX_mask,SE_mask)
+            if random.random() < 0.5:
+                img, MA_mask, HE_mask, EX_mask, SE_mask = vflip_four(img, MA_mask, HE_mask, EX_mask, SE_mask)
+            if random.random() < 0.5:
+                img, MA_mask, HE_mask, EX_mask, SE_mask = random_rotate_four(img, MA_mask, HE_mask, EX_mask, SE_mask)
+            if random.random() < 0.5:
+                img, MA_mask, HE_mask, EX_mask, SE_mask = random_translate_four(img, MA_mask, HE_mask, EX_mask, SE_mask)
+            if self.size == 1440:
+                img, MA_mask, HE_mask, EX_mask, SE_mask = resize1440_four(img, MA_mask, HE_mask, EX_mask, SE_mask)
+            else:
+                img, MA_mask, HE_mask, EX_mask, SE_mask = resize_four(img, MA_mask, HE_mask, EX_mask, SE_mask,width=self.size,height=self.size)
+            if random.random() < 0.5:
+                if self.size == 1440:
+                    img, MA_mask, HE_mask, EX_mask, SE_mask = random_scale_and_crop_four(img, MA_mask, HE_mask, EX_mask, SE_mask,target_size=(1440,960))
+                else:
+                    img, MA_mask, HE_mask, EX_mask, SE_mask = random_scale_and_crop_four(img, MA_mask, HE_mask, EX_mask, SE_mask,target_size=(self.size,self.size))
+        else:
+            if self.size == 1440:
+                img, MA_mask, HE_mask, EX_mask, SE_mask = resize1440_four(img, MA_mask, HE_mask, EX_mask, SE_mask)
+            else:
+                img, MA_mask, HE_mask, EX_mask, SE_mask = resize_four(img, MA_mask, HE_mask, EX_mask, SE_mask,
+                                                                      width=self.size, height=self.size)
+
+        img, MA_mask, HE_mask, EX_mask, SE_mask = normalize_four(img, MA_mask, HE_mask, EX_mask, SE_mask)
         sample['image'] = img
+        sample['MA_mask'] = MA_mask if MA_mask is not None else torch.zeros(1)
+        sample['HE_mask'] = HE_mask if HE_mask is not None else torch.zeros(1)
+        sample['EX_mask'] = EX_mask if EX_mask is not None else torch.zeros(1)
+        sample['SE_mask'] = SE_mask if SE_mask is not None else torch.zeros(1)
         return sample
 
     def __getitem__(self, item):

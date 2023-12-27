@@ -200,8 +200,8 @@ if __name__ == '__main__':
     # 开始训练
     iterator = tqdm(range(max_epoch), ncols=70)
 
-    # DR_val_metrics = DR_metrics(device)
-    DR_val_metrics = Sklearn_DR_metrics()
+    DR_val_metrics = DR_metrics(device)
+    # DR_val_metrics = Sklearn_DR_metrics()
     best_AUC_PR_EX = 0
     for epoch_num in iterator:
         torch.cuda.empty_cache()

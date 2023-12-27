@@ -161,10 +161,10 @@ OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_idrid_supervised_2d.py \
 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 nohup python train_idrid_supervised_2d_smp.py \
         --num_works 0 \
         --device 1 \
-        --exp IDRID_smp_UNet_ex \
-        --dataset_name IDRID \
+        --exp crop_IDRID_smp_UNet_ex \
+        --dataset_name crop_IDRID \
         --val_period 54 \
-        --image_size 1440 \
+        --image_size 1024 \
         --model DeepLabV3p \
         --batch_size 1 \
         --base_lr 0.0001 \
@@ -174,18 +174,22 @@ OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 nohup python train_idrid_supervised_2d_smp.p
 
 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_idrid_supervised_2d_smp.py \
         --num_works 0 \
-        --device 0 \
-        --exp IDRID_smp_UNet_ex_skmetric \
-        --dataset_name IDRID \
-        --val_period 54 \
-        --image_size 1440 \
+        --device 1 \
+        --exp crop_IDRID_smp_UNet_ex \
+        --dataset_name crop_IDRID \
+        --val_period 50 \
+        --image_size 1024 \
         --model UNet \
         --batch_size 1 \
         --base_lr 0.0001 \
         --CLAHE 4 \
         --ce_weight 0.001 1.0 0.1 0.1 0.1 \
-        --backbone resnet34
+        --backbone tu-tf_efficientnet_b0
 
+        efficientnet-b1
+        tu-tf_efficientnet_b0
+        efficientnet-b0
+        resnet50
 
         --ce_weight 0.001 1.0 1.0 1.0 1.0 \
 ###

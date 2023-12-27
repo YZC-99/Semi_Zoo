@@ -177,11 +177,15 @@ if __name__ == '__main__':
     # HE_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([684],device=device))
     # EX_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([789],device=device))
     # SE_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([607],device=device))
-    MA_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([600],device=device))
-    HE_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([600],device=device))
-    EX_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([600],device=device))
-    SE_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([600],device=device))
+    # MA_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([600],device=device))
+    # HE_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([600],device=device))
+    # EX_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([600],device=device))
+    # SE_ce_loss = BCEWithLogitsLoss(pos_weight=torch.tensor([600],device=device))
 
+    MA_ce_loss = BCEWithLogitsLoss()
+    HE_ce_loss = BCEWithLogitsLoss()
+    EX_ce_loss = BCEWithLogitsLoss()
+    SE_ce_loss = BCEWithLogitsLoss()
 
     # 验证集
     # init dataset
@@ -215,20 +219,21 @@ if __name__ == '__main__':
             SE_label_batch = labeled_sampled_batch['SE_mask'].to(device)
 
             outputs = model(labeled_batch)
-            MA_loss = 0
-            HE_loss = 0
-            EX_loss = 0
-            SE_loss = 0
+            loss_seg_ce = 0
 
 
             if len(torch.unique(MA_label_batch)) > 1:
                 MA_loss = MA_ce_loss(outputs[:,0,...],MA_label_batch.float())
+                loss_seg_ce += MA_loss
             if len(torch.unique(HE_label_batch)) > 1:
                 HE_loss = HE_ce_loss(outputs[:,1,...],HE_label_batch.float())
+                loss_seg_ce += HE_loss
             if len(torch.unique(EX_label_batch)) > 1:
                 EX_loss = EX_ce_loss(outputs[:,2,...],EX_label_batch.float())
+                loss_seg_ce += EX_loss
             if len(torch.unique(SE_label_batch)) > 1:
                 SE_loss = SE_ce_loss(outputs[:,3,...],SE_label_batch.float())
+                loss_seg_ce += SE_loss
 
 
             # loss_seg_ce = args.ce_weight[1] * MA_loss + \
@@ -236,10 +241,6 @@ if __name__ == '__main__':
             #               args.ce_weight[3] * EX_loss +\
             #               args.ce_weight[4] * SE_loss
 
-            loss_seg_ce = MA_loss + \
-                          HE_loss + \
-                          EX_loss + \
-                          SE_loss
 
             loss = loss_seg_ce
 
