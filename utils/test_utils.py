@@ -83,8 +83,8 @@ class ODOC_metrics(object):
 
 class DR_metrics(object):
     def __init__(self,device):
-        self.AUC_PR = AveragePrecision(num_classes=5, average=None).to(device)
-        self.AUC_ROC = AUROC(num_classes=5, average=None).to(device)
+        self.AUC_PR = AveragePrecision(task="multiclass",num_classes=5, average=None).to(device)
+        self.AUC_ROC = AUROC(task="multiclass",num_classes=5, average=None).to(device)
         self.Dice = Dice(num_classes=1, multiclass=False,average='samples').to(device)
         self.IoU = JaccardIndex(num_classes=2, task='binary', average='micro').to(device)
 
