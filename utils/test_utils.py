@@ -211,7 +211,7 @@ class Sklearn_DR_metrics(object):
     def PR_AUC(self,pred,label):
         # y_pred,y_true = self.get_scores(pred.cpu().numpy(),label.cpu().numpy())
         # precision, recall, thresholds = precision_recall_curve(y_true, y_pred)
-        precision, recall, thresholds = PrecisionRecallCurve(task="binary")(label, pred)
+        precision, recall, thresholds = PrecisionRecallCurve(task="binary")(pred,label.long())
         precision, recall, thresholds = precision.cpu().numpy(), recall.cpu().numpy(), thresholds.cpu().numpy()
 
 
