@@ -218,7 +218,7 @@ if __name__ == '__main__':
 
             outputs = model(all_batch)
 
-            loss_seg_dice = 0
+            loss_seg_dice = torch.zeros(1,device=device)
             # calculate the loss
             outputs_soft = torch.argmax(outputs,dim=1)
             all_label_batch[all_label_batch > 4] = 4
