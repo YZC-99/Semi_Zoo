@@ -174,8 +174,8 @@ OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 nohup python train_idrid_supervised_2d_smp.p
 
 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_idrid_supervised_2d_smp.py \
         --num_works 0 \
-        --device 1 \
-        --exp crop_IDRID_smp_UNet_ex \
+        --device 0 \
+        --exp crop_IDRID_smp_UNet_ex_dice \
         --dataset_name crop_IDRID \
         --val_period 50 \
         --image_size 1024 \
@@ -183,8 +183,9 @@ OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_idrid_supervised_2d_smp.py \
         --batch_size 1 \
         --base_lr 0.0001 \
         --CLAHE 4 \
-        --ce_weight 0.001 0.0 0.1 0.1 0.1 \
-        --backbone resnet50
+        --ce_weight 0.001 1.0 0.1 0.1 0.1 \
+        --with_dice \
+        --backbone vgg16
 
         efficientnet-b1
         tu-tf_efficientnet_b0

@@ -68,7 +68,7 @@ parser.add_argument('--ohem',type=float,default=-1.0)
 parser.add_argument('--annealing_softmax_focalloss',action='store_true')
 parser.add_argument('--softmax_focalloss',action='store_true')
 parser.add_argument('--weight_softmax_focalloss',action='store_true')
-parser.add_argument('--with_dice',type=bool,default=False)
+parser.add_argument('--with_dice',action='store_true')
 
 parser.add_argument('--autodl',action='store_true')
 
@@ -181,6 +181,8 @@ if __name__ == '__main__':
         ce_loss = OhemCrossEntropy(thres=args.ohem,weight=torch.tensor(class_weights,device=device))
     else:
         ce_loss = CrossEntropyLoss(ignore_index=255,weight=torch.tensor(class_weights,device=device))
+
+    dice_loss = smp.losses.DiceLoss(mode='multiclass',from_logits=True)
     # mse_loss = MSELoss()
 
 
@@ -216,6 +218,7 @@ if __name__ == '__main__':
 
             outputs = model(all_batch)
 
+            loss_seg_dice = 0
             # calculate the loss
             outputs_soft = torch.argmax(outputs,dim=1)
             all_label_batch[all_label_batch > 4] = 4
@@ -228,8 +231,12 @@ if __name__ == '__main__':
                 loss_seg_ce = weight_softmax_focalloss(outputs,all_label_batch,weight=torch.tensor(class_weights,device=device))
             else:
                 loss_seg_ce = ce_loss(outputs,all_label_batch)
-            loss = loss_seg_ce
 
+            if args.with_dice:
+                loss_seg_dice = dice_loss(outputs,all_label_batch)
+                loss = loss_seg_ce + loss_seg_dice
+            else:
+                loss = loss_seg_ce
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -239,7 +246,7 @@ if __name__ == '__main__':
             writer.add_scalar('lr', optimizer.param_groups[0]['lr'], iter_num)
             writer.add_scalar('loss/loss', loss, iter_num)
             writer.add_scalar('loss/loss_seg', loss_seg_ce, iter_num)
-            # writer.add_scalar('loss/loss_dice', loss_seg_dice, iter_num)
+            writer.add_scalar('loss/loss_dice', loss_seg_dice, iter_num)
 
             logging.info(
                 'iteration %d : loss : %f' %
@@ -247,7 +254,7 @@ if __name__ == '__main__':
             writer.add_scalar('loss/loss', loss, iter_num)
             logging.info('iteration %d : loss : %f' % (iter_num, loss.item()))
             logging.info('iteration %d : loss_seg : %f' % (iter_num, loss_seg_ce.item()))
-            # logging.info('iteration %d : loss_dice : %f' % (iter_num, loss_seg_dice.item()))
+            logging.info('iteration %d : loss_dice : %f' % (iter_num, loss_seg_dice.item()))
 
             with torch.no_grad():
                 if iter_num % 50 == 0:
