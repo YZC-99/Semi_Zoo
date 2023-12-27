@@ -183,8 +183,8 @@ OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_idrid_supervised_2d_smp.py \
         --batch_size 1 \
         --base_lr 0.0001 \
         --CLAHE 4 \
-        --ce_weight 0.001 1.0 0.1 0.1 0.1 \
-        --backbone tu-tf_efficientnet_b0
+        --ce_weight 0.001 0.0 0.1 0.1 0.1 \
+        --backbone resnet50
 
         efficientnet-b1
         tu-tf_efficientnet_b0
