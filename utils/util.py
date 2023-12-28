@@ -45,16 +45,23 @@ def get_optimizer(model,name,base_lr,lr_decouple):
         if lr_decouple:
             optimizer = optim.SGD([{'params': model.encoder.parameters(),'lr':base_lr},
                                      {'params': [param for name, param in model.named_parameters() if 'encoder' not in name], 'lr': base_lr * 10},
-                                     ], momentum=0.9, weight_decay=0.0001)
+                                     ], momentum=0.9, weight_decay=0.0005)
         else:
             optimizer = optim.SGD(model.parameters(), lr=base_lr, momentum=0.9, weight_decay=0.0001)
     elif name == 'AdamW':
         if lr_decouple:
             optimizer = optim.AdamW([{'params': model.encoder.parameters(),'lr':base_lr},
                                      {'params': [param for name, param in model.named_parameters() if 'encoder' not in name], 'lr': base_lr * 10},
-                                     ],weight_decay=1e-2)
+                                     ])
         else:
-            optimizer = optim.AdamW(model.parameters(), lr=base_lr, weight_decay=1e-2)
+            optimizer = optim.AdamW(model.parameters(), lr=base_lr)
+    elif name == 'Adam':
+        if lr_decouple:
+            optimizer = optim.Adam([{'params': model.encoder.parameters(),'lr':base_lr},
+                                     {'params': [param for name, param in model.named_parameters() if 'encoder' not in name], 'lr': base_lr * 10},
+                                     ])
+        else:
+            optimizer = optim.Adam(model.parameters(), lr=base_lr)
     return optimizer
 
 
