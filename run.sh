@@ -209,19 +209,21 @@ OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python train_idrid_supervised_2d_smp.py \
         --ce_weight 0.001 1.0 1.0 1.0 1.0 \
 
 python train_idrid_supervised_2d_smp.py \
-        --num_works 4 \
+        --num_works 8 \
         --device 0 \
-        --exp crop_IDRID_smp_UNet_ex_no-weight_lr1e-4_Adam \
+        --exp crop_IDRID_smp_UNet_ex_no-weight_lr1e-4_Adam_Unet_resnet34_SGD \
         --dataset_name crop_IDRID \
         --val_period 54 \
         --image_size 1440 \
         --model UNet \
-        --optim Adam \
+        --optim SGD \
         --batch_size 1 \
         --base_lr 0.0001 \
         --CLAHE 4 \
         --ce_weight 1 1 1 1 1 \
-        --backbone mit_b2
+        --backbone resnet34
+
+SR_Unet
 ###
 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 nohup python train_idrid_supervised_2d.py \
         --num_works 0 \

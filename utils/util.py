@@ -45,7 +45,7 @@ def get_optimizer(model,name,base_lr,lr_decouple):
         if lr_decouple:
             optimizer = optim.SGD([{'params': model.encoder.parameters(),'lr':base_lr},
                                      {'params': [param for name, param in model.named_parameters() if 'encoder' not in name], 'lr': base_lr * 10},
-                                     ], momentum=0.9, weight_decay=0.0005)
+                                     ], momentum=0.9, weight_decay=0.0001)
         else:
             optimizer = optim.SGD(model.parameters(), lr=base_lr, momentum=0.9, weight_decay=0.0001)
     elif name == 'AdamW':
