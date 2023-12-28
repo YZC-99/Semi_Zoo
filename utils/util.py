@@ -11,7 +11,7 @@ from scipy.ndimage import distance_transform_edt as distance
 from skimage import segmentation as skimage_seg
 import torch
 from torch.utils.data.sampler import Sampler
-from torch.optim.lr_scheduler import _LRScheduler,LambdaLR
+from torch.optim.lr_scheduler import _LRScheduler,LambdaLR,PolynomialLR
 import torch.optim as optim
 
 
