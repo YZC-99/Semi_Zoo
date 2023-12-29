@@ -41,7 +41,7 @@ parser.add_argument('--backbone',type=str,default='b2')
 parser.add_argument('--lr_decouple',action='store_true')
 
 parser.add_argument('--exp',type=str,default='IDRID')
-parser.add_argument('--save_period',type=int,default=500)
+parser.add_argument('--save_period',type=int,default=5000)
 parser.add_argument('--val_period',type=int,default=100)
 
 parser.add_argument('--dataset_name',type=str,default='IDRID')
