@@ -73,11 +73,13 @@ parser.add_argument('--with_dice',action='store_true')
 
 parser.add_argument('--autodl',action='store_true')
 
+parser.add_argument('--ckpt_weight',type=str,default=None)
 
 
 
 
-def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type):
+
+def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt_weight=None):
     if model == "UNet":
         net =  smp.Unet(
             encoder_name = backbone,
@@ -99,6 +101,9 @@ def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type):
             in_channels = in_chns,
             classes= class_num1
         )
+    if ckpt_weight is not None:
+        df = torch.load(ckpt_weight,map_location='cpu')
+        net.load_state_dict(df)
     return net
 
 
@@ -148,7 +153,7 @@ if __name__ == '__main__':
     logging.info(str(args))
 
     # init model
-    model = build_model(model=args.model,backbone=args.backbone,in_chns=3,class_num1=args.num_classes,class_num2=2,fuse_type=None)
+    model = build_model(model=args.model,backbone=args.backbone,in_chns=3,class_num1=args.num_classes,class_num2=2,fuse_type=None,ckpt_weight=args.ckpt_weight)
     model.to(device)
 
     # init dataset
