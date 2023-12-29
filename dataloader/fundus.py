@@ -17,8 +17,8 @@ from scipy import ndimage
 from torchvision.transforms import functional
 import scipy.io
 
-
-
+MEAN_RGB = [0.485 * 255, 0.456 * 255, 0.406 * 255]
+STDDEV_RGB = [0.229 * 255, 0.224 * 255, 0.225 * 255]
 
 
 
@@ -158,8 +158,7 @@ class BinaryIDRIDDataset(Dataset):
                 'SE_mask': None,
                 }
 
-        MEAN_RGB = [0.485 * 255, 0.456 * 255, 0.406 * 255]
-        STDDEV_RGB = [0.229 * 255, 0.224 * 255, 0.225 * 255]
+
 
         # if os.path.exists(MA_mask_path):
         #     MA_mask = Image.open(MA_mask_path)
@@ -289,6 +288,7 @@ class IDRIDDataset(Dataset):
 
         if self.CLAHE:
             img, mask = normalize(img, mask, mean=(0.0,), std=(1.0,))
+            # img, mask = normalize(img, mask, mean=MEAN_RGB, std=STDDEV_RGB)
         else:
             img, mask = normalize(img, mask,mean=(116.51,56,437,16.31),std=(81.60,41.72,7.36))
 
