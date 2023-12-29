@@ -134,10 +134,18 @@ def create_version_folder(snapshot_path):
 
 
 args = parser.parse_args()
-snapshot_path = "./exp_2d_dr/" + args.exp + "/"
 
 
 def model_train(args,model,image_size,batch_size,base_lr,max_iterations):
+    snapshot_path = "./exp_2d_dr/" + args.exp + "/"
+    if not os.path.exists(snapshot_path):
+        os.makedirs(snapshot_path)
+    snapshot_path = create_version_folder(snapshot_path)
+    logging.basicConfig(filename=snapshot_path+"/log.txt", level=logging.INFO,
+                        format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
+    logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+    logging.info(str(args))
+
     # init dataset
     root_base = '/home/gu721/yzc/data/dr/'
     if args.autodl:
@@ -362,18 +370,11 @@ if __name__ == '__main__':
     2、如果有version的文件夹，如果当前文件夹下有version0和version01，则创建version02，以此类推
     """
 
-    if not os.path.exists(snapshot_path):
-        os.makedirs(snapshot_path)
-    snapshot_path = create_version_folder(snapshot_path)
+
 
     device = "cuda:{}".format(args.device)
-    # if os.path.exists(snapshot_path + '/code'):
-    #     shutil.rmtree(snapshot_path + '/code')
-    # shutil.copytree('.', snapshot_path + '/code', shutil.ignore_patterns(['.git', '__pycache__']))
-    logging.basicConfig(filename=snapshot_path+"/log.txt", level=logging.INFO,
-                        format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
-    logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
-    logging.info(str(args))
+
+
 
     print("===================================")
     print("开始第一阶段的小分辨率训练")
