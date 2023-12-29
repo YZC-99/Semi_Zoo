@@ -79,7 +79,7 @@ parser.add_argument('--ckpt_weight',type=str,default=None)
 
 
 
-def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt_weight=None):
+def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt_weight=None,sd=None):
     if model == "UNet":
         net =  smp.Unet(
             encoder_name = backbone,
@@ -102,10 +102,15 @@ def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt_weig
             classes= class_num1
         )
     if ckpt_weight is not None:
-        df = torch.load(ckpt_weight,map_location='cpu')
-        net.load_state_dict(df)
+        sd = torch.load(ckpt_weight,map_location='cpu')
+        net.load_state_dict(sd)
         print("===================================")
         print("成功加载权重:{}".format(ckpt_weight))
+        print("===================================")
+    if sd is not None:
+        net.load_state_dict(sd)
+        print("===================================")
+        print("成功加载权重")
         print("===================================")
     return net
 
@@ -130,35 +135,9 @@ def create_version_folder(snapshot_path):
 
 args = parser.parse_args()
 snapshot_path = "./exp_2d_dr/" + args.exp + "/"
-max_iterations = args.max_iterations
-base_lr = args.base_lr
-labeled_bs = args.labeled_bs
 
 
-if __name__ == '__main__':
-    """
-    1、搜寻snapshot_path下面的含有version的文件夹，如果没有就创建version0，即：
-    snapshot_path = snapshot_path + "/" + "version0"
-    2、如果有version的文件夹，如果当前文件夹下有version0和version01，则创建version02，以此类推
-    """
-
-    if not os.path.exists(snapshot_path):
-        os.makedirs(snapshot_path)
-    snapshot_path = create_version_folder(snapshot_path)
-
-    device = "cuda:{}".format(args.device)
-    # if os.path.exists(snapshot_path + '/code'):
-    #     shutil.rmtree(snapshot_path + '/code')
-    # shutil.copytree('.', snapshot_path + '/code', shutil.ignore_patterns(['.git', '__pycache__']))
-    logging.basicConfig(filename=snapshot_path+"/log.txt", level=logging.INFO,
-                        format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
-    logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
-    logging.info(str(args))
-
-    # init model
-    model = build_model(model=args.model,backbone=args.backbone,in_chns=3,class_num1=args.num_classes,class_num2=2,fuse_type=None,ckpt_weight=args.ckpt_weight)
-    model.to(device)
-
+def model_train(args,model,image_size,batch_size,base_lr,max_iterations):
     # init dataset
     root_base = '/home/gu721/yzc/data/dr/'
     if args.autodl:
@@ -167,26 +146,25 @@ if __name__ == '__main__':
     labeled_dataset = IDRIDDataset(name='./dataset/{}'.format(args.dataset_name),
                                   root="{}{}".format(root_base,args.dataset_name),
                                   mode='semi_train',
-                                  size=args.image_size,
+                                  size=image_size,
                                   id_path='train.txt',
                                   CLAHE=args.CLAHE)
 
 
-    labeledtrainloader = DataLoader(labeled_dataset,batch_size=args.batch_size, num_workers=args.num_works, pin_memory=True,)
+    labeledtrainloader = DataLoader(labeled_dataset,batch_size=batch_size, num_workers=args.num_works, pin_memory=True,)
 
     model.train()
     # init optimizer
-    optimizer = get_optimizer(model=model,name=args.optim,base_lr=args.base_lr,lr_decouple=args.lr_decouple)
+    optimizer = get_optimizer(model=model,name=args.optim,base_lr=base_lr,lr_decouple=args.lr_decouple)
 
 
     # scheduler = StepLR(optimizer,step_size=100,gamma=0.999)
-    scheduler = PolyLRwithWarmup(optimizer,total_steps=args.max_iterations,warmup_steps=args.max_iterations * 0.01)
+    scheduler = PolyLRwithWarmup(optimizer,total_steps=max_iterations,warmup_steps=max_iterations * 0.01)
     # init summarywriter
     writer = SummaryWriter(snapshot_path + '/log')
 
     iter_num = 0
-    max_epoch = args.max_iterations // len(labeledtrainloader) + 1
-    lr_ = args.base_lr
+    max_epoch = max_iterations // len(labeledtrainloader) + 1
     model.train()
 
     # ce_loss = BCEWithLogitsLoss()
@@ -199,7 +177,6 @@ if __name__ == '__main__':
         ce_loss = CrossEntropyLoss(ignore_index=255,weight=torch.tensor(class_weights,device=device))
 
     dice_loss = smp.losses.DiceLoss(mode='multiclass',from_logits=True)
-    # mse_loss = MSELoss()
 
 
     # 验证集
@@ -208,7 +185,7 @@ if __name__ == '__main__':
                                     # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
                                   root="{}{}".format(root_base,args.dataset_name),
                                   mode='val',
-                                  size=args.image_size,
+                                  size=image_size,
                                   CLAHE=args.CLAHE)
 
     val_labeledtrainloader = DataLoader(val_dataset,batch_size=1,num_workers=args.num_works)
@@ -240,7 +217,7 @@ if __name__ == '__main__':
             all_label_batch[all_label_batch > 4] = 4
             if args.annealing_softmax_focalloss:
                 loss_seg_ce = annealing_softmax_focalloss(outputs,all_label_batch,
-                                                         t=iter_num,t_max=args.max_iterations * 0.6)
+                                                         t=iter_num,t_max=max_iterations * 0.6)
             elif args.softmax_focalloss:
                 loss_seg_ce = softmax_focalloss(outputs,all_label_batch)
             elif args.weight_softmax_focalloss:
@@ -376,3 +353,62 @@ if __name__ == '__main__':
             iterator.close()
             break
     writer.close()
+    return model.state_dict()
+
+if __name__ == '__main__':
+    """
+    1、搜寻snapshot_path下面的含有version的文件夹，如果没有就创建version0，即：
+    snapshot_path = snapshot_path + "/" + "version0"
+    2、如果有version的文件夹，如果当前文件夹下有version0和version01，则创建version02，以此类推
+    """
+
+    if not os.path.exists(snapshot_path):
+        os.makedirs(snapshot_path)
+    snapshot_path = create_version_folder(snapshot_path)
+
+    device = "cuda:{}".format(args.device)
+    # if os.path.exists(snapshot_path + '/code'):
+    #     shutil.rmtree(snapshot_path + '/code')
+    # shutil.copytree('.', snapshot_path + '/code', shutil.ignore_patterns(['.git', '__pycache__']))
+    logging.basicConfig(filename=snapshot_path+"/log.txt", level=logging.INFO,
+                        format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
+    logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+    logging.info(str(args))
+
+    print("===================================")
+    print("开始第一阶段的小分辨率训练")
+    print("===================================")
+
+    # stage1
+    model_stage1 = build_model(model=args.model,backbone=args.backbone,in_chns=3,class_num1=args.num_classes,class_num2=2,fuse_type=None,ckpt_weight=args.ckpt_weight)
+    model_stage1.to(device)
+    sd1 = model_train(args,model_stage1,
+                image_size=256,
+                batch_size=16,
+                base_lr=0.01,
+                max_iterations=int(args.max_iterations / 4))
+
+    print("===================================")
+    print("开始第二阶段的中分辨率训练")
+    print("===================================")
+
+    # stage2
+    model_stage2 = build_model(model=args.model,backbone=args.backbone,in_chns=3,class_num1=args.num_classes,class_num2=2,fuse_type=None,sd=sd1)
+    model_stage2.to(device)
+    sd2 = model_train(args,model_stage2,
+                image_size=512,
+                batch_size=8,
+                base_lr=0.001,
+                max_iterations=int(args.max_iterations / 2))
+
+    print("===================================")
+    print("开始第三阶段的高分辨率训练")
+    print("===================================")
+    # stage3
+    model_stage3 = build_model(model=args.model,backbone=args.backbone,in_chns=3,class_num1=args.num_classes,class_num2=2,fuse_type=None,sd=sd2)
+    model_stage3.to(device)
+    sd3 = model_train(args,model_stage3,
+                image_size=args.image_size,
+                batch_size=args.batch_size,
+                base_lr=args.base_lr,
+                max_iterations=args.max_iterations)
