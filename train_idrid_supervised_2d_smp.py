@@ -104,6 +104,9 @@ def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt_weig
     if ckpt_weight is not None:
         df = torch.load(ckpt_weight,map_location='cpu')
         net.load_state_dict(df)
+        print("===================================")
+        print("成功加载权重:{}".format(ckpt_weight))
+        print("===================================")
     return net
 
 
