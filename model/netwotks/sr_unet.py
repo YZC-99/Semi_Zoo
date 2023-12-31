@@ -19,6 +19,7 @@ class SR_Unet(SegmentationModel):
         encoder_name: str = "resnet34",
         encoder_depth: int = 5,
         encoder_weights: Optional[str] = "imagenet",
+        fpn_out_channels = -1,
         decoder_use_batchnorm: bool = True,
         decoder_channels: List[int] = (256, 128, 64, 32, 16),
         decoder_attention_type: Optional[str] = None,
@@ -38,7 +39,12 @@ class SR_Unet(SegmentationModel):
 
         #--------------
         self.zero_layer = False
-        self.mean_encoder_channel = int(sum(self.encoder.out_channels) / len(self.encoder.out_channels))
+        if fpn_out_channels < 0:
+            self.fpn_out_channels = int(sum(self.encoder.out_channels) / len(self.encoder.out_channels))
+        else:
+            self.fpn_out_channels = fpn_out_channels
+        
+
         fpn_in_channels_list = self.encoder.out_channels
         fpn_in_channels_list = [i for i in fpn_in_channels_list if i != 0]
         if len(fpn_in_channels_list) != len(self.encoder.out_channels):
@@ -47,14 +53,14 @@ class SR_Unet(SegmentationModel):
         self.gap = GlobalAvgPool2D()
         self.fpn = fpn.FPN(
                             in_channels_list=fpn_in_channels_list,
-                            out_channels=self.mean_encoder_channel,
+                            out_channels=self.fpn_out_channels,
                             conv_block=fpn.default_conv_block,
                             top_blocks=None,)
-        self.sr_out_channels = [self.mean_encoder_channel for i in range(len(fpn_in_channels_list))]
+        self.sr_out_channels = [self.fpn_out_channels for i in range(len(fpn_in_channels_list))]
         self.sr = SceneRelation(
                             in_channels=self.encoder.out_channels[-1],
                             channel_list=self.sr_out_channels,
-                            out_channels=self.mean_encoder_channel,
+                            out_channels=self.fpn_out_channels,
                             scale_aware_proj=True,
                         )
         #--------------
@@ -116,6 +122,9 @@ class SR_Unet(SegmentationModel):
             return masks, labels
 
         return masks
+
+
+
 
 if __name__ == '__main__':
     import ssl

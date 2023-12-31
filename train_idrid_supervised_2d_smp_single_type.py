@@ -50,14 +50,12 @@ parser.add_argument('--CLAHE',type=int,default=2)
 
 parser.add_argument('--optim',type=str,default='AdamW')
 parser.add_argument('--amp',type=bool,default=True)
-parser.add_argument('--num_classes',type=int,default=5)
+parser.add_argument('--num_classes',type=int,default=2)
 parser.add_argument('--base_lr',type=float,default=0.00025)
 
 parser.add_argument('--batch_size',type=int,default=4)
 parser.add_argument('--labeled_bs',type=int,default=16)
 
-parser.add_argument('--od_rim',type=bool,default=True)
-parser.add_argument('--oc_label',type=int,default=2)
 parser.add_argument('--image_size',type=int,default=512)
 
 
@@ -73,10 +71,10 @@ parser.add_argument('--with_dice',action='store_true')
 
 parser.add_argument('--autodl',action='store_true')
 
-# ==============model===================
-parser.add_argument('--fpn_out_c',type=int,default=-1)
 parser.add_argument('--ckpt_weight',type=str,default=None)
-# ==============model===================
+
+parser.add_argument('--single_type',type=str,default='EX')
+
 
 
 
@@ -101,8 +99,7 @@ def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt_weig
             encoder_name = backbone,
             encoder_weights = 'imagenet',
             in_channels = in_chns,
-            classes= class_num1,
-            fpn_out_channels = args.fpn_out_c
+            classes= class_num1
         )
     if ckpt_weight is not None:
         df = torch.load(ckpt_weight,map_location='cpu')
