@@ -9,6 +9,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import StepLR,LambdaLR
 from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss,MSELoss
+from torch.utils.data import DataLoader, WeightedRandomSampler
 from torch.cuda.amp import autocast,GradScaler
 import torch.nn.functional as F
 # from torch.utils.tensorboard import SummaryWriter
@@ -195,8 +196,21 @@ if __name__ == '__main__':
                                   id_path='train.txt',
                                   CLAHE=args.CLAHE)
 
+    total_samples = 54
+    # 创建一个权重列表，其中03，08，13，14，17，18，19，22，23，25，30，31，32，33，35，38，39，46，47，48，49，50，51，52，53，54的权重是其他条目的两倍
+    weights = [
+        2.0 if i + 1 in [3, 8, 13, 14, 17, 18, 19, 22, 23, 25, 30, 31, 32, 33, 35, 38, 39, 46, 47, 48, 49, 50, 51, 52, 53,
+                     54] else 1.0 for i in range(total_samples)]
 
-    labeledtrainloader = DataLoader(labeled_dataset,batch_size=args.batch_size, num_workers=args.num_works, pin_memory=True,)
+
+    # 使用WeightedRandomSampler
+    sampler = WeightedRandomSampler(weights, num_samples=len(weights), replacement=True)
+
+    labeledtrainloader = DataLoader(labeled_dataset,
+                                    batch_size=args.batch_size,
+                                    num_workers=args.num_works,
+                                    pin_memory=True,
+                                    sampler=sampler)
 
     model.train()
     # init optimizer
