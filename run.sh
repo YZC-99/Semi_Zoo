@@ -74,3 +74,18 @@ python train_idrid_supervised_2d_smp.py \
         --max_iterations 20000 \
         --backbone resnet50
 
+#SR
+python train_idrid_supervised_2d_smp.py \
+        --num_works 4 \
+        --device 1 \
+        --exp crop_IDRID_smp_SR_Unet_woFPN_ex/resnet50/imgz1440_CLAHE2_lr2e-4 \
+        --dataset_name crop_IDRID \
+        --val_period 27 \
+        --image_size 1440 \
+        --model SR_Unet_woFPN \
+        --optim Adam \
+        --batch_size 1 \
+        --base_lr 0.0002 \
+        --CLAHE 2 \
+        --ce_weight 1 1 1 1 1 \
+        --backbone resnet50
