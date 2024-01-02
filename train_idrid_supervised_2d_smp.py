@@ -15,7 +15,7 @@ import torch.nn.functional as F
 from tensorboardX import SummaryWriter
 import segmentation_models_pytorch as smp
 from utils import ramps,losses
-from model.netwotks.sr_unet import SR_Unet,SR_Unet_woFPN
+from model.netwotks.sr_unet import SR_Unet,SR_Unet_woFPN,SR_Unet_SR_FPN
 from utils.losses import OhemCrossEntropy,annealing_softmax_focalloss,softmax_focalloss,weight_softmax_focalloss
 from utils.test_utils import DR_metrics,Sklearn_DR_metrics
 from utils.util import color_map,gray_to_color
@@ -104,6 +104,15 @@ def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt_weig
             in_channels = in_chns,
             classes= class_num1,
             fpn_out_channels = args.fpn_out_c
+        )
+    elif model == 'SR_Unet_SR_FPN':
+        net =  SR_Unet_SR_FPN(
+            encoder_name = backbone,
+            encoder_weights = 'imagenet',
+            in_channels = in_chns,
+            classes= class_num1,
+            fpn_out_channels = args.fpn_out_c,
+            sr_out_channels=args.sr_out_c
         )
     elif model == 'SR_Unet_woFPN':
         net = SR_Unet_woFPN(
