@@ -4,7 +4,6 @@ import torch
 from dataloader.transform import  hflip,vflip, normalize, resize, random_scale_and_crop,resize1440
 from dataloader.transform import random_rotate,random_translate,random_scale
 from dataloader.transform_dr import *
-import cv2
 import math
 import os
 from PIL import Image
@@ -295,6 +294,8 @@ class IDRIDDataset(Dataset):
         return {'image': img, 'label': mask}
 
     def __getitem__(self, item):
+        import cv2
+        cv2.setNumThreads(0)
         sample = self.get_item_nor(item)
 
         return sample
