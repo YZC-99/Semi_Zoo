@@ -197,7 +197,19 @@ class SR_Unet_SR_FPN(SegmentationModel):
             out_channels=self.fpn_out_channels,
             conv_block=fpn.default_conv_block,
             top_blocks=None, )
+        # Update SceneRelation weights
+        fpn_state_dict = self.fpn.state_dict()
+        for name, param in sd['model'].items():
 
+            if 'module.fpn' in name:
+                # 移除 'module.' 前缀
+                name = name.replace('module.', '')
+                # Update SceneRelation state_dict
+                fpn_state_dict[name] = param
+        # Load the modified SceneRelation state_dict
+        self.fpn.load_state_dict(fpn_state_dict,strict=False)
+        print("================加载FPN权重成功！===============")
+        print(fpn_state_dict.keys())
         # --------------
 
         self.decoder = UnetDecoder(
