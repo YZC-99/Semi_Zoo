@@ -55,7 +55,7 @@ parser.add_argument('--optim',type=str,default='AdamW')
 parser.add_argument('--amp',type=bool,default=True)
 parser.add_argument('--num_classes',type=int,default=5)
 parser.add_argument('--base_lr',type=float,default=0.00025)
-parser.add_argument('--scheduler',type=str,default='poly')
+parser.add_argument('--scheduler',type=str,default='poly-v2')
 
 
 parser.add_argument('--batch_size',type=int,default=4)
@@ -86,8 +86,8 @@ parser.add_argument('--ckpt_weight',type=str,default=None)
 # ==============model===================
 
 
-def step_decay(current_epoch,total_epochs=60):
-    initial_lrate = 0.0001
+def step_decay(current_epoch,total_epochs=60,base_lr=0.0001):
+    initial_lrate = base_lr
     epochs_drop = total_epochs
     lrate = initial_lrate * math.pow(1-(1+current_epoch)/epochs_drop,0.9)
     return lrate
@@ -324,7 +324,7 @@ if __name__ == '__main__':
             if args.scheduler == 'poly':
                 scheduler.step()
             elif args.scheduler == 'poly-v2':
-                current_lr = step_decay(epoch_num,max_epoch)
+                current_lr = step_decay(epoch_num,max_epoch,args.base_lr)
                 for param_group in optimizer.param_groups:
                     param_group['lr'] = current_lr
 
@@ -361,7 +361,7 @@ if __name__ == '__main__':
 
             # eval
             with torch.no_grad():
-                if iter_num % args.val_period == 0:
+                if iter_num % (54 / args.batch_size) == 0:
                     model.eval()
                     show_id = random.randint(0,len(val_iteriter))
                     for id,data in enumerate(val_iteriter):

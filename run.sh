@@ -26,8 +26,8 @@ nohup python train_idrid_supervised_2d_smp.py \
 # batch size
 nohup python train_idrid_supervised_2d_smp.py \
         --num_works 4 \
-        --device 1 \
-        --exp crop_IDRID_smp_UNet_ex/efficientnet-b0_shuffle/imgz1024_bs2_Adam_CLAHE2_warmup0_newschduler_max_iterations-15000 \
+        --device 0 \
+        --exp crop_IDRID_smp_UNet_ex/resnet50_shuffle/poly-v2_imgz1024_bs2_Adam_CLAHE2_warmup0_newschduler_max_iterations-15000 \
         --dataset_name crop_IDRID \
         --val_period 54 \
         --image_size 1024 \
@@ -39,7 +39,8 @@ nohup python train_idrid_supervised_2d_smp.py \
         --CLAHE 2 \
         --ce_weight 1 1 1 1 1 \
         --max_iterations 15000 \
-        --backbone efficientnet-b0 &
+        --scheduler poly-v2 \
+        --backbone resnet50 &
 
 # cnnpreprocess
 python train_idrid_supervised_2d_smp.py \
