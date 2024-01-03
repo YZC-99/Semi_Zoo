@@ -178,6 +178,7 @@ class SR_Unet_SR_FPN(SegmentationModel):
         # Load the modified SceneRelation state_dict
         self.sr.load_state_dict(sr_state_dict,strict=False)
         print("================加载SR权重成功！===============")
+        print(sr_state_dict.keys())
 
 
         # --------------
