@@ -163,6 +163,22 @@ class SR_Unet_SR_FPN(SegmentationModel):
             out_channels=self.sr_out_channels,
             scale_aware_proj=True,
         )
+        ## 加载sr的预训练权重
+        ckpt_apth = 'pretrained/farseg50.pth'
+        sd = torch.load(ckpt_apth)
+        # Update SceneRelation weights
+        sr_state_dict = self.sr.state_dict()
+        for name, param in sd['model'].items():
+
+            if 'module.sr' in name:
+                # 移除 'module.' 前缀
+                name = name.replace('module.', '')
+                # Update SceneRelation state_dict
+                sr_state_dict[name] = param
+        # Load the modified SceneRelation state_dict
+        self.sr.load_state_dict(sr_state_dict,strict=False)
+        print("================加载SR权重成功！===============")
+
 
         # --------------
         self.zero_layer = False
@@ -282,6 +298,22 @@ class SR_Unet_woFPN(SegmentationModel):
             scale_aware_proj=True,
         )
         # --------------
+        ## 加载sr的预训练权重
+        ckpt_apth = 'pretrained/farseg50.pth'
+        sd = torch.load(ckpt_apth)
+        # Update SceneRelation weights
+        sr_state_dict = self.sr.state_dict()
+        for name, param in sd['model'].items():
+
+            if 'module.sr' in name:
+                # 移除 'module.' 前缀
+                name = name.replace('module.', '')
+                # Update SceneRelation state_dict
+                sr_state_dict[name] = param
+        # Load the modified SceneRelation state_dict
+        self.sr.load_state_dict(sr_state_dict,strict=False)
+        print("================加载SR权重成功！===============")
+        print(sr_state_dict.keys())
 
         self.decoder = UnetDecoder(
             encoder_channels=self.sr_out_channels_list,
