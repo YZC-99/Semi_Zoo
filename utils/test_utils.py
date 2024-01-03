@@ -132,7 +132,7 @@ class DR_metrics(object):
 
 
         for i in range(5):
-            if i in labels:
+            if i in current_labels:
                 self.auc_pr[i] += current_auc_pr[i]
                 self.auc_roc[i] += current_auc_roc[i]
 

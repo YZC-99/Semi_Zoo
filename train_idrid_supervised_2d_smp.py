@@ -20,6 +20,7 @@ from model.netwotks.sr_unet import SR_Unet,SR_Unet_woFPN,SR_Unet_SR_FPN
 from utils.losses import OhemCrossEntropy,annealing_softmax_focalloss,softmax_focalloss,weight_softmax_focalloss
 from utils.test_utils import DR_metrics,Sklearn_DR_metrics
 from utils.util import color_map,gray_to_color
+from utils.scheduler.poly_lr import PolyLRScheduler
 import random
 from utils.util import get_optimizer,PolyLRwithWarmup, compute_sdf,compute_sdf_luoxd,compute_sdf_multi_class
 import time
@@ -27,6 +28,7 @@ import logging
 import os
 import shutil
 import logging
+import math
 import sys
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -53,6 +55,8 @@ parser.add_argument('--optim',type=str,default='AdamW')
 parser.add_argument('--amp',type=bool,default=True)
 parser.add_argument('--num_classes',type=int,default=5)
 parser.add_argument('--base_lr',type=float,default=0.00025)
+parser.add_argument('--scheduler',type=str,default='poly')
+
 
 parser.add_argument('--batch_size',type=int,default=4)
 parser.add_argument('--labeled_bs',type=int,default=16)
@@ -64,6 +68,7 @@ parser.add_argument('--image_size',type=int,default=512)
 
 parser.add_argument('--scale_num',type=int,default=2)
 parser.add_argument('--max_iterations',type=int,default=10000)
+parser.add_argument('--warmup',type=float,default=0.01)
 
 parser.add_argument('--ce_weight', type=float, nargs='+', default=[0.001,1.0,0.1,0.1,0.1], help='List of floating-point values')
 parser.add_argument('--ohem',type=float,default=-1.0)
@@ -80,6 +85,12 @@ parser.add_argument('--sr_out_c',type=int,default=128)
 parser.add_argument('--ckpt_weight',type=str,default=None)
 # ==============model===================
 
+
+def step_decay(current_epoch,total_epochs=60):
+    initial_lrate = 0.0001
+    epochs_drop = total_epochs
+    lrate = initial_lrate * math.pow(1-(1+current_epoch)/epochs_drop,0.9)
+    return lrate
 
 
 
@@ -203,14 +214,32 @@ if __name__ == '__main__':
                      54] else 1.0 for i in range(total_samples)]
 
 
-    # 使用WeightedRandomSampler
-    sampler = WeightedRandomSampler(weights, num_samples=len(weights), replacement=True)
 
     labeledtrainloader = DataLoader(labeled_dataset,
                                     batch_size=args.batch_size,
                                     num_workers=args.num_works,
                                     pin_memory=True,
-                                    sampler=sampler)
+                                    shuffle=True
+                                    )
+    # 使用WeightedRandomSampler
+    # sampler = WeightedRandomSampler(weights, num_samples=len(weights), replacement=True)
+    # labeledtrainloader = DataLoader(labeled_dataset,
+    #                                 batch_size=args.batch_size,
+    #                                 num_workers=args.num_works,
+    #                                 pin_memory=True,
+    #                                 sampler=sampler,
+    #                                 )
+    # 验证集
+    # init dataset
+    val_dataset = IDRIDDataset(name='./dataset/{}'.format(args.dataset_name),
+                                    # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
+                                  root="{}{}".format(root_base,args.dataset_name),
+                                  mode='val',
+                                  size=args.image_size,
+                                  CLAHE=args.CLAHE)
+
+    val_labeledtrainloader = DataLoader(val_dataset,batch_size=1,num_workers=args.num_works)
+    val_iteriter = tqdm(val_labeledtrainloader)
 
     model.train()
     # init optimizer
@@ -218,7 +247,14 @@ if __name__ == '__main__':
 
 
     # scheduler = StepLR(optimizer,step_size=100,gamma=0.999)
-    scheduler = PolyLRwithWarmup(optimizer,total_steps=args.max_iterations,warmup_steps=args.max_iterations * 0.01)
+    scheduler = PolyLRwithWarmup(optimizer,total_steps=args.max_iterations,warmup_steps=args.max_iterations * args.warmup)
+    # scheduler = PolyLRScheduler(optimizer,
+    #                             t_initial=args.max_iterations,
+    #                             power = 0.9,
+    #                             warmup_t = args.max_iterations * args.warmup,
+    #                             t_in_epochs = False,
+    #                             cycle_mul = 1
+    #                             )
     # init summarywriter
     writer = SummaryWriter(snapshot_path + '/log')
 
@@ -240,22 +276,12 @@ if __name__ == '__main__':
     # mse_loss = MSELoss()
 
 
-    # 验证集
-    # init dataset
-    val_dataset = IDRIDDataset(name='./dataset/{}'.format(args.dataset_name),
-                                    # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
-                                  root="{}{}".format(root_base,args.dataset_name),
-                                  mode='val',
-                                  size=args.image_size,
-                                  CLAHE=args.CLAHE)
 
-    val_labeledtrainloader = DataLoader(val_dataset,batch_size=1,num_workers=args.num_works)
-    val_iteriter = tqdm(val_labeledtrainloader)
 
+    print("=================共计训练epoch: {}====================".format(max_epoch))
 
     # 开始训练
     iterator = tqdm(range(max_epoch), ncols=70)
-
     DR_val_metrics = DR_metrics(device)
     # DR_val_metrics = Sklearn_DR_metrics()
     best_AUC_PR_EX = 0
@@ -294,7 +320,13 @@ if __name__ == '__main__':
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            scheduler.step()
+
+            if args.scheduler == 'poly':
+                scheduler.step()
+            elif args.scheduler == 'poly-v2':
+                current_lr = step_decay(epoch_num,max_epoch)
+                for param_group in optimizer.param_groups:
+                    param_group['lr'] = current_lr
 
             iter_num = iter_num + 1
             writer.add_scalar('lr', optimizer.param_groups[0]['lr'], iter_num)
