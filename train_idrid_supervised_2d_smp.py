@@ -343,18 +343,18 @@ if __name__ == '__main__':
                     param_group['lr'] = current_lr
 
             iter_num = iter_num + 1
-            writer.add_scalar('lr', optimizer.param_groups[0]['lr'], iter_num)
-            writer.add_scalar('loss/loss', loss, iter_num)
-            writer.add_scalar('loss/loss_seg', loss_seg_ce, iter_num)
-            writer.add_scalar('loss/loss_dice', loss_seg_dice, iter_num)
+            # writer.add_scalar('lr', optimizer.param_groups[0]['lr'], iter_num)
+            # writer.add_scalar('loss/loss', loss, iter_num)
+            # writer.add_scalar('loss/loss_seg', loss_seg_ce, iter_num)
+            # writer.add_scalar('loss/loss_dice', loss_seg_dice, iter_num)
 
             logging.info(
                 'iteration %d : loss : %f' %
                 (iter_num, loss.item()))
             writer.add_scalar('loss/loss', loss, iter_num)
-            logging.info('iteration %d : loss : %f' % (iter_num, loss.item()))
-            logging.info('iteration %d : loss_seg : %f' % (iter_num, loss_seg_ce.item()))
-            logging.info('iteration %d : loss_dice : %f' % (iter_num, loss_seg_dice.item()))
+            # logging.info('iteration %d : loss : %f' % (iter_num, loss.item()))
+            # logging.info('iteration %d : loss_seg : %f' % (iter_num, loss_seg_ce.item()))
+            # logging.info('iteration %d : loss_dice : %f' % (iter_num, loss_seg_dice.item()))
 
             with torch.no_grad():
                 if iter_num % 50 == 0:
