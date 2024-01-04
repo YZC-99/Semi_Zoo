@@ -76,27 +76,27 @@ python train_idrid_supervised_2d_smp.py \
 
 
 
-python train_idrid_supervised_2d_smp.py \
-        --num_works 0 \
-        --device 0 \
-        --exp crop_IDRID_smp_UNet_ex/efficientnet-b0_shuffle/imgz1440_bs2_Adam_CLAHE2_warmup0_newschduler_max_iterations-7500_polyv2\
+nohup python train_idrid_supervised_2d_smp.py \
+        --num_works 4 \
+        --device 1 \
+        --exp crop_IDRID_smp_UNet_ex/lr/lr4e-4/imgz800_resnet50_bs2_Adam_CLAHE2_warmup0_newschduler_max_iterations-7500_polyv2 \
         --dataset_name crop_IDRID \
         --val_period 54 \
-        --image_size 1440 \
+        --image_size 800 \
         --model UNet \
         --optim Adam \
         --batch_size 2 \
         --warmup 0.0 \
-        --base_lr 0.0002 \
+        --base_lr 0.0004 \
         --CLAHE 2 \
         --ce_weight 1 1 1 1 1 \
         --max_iterations 7500 \
-        --backbone efficientnet-b0
+        --backbone resnet50 &
 
 
 
 python train_idrid_supervised_2d_smp.py \
-        --num_works 0 \
+        --num_works 4 \
         --device 0 \
         --exp crop_IDRID_smp_SR_Unet_woFPN_ex/resnet50_shuffle/imgz512_bs2_Adam_CLAHE2_warmup0_newschduler_max_iterations-7500_polyv2\
         --dataset_name crop_IDRID \

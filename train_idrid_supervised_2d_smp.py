@@ -102,6 +102,20 @@ def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt_weig
             in_channels = in_chns,
             classes= class_num1
         )
+    elif model == 'PAN':
+        net =  smp.PAN(
+            encoder_name = backbone,
+            encoder_weights = 'imagenet',
+            in_channels = in_chns,
+            classes= class_num1
+        )
+    elif model == 'MAnet':
+        net =  smp.MAnet(
+            encoder_name = backbone,
+            encoder_weights = 'imagenet',
+            in_channels = in_chns,
+            classes= class_num1
+        )
     elif model == 'DeepLabV3p':
         net =  smp.DeepLabV3Plus(
             encoder_name = backbone,
