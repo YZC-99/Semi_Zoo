@@ -76,6 +76,7 @@ parser.add_argument('--annealing_softmax_focalloss',action='store_true')
 parser.add_argument('--softmax_focalloss',action='store_true')
 parser.add_argument('--weight_softmax_focalloss',action='store_true')
 parser.add_argument('--with_dice',action='store_true')
+parser.add_argument('--aux_weight',type=float,default=0.1)
 
 parser.add_argument('--autodl',action='store_true')
 
