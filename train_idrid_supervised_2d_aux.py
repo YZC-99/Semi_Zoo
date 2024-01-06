@@ -179,7 +179,11 @@ if __name__ == '__main__':
                                   CLAHE=args.CLAHE)
 
 
-    labeledtrainloader = DataLoader(labeled_dataset,batch_size=args.batch_size, num_workers=args.num_works, pin_memory=True,)
+    labeledtrainloader = DataLoader(labeled_dataset,
+                                    batch_size=args.batch_size,
+                                    num_workers=args.num_works,
+                                    pin_memory=True,
+                                    shuffle=True)
 
     model.train()
     # init optimizer
@@ -216,7 +220,7 @@ if __name__ == '__main__':
                                   size=args.image_size,
                                   CLAHE=args.CLAHE)
 
-    val_labeledtrainloader = DataLoader(val_dataset,batch_size=1,num_workers=args.num_works)
+    val_labeledtrainloader = DataLoader(val_dataset,batch_size=1,num_workers=1)
     val_iteriter = tqdm(val_labeledtrainloader)
 
 
