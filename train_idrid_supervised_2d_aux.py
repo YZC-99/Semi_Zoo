@@ -208,8 +208,12 @@ if __name__ == '__main__':
     model.to(device)
 
     # init dataset
+    root_base = '/home/gu721/yzc/data/dr/'
+    if args.autodl:
+        root_base = '/root/autodl-tmp/'
+
     labeled_dataset = IDRIDDataset(name='./dataset/{}'.format(args.dataset_name),
-                                  root="/home/gu721/yzc/data/dr/{}".format(args.dataset_name),
+                                  root="{}{}".format(root_base,args.dataset_name),
                                   mode='semi_train',
                                   size=args.image_size,
                                   id_path='train.txt',
@@ -248,7 +252,7 @@ if __name__ == '__main__':
     # init dataset
     val_dataset = IDRIDDataset(name='./dataset/{}'.format(args.dataset_name),
                                     # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
-                                  root="/home/gu721/yzc/data/dr/{}".format(args.dataset_name),
+                                  root="{}{}".format(root_base,args.dataset_name),
                                   mode='val',
                                   size=args.image_size,
                                   CLAHE=args.CLAHE)
