@@ -16,7 +16,7 @@ import torch.nn.functional as F
 from tensorboardX import SummaryWriter
 import segmentation_models_pytorch as smp
 from utils import ramps,losses
-from model.netwotks.dual_decoer_unet import Dual_Decoder_Unet
+from model.netwotks.dual_decoer_unet import Dual_Decoder_Unet,Dual_Seg_Head_Unet
 from utils.losses import OhemCrossEntropy,annealing_softmax_focalloss,softmax_focalloss,weight_softmax_focalloss
 from utils.test_utils import DR_metrics,Sklearn_DR_metrics
 from utils.util import color_map,gray_to_color
@@ -113,6 +113,15 @@ def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt_weig
             in_channels=in_chns,
             classes=class_num1,
         )
+    elif model == 'Dual_Seg_Head_Unet':
+        net = Dual_Seg_Head_Unet(
+            encoder_name=backbone,
+            encoder_weights='imagenet',
+            in_channels=in_chns,
+            classes=class_num1,
+        )
+
+
 
     return net
 
