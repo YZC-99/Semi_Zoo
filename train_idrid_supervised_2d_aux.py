@@ -16,7 +16,7 @@ import torch.nn.functional as F
 from tensorboardX import SummaryWriter
 import segmentation_models_pytorch as smp
 from utils import ramps,losses
-from model.netwotks.sr_unet import SR_Unet,SR_Unet_woFPN,SR_Unet_SR_FPN
+from model.netwotks.dual_decoer_unet import Dual_Decoder_Unet
 from utils.losses import OhemCrossEntropy,annealing_softmax_focalloss,softmax_focalloss,weight_softmax_focalloss
 from utils.test_utils import DR_metrics,Sklearn_DR_metrics
 from utils.util import color_map,gray_to_color
@@ -106,55 +106,14 @@ def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt_weig
             classes= class_num1,
             decoder_attention_type = args.decoder_attention_type
         )
-    elif model == 'PAN':
-        net =  smp.PAN(
-            encoder_name = backbone,
-            encoder_weights = 'imagenet',
-            in_channels = in_chns,
-            classes= class_num1,
-        )
-    elif model == 'MAnet':
-        net =  smp.MAnet(
-            encoder_name = backbone,
-            encoder_weights = 'imagenet',
-            in_channels = in_chns,
-            classes= class_num1
-        )
-    elif model == 'DeepLabV3p':
-        net =  smp.DeepLabV3Plus(
-            encoder_name = backbone,
-            encoder_weights = 'imagenet',
-            in_channels = in_chns,
-            classes= class_num1
-        )
-    elif model == 'SR_Unet':
-        net =  SR_Unet(
-            encoder_name = backbone,
-            encoder_weights = 'imagenet',
-            in_channels = in_chns,
-            classes= class_num1,
-            fpn_out_channels = args.fpn_out_c,
-            decoder_attention_type = args.decoder_attention_type
-        )
-    elif model == 'SR_Unet_SR_FPN':
-        net =  SR_Unet_SR_FPN(
-            encoder_name = backbone,
-            encoder_weights = 'imagenet',
-            in_channels = in_chns,
-            classes= class_num1,
-            fpn_out_channels = args.fpn_out_c,
-            sr_out_channels=args.sr_out_c,
-            decoder_attention_type =  args.decoder_attention_type
-        )
-    elif model == 'SR_Unet_woFPN':
-        net = SR_Unet_woFPN(
+    elif model == 'Dual_Decoder_Unet':
+        net = smp.Dual_Decoder_Unet(
             encoder_name=backbone,
             encoder_weights='imagenet',
             in_channels=in_chns,
             classes=class_num1,
-            sr_out_channels = args.sr_out_c,
-            decoder_attention_type =  args.decoder_attention_type
         )
+
     return net
 
 
