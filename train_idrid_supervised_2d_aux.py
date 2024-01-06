@@ -340,7 +340,7 @@ if __name__ == '__main__':
 
             # eval
             with torch.no_grad():
-                if iter_num % args.val_period == 0:
+                if iter_num % (54 / args.batch_size) == 0:
                     model.eval()
                     show_id = random.randint(0,len(val_iteriter))
                     for id,data in enumerate(val_iteriter):
