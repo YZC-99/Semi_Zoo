@@ -82,6 +82,7 @@ parser.add_argument('--autodl',action='store_true')
 # ==============model===================
 parser.add_argument('--fpn_out_c',type=int,default=-1)
 parser.add_argument('--sr_out_c',type=int,default=128)
+parser.add_argument('--decoder_attention_type',type=str,default=None,choices=['scse'])
 parser.add_argument('--ckpt_weight',type=str,default=None)
 # ==============model===================
 
@@ -95,19 +96,21 @@ def step_decay(current_epoch,total_epochs=60,base_lr=0.0001):
 
 
 def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt_weight=None):
+    # scse
     if model == "UNet":
         net =  smp.Unet(
             encoder_name = backbone,
             encoder_weights = 'imagenet',
             in_channels = in_chns,
-            classes= class_num1
+            classes= class_num1,
+            decoder_attention_type = args.decoder_attention_type
         )
     elif model == 'PAN':
         net =  smp.PAN(
             encoder_name = backbone,
             encoder_weights = 'imagenet',
             in_channels = in_chns,
-            classes= class_num1
+            classes= class_num1,
         )
     elif model == 'MAnet':
         net =  smp.MAnet(
@@ -129,7 +132,8 @@ def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt_weig
             encoder_weights = 'imagenet',
             in_channels = in_chns,
             classes= class_num1,
-            fpn_out_channels = args.fpn_out_c
+            fpn_out_channels = args.fpn_out_c,
+            decoder_attention_type = args.decoder_attention_type
         )
     elif model == 'SR_Unet_SR_FPN':
         net =  SR_Unet_SR_FPN(
@@ -138,7 +142,8 @@ def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt_weig
             in_channels = in_chns,
             classes= class_num1,
             fpn_out_channels = args.fpn_out_c,
-            sr_out_channels=args.sr_out_c
+            sr_out_channels=args.sr_out_c,
+            decoder_attention_type =  args.decoder_attention_type
         )
     elif model == 'SR_Unet_woFPN':
         net = SR_Unet_woFPN(
@@ -146,7 +151,8 @@ def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt_weig
             encoder_weights='imagenet',
             in_channels=in_chns,
             classes=class_num1,
-            sr_out_channels = args.sr_out_c
+            sr_out_channels = args.sr_out_c,
+            decoder_attention_type =  args.decoder_attention_type
         )
 
 

@@ -1,113 +1,34 @@
-#231231
-#backbone
-nohup python train_idrid_supervised_2d_smp.py \
-        --num_works 4 \
-        --device 0 \
-        --exp crop_IDRID_smp_UNet_ex/resnet50/imgz1024_bs2_CLAHE2_lr4e-4 \
-        --dataset_name crop_IDRID \
-        --val_period 27 \
-        --image_size 1024 \
-        --model UNet \
-        --optim Adam \
-        --batch_size 2 \
-        --base_lr 0.0004 \
-        --CLAHE 2 \
-        --ce_weight 1 1 1 1 1 \
-        --backbone resnet50 &
-
-        efficientnet-b0
-        mobileone_s3
-        resnet50
-        se_resnet50
-        vgg16
-        tu-efficientnet_b0
-        timm-efficientnet-b0
-
-# batch size
-nohup python train_idrid_supervised_2d_smp.py \
-        --num_works 4 \
-        --device 0 \
-        --exp crop_IDRID_smp_UNet_ex/resnet50_shuffle/poly-v2_imgz1024_bs2_Adam_CLAHE2_warmup0_newschduler_max_iterations-15000 \
-        --dataset_name crop_IDRID \
-        --val_period 54 \
-        --image_size 1024 \
-        --model UNet \
-        --optim Adam \
-        --batch_size 2 \
-        --warmup 0.0 \
-        --base_lr 0.0002 \
-        --CLAHE 2 \
-        --ce_weight 1 1 1 1 1 \
-        --max_iterations 15000 \
-        --scheduler poly-v2 \
-        --backbone resnet50 &
-
-# cnnpreprocess
 python train_idrid_supervised_2d_smp.py \
         --num_works 4 \
-        --device 1 \
-        --exp cnn_preprocess_IDRID_smp_UNet/resnet50_shuffle/imgz800_bs4_Adam \
-        --dataset_name cnn_preprocess_IDRID \
-        --val_period 54 \
-        --image_size 800 \
-        --model UNet \
-        --optim Adam \
-        --batch_size 4 \
-        --base_lr 0.0004 \
-        --CLAHE 0 \
-        --ce_weight 1 1 1 1 1 \
-        --backbone resnet50
-
-#SR
-python train_idrid_supervised_2d_smp.py \
-        --num_works 4 \
-        --device 1 \
-        --exp crop_IDRID_smp_SR_Unet_woFPN_ex/resnet50/imgz1440_CLAHE2_lr2e-4 \
+        --device 0 \
+        --exp crop_IDRID_smp_UNet_ex/resnet50_shuffle/imgz1440_bs1_Adam_CLAHE2_warmup0_newschduler_max_iterations-4000_polyv2_lr2e-3 \
         --dataset_name crop_IDRID \
-        --val_period 27 \
+        --val_period 54 \
         --image_size 1440 \
-        --model SR_Unet_woFPN \
+        --model UNet \
         --optim Adam \
         --batch_size 1 \
-        --base_lr 0.0002 \
-        --CLAHE 2 \
-        --ce_weight 1 1 1 1 1 \
-        --backbone resnet50
-
-
-
-nohup python train_idrid_supervised_2d_smp.py \
-        --num_works 4 \
-        --device 1 \
-        --exp crop_IDRID_smp_UNet_ex/lr/lr4e-4/imgz800_resnet50_bs2_Adam_CLAHE2_warmup0_newschduler_max_iterations-7500_polyv2 \
-        --dataset_name crop_IDRID \
-        --val_period 54 \
-        --image_size 800 \
-        --model UNet \
-        --optim Adam \
-        --batch_size 2 \
         --warmup 0.0 \
-        --base_lr 0.0004 \
+        --base_lr 0.002 \
         --CLAHE 2 \
         --ce_weight 1 1 1 1 1 \
-        --max_iterations 7500 \
-        --backbone resnet50 &
-
+        --max_iterations 4000 \
+        --backbone resnet50
 
 
 python train_idrid_supervised_2d_smp.py \
         --num_works 4 \
-        --device 0 \
-        --exp crop_IDRID_smp_SR_Unet_woFPN_ex/resnet50_shuffle/imgz512_bs2_Adam_CLAHE2_warmup0_newschduler_max_iterations-7500_polyv2\
-        --dataset_name crop_IDRID \
+        --device 1 \
+        --exp cnn_preprocess_IDRID_smp_UNet_ex/resnet50_shuffle/imgz1440_bs1_Adam_CLAHE2_warmup0_newschduler_max_iterations-7000_polyv2_lr2e-3 \
+        --dataset_name cnn_preprocess_IDRID \
         --val_period 54 \
-        --image_size 512 \
-        --model SR_Unet_woFPN \
+        --image_size 1440 \
+        --model UNet \
         --optim Adam \
-        --batch_size 2 \
+        --batch_size 1 \
         --warmup 0.0 \
-        --base_lr 0.0002 \
-        --CLAHE 2 \
+        --base_lr 0.002 \
+        --CLAHE 0 \
         --ce_weight 1 1 1 1 1 \
-        --max_iterations 7500 \
+        --max_iterations 7000 \
         --backbone resnet50
