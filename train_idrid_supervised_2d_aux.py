@@ -107,7 +107,7 @@ def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt_weig
             decoder_attention_type = args.decoder_attention_type
         )
     elif model == 'Dual_Decoder_Unet':
-        net = smp.Dual_Decoder_Unet(
+        net = Dual_Decoder_Unet(
             encoder_name=backbone,
             encoder_weights='imagenet',
             in_channels=in_chns,
