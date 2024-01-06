@@ -155,6 +155,7 @@ def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt_weig
             sr_out_channels = args.sr_out_c,
             decoder_attention_type =  args.decoder_attention_type
         )
+    return net
 
 
 def create_version_folder(snapshot_path):
