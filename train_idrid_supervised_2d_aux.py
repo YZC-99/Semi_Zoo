@@ -9,18 +9,18 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import StepLR,LambdaLR
 from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss,MSELoss
+from torch.utils.data import DataLoader, WeightedRandomSampler
 from torch.cuda.amp import autocast,GradScaler
 import torch.nn.functional as F
 # from torch.utils.tensorboard import SummaryWriter
 from tensorboardX import SummaryWriter
-from model.netwotks.deeplabv3plus import DeepLabV3Plus
-from model.netwotks.unet import UNet, MCNet2d_compete_v1,UNet_DTC2d
-from model.netwotks.unet_two_decoder import UNet_two_Decoder,UNet_MiT,UNet_ResNet,SR_UNet_ResNet
-from model.netwotks.efficientunet import get_efficientunet,get_efficientunet_SR,get_efficientunet_aux
+import segmentation_models_pytorch as smp
 from utils import ramps,losses
-from utils.losses import OhemCrossEntropy,annealing_softmax_focalloss
-from utils.test_utils import DR_metrics
+from model.netwotks.sr_unet import SR_Unet,SR_Unet_woFPN,SR_Unet_SR_FPN
+from utils.losses import OhemCrossEntropy,annealing_softmax_focalloss,softmax_focalloss,weight_softmax_focalloss
+from utils.test_utils import DR_metrics,Sklearn_DR_metrics
 from utils.util import color_map,gray_to_color
+from utils.scheduler.poly_lr import PolyLRScheduler
 import random
 from utils.util import get_optimizer,PolyLRwithWarmup, compute_sdf,compute_sdf_luoxd,compute_sdf_multi_class
 import time
@@ -28,7 +28,10 @@ import logging
 import os
 import shutil
 import logging
+import math
 import sys
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 
 
@@ -40,18 +43,20 @@ parser.add_argument('--model',type=str,default='unet')
 parser.add_argument('--backbone',type=str,default='b2')
 parser.add_argument('--lr_decouple',action='store_true')
 
-parser.add_argument('--exp',type=str,default='IDRID_AUX')
+parser.add_argument('--exp',type=str,default='IDRID')
 parser.add_argument('--save_period',type=int,default=5000)
 parser.add_argument('--val_period',type=int,default=100)
 
 parser.add_argument('--dataset_name',type=str,default='IDRID')
 parser.add_argument('--unlabeled_txt',type=str,default='unlabeled_addDDR.txt')
-parser.add_argument('--CLAHE',action='store_true')
+parser.add_argument('--CLAHE',type=int,default=2)
 
 parser.add_argument('--optim',type=str,default='AdamW')
 parser.add_argument('--amp',type=bool,default=True)
 parser.add_argument('--num_classes',type=int,default=5)
 parser.add_argument('--base_lr',type=float,default=0.00025)
+parser.add_argument('--scheduler',type=str,default='poly-v2')
+
 
 parser.add_argument('--batch_size',type=int,default=4)
 parser.add_argument('--labeled_bs',type=int,default=16)
@@ -60,26 +65,95 @@ parser.add_argument('--od_rim',type=bool,default=True)
 parser.add_argument('--oc_label',type=int,default=2)
 parser.add_argument('--image_size',type=int,default=512)
 
-parser.add_argument('--labeled_num',type=int,default=100,help="5%:100,")
-parser.add_argument('--total_num',type=int,default=11249,help="SEG:2859;SEG_add_DDR:11249")
-
 
 parser.add_argument('--scale_num',type=int,default=2)
 parser.add_argument('--max_iterations',type=int,default=10000)
+parser.add_argument('--warmup',type=float,default=0.01)
 
 parser.add_argument('--ce_weight', type=float, nargs='+', default=[0.001,1.0,0.1,0.1,0.1], help='List of floating-point values')
 parser.add_argument('--ohem',type=float,default=-1.0)
 parser.add_argument('--annealing_softmax_focalloss',action='store_true')
-parser.add_argument('--aux_weight',type=float,default=1.0)
-parser.add_argument('--with_dice',type=bool,default=False)
+parser.add_argument('--softmax_focalloss',action='store_true')
+parser.add_argument('--weight_softmax_focalloss',action='store_true')
+parser.add_argument('--with_dice',action='store_true')
+
+parser.add_argument('--autodl',action='store_true')
+
+# ==============model===================
+parser.add_argument('--fpn_out_c',type=int,default=-1)
+parser.add_argument('--sr_out_c',type=int,default=128)
+parser.add_argument('--decoder_attention_type',type=str,default=None,choices=['scse'])
+parser.add_argument('--ckpt_weight',type=str,default=None)
+# ==============model===================
+
+
+def step_decay(current_epoch,total_epochs=60,base_lr=0.0001):
+    initial_lrate = base_lr
+    epochs_drop = total_epochs
+    lrate = initial_lrate * math.pow(1-(1+current_epoch)/epochs_drop,0.9)
+    return lrate
 
 
 
-
-
-def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type):
-    if model == 'UNet_efficient_aux':
-        return get_efficientunet_aux(num_classes=class_num1,backbone=backbone,pretrained=True)
+def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt_weight=None):
+    # scse
+    if model == "UNet":
+        net =  smp.Unet(
+            encoder_name = backbone,
+            encoder_weights = 'imagenet',
+            in_channels = in_chns,
+            classes= class_num1,
+            decoder_attention_type = args.decoder_attention_type
+        )
+    elif model == 'PAN':
+        net =  smp.PAN(
+            encoder_name = backbone,
+            encoder_weights = 'imagenet',
+            in_channels = in_chns,
+            classes= class_num1,
+        )
+    elif model == 'MAnet':
+        net =  smp.MAnet(
+            encoder_name = backbone,
+            encoder_weights = 'imagenet',
+            in_channels = in_chns,
+            classes= class_num1
+        )
+    elif model == 'DeepLabV3p':
+        net =  smp.DeepLabV3Plus(
+            encoder_name = backbone,
+            encoder_weights = 'imagenet',
+            in_channels = in_chns,
+            classes= class_num1
+        )
+    elif model == 'SR_Unet':
+        net =  SR_Unet(
+            encoder_name = backbone,
+            encoder_weights = 'imagenet',
+            in_channels = in_chns,
+            classes= class_num1,
+            fpn_out_channels = args.fpn_out_c,
+            decoder_attention_type = args.decoder_attention_type
+        )
+    elif model == 'SR_Unet_SR_FPN':
+        net =  SR_Unet_SR_FPN(
+            encoder_name = backbone,
+            encoder_weights = 'imagenet',
+            in_channels = in_chns,
+            classes= class_num1,
+            fpn_out_channels = args.fpn_out_c,
+            sr_out_channels=args.sr_out_c,
+            decoder_attention_type =  args.decoder_attention_type
+        )
+    elif model == 'SR_Unet_woFPN':
+        net = SR_Unet_woFPN(
+            encoder_name=backbone,
+            encoder_weights='imagenet',
+            in_channels=in_chns,
+            classes=class_num1,
+            sr_out_channels = args.sr_out_c,
+            decoder_attention_type =  args.decoder_attention_type
+        )
 
 
 def create_version_folder(snapshot_path):
@@ -220,7 +294,12 @@ if __name__ == '__main__':
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            scheduler.step()
+            if args.scheduler == 'poly':
+                scheduler.step()
+            elif args.scheduler == 'poly-v2':
+                current_lr = step_decay(epoch_num, max_epoch, args.base_lr)
+                for param_group in optimizer.param_groups:
+                    param_group['lr'] = current_lr
 
             iter_num = iter_num + 1
             writer.add_scalar('lr', optimizer.param_groups[0]['lr'], iter_num)
@@ -228,13 +307,13 @@ if __name__ == '__main__':
             writer.add_scalar('loss/loss_seg', loss_seg_ce, iter_num)
             writer.add_scalar('loss/loss_seg_ce_aux', loss_seg_ce_aux, iter_num)
 
-            logging.info(
-                'iteration %d : loss : %f' %
-                (iter_num, loss.item()))
+            # logging.info(
+            #     'iteration %d : loss : %f' %
+            #     (iter_num, loss.item()))
             writer.add_scalar('loss/loss', loss, iter_num)
-            logging.info('iteration %d : loss : %f' % (iter_num, loss.item()))
-            logging.info('iteration %d : loss_seg : %f' % (iter_num, loss_seg_ce.item()))
-            logging.info('iteration %d : loss_seg_ce_aux : %f' % (iter_num, loss_seg_ce_aux.item()))
+            # logging.info('iteration %d : loss : %f' % (iter_num, loss.item()))
+            # logging.info('iteration %d : loss_seg : %f' % (iter_num, loss_seg_ce.item()))
+            # logging.info('iteration %d : loss_seg_ce_aux : %f' % (iter_num, loss_seg_ce_aux.item()))
 
             with torch.no_grad():
                 if iter_num % 50 == 0:
@@ -286,18 +365,18 @@ if __name__ == '__main__':
 
 
 
-                    logging.info("MA_AUC_PR:{}--HE_AUC_PR:{}--EX_AUC_PR:{}--SE_AUC_PR:{}".format(
-                                                                                            MA_AUC_PR,
-                                                                                            HE_AUC_PR,
-                                                                                            EX_AUC_PR,
-                                                                                           SE_AUC_PR,
-                                                                                           ))
-                    logging.info("MA_AUC_ROC:{}--HE_AUC_ROC:{}--EX_AUC_ROC:{}--SE_AUC_ROC:{}".format(
-                                                                                            MA_AUC_ROC,
-                                                                                            HE_AUC_ROC,
-                                                                                            EX_AUC_ROC,
-                                                                                           SE_AUC_ROC,
-                                                                                           ))
+                    # logging.info("MA_AUC_PR:{}--HE_AUC_PR:{}--EX_AUC_PR:{}--SE_AUC_PR:{}".format(
+                    #                                                                         MA_AUC_PR,
+                    #                                                                         HE_AUC_PR,
+                    #                                                                         EX_AUC_PR,
+                    #                                                                        SE_AUC_PR,
+                    #                                                                        ))
+                    # logging.info("MA_AUC_ROC:{}--HE_AUC_ROC:{}--EX_AUC_ROC:{}--SE_AUC_ROC:{}".format(
+                    #                                                                         MA_AUC_ROC,
+                    #                                                                         HE_AUC_ROC,
+                    #                                                                         EX_AUC_ROC,
+                    #                                                                        SE_AUC_ROC,
+                    #                                                                        ))
 
                     writer.add_scalar('val_AUC_PR/MA',MA_AUC_PR, iter_num)
                     writer.add_scalar('val_AUC_PR/HE',HE_AUC_PR, iter_num)
@@ -332,7 +411,7 @@ if __name__ == '__main__':
                     save_mode_path = os.path.join(
                         snapshot_path, 'iter_' + str(iter_num) + '.pth')
                     torch.save(model.state_dict(), save_mode_path)
-                    logging.info("save model to {}".format(save_mode_path))
+                    # logging.info("save model to {}".format(save_mode_path))
 
                 if iter_num >= max_iterations:
                     break
