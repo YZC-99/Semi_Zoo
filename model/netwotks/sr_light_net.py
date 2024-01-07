@@ -17,7 +17,7 @@ class LightNet_wFPN(SegmentationModel):
     def __init__(
             self,
             encoder_name: str = "resnet34",
-            encoder_depth: int = 5,
+            encoder_depth: int = 4,
             encoder_weights: Optional[str] = "imagenet",
             fpn_out_channels=256,
             decoder_use_batchnorm: bool = True,
