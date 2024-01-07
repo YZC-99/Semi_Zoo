@@ -452,7 +452,7 @@ if __name__ == '__main__':
                             os.remove(file_path)
 
                         torch.save(model.state_dict(), save_mode_path)
-                        # logging.info("save model to {}".format(save_mode_path))
+                        logging.info("save model to {}".format(save_mode_path))
 
 
                 if iter_num % args.save_period == 0:

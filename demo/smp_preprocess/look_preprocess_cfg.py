@@ -4,7 +4,8 @@ import numpy as np
 import segmentation_models_pytorch as smp
 
 
-encoder = 'resnet50'
+# encoder = 'resnet50'
+encoder = 'tu-efficientnet_b0'
 ENCODER_WEIGHTS = 'imagenet'
 
 preprocessing_fn = smp.encoders.get_preprocessing_fn(encoder, ENCODER_WEIGHTS)
