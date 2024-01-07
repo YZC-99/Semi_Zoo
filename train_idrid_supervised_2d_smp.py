@@ -15,6 +15,7 @@ import torch.nn.functional as F
 # from torch.utils.tensorboard import SummaryWriter
 from tensorboardX import SummaryWriter
 import segmentation_models_pytorch as smp
+from segmentation_models_pytorch.encoders import  get_preprocessing_fn
 from utils import ramps,losses
 from model.netwotks.sr_unet import SR_Unet,SR_Unet_woFPN,SR_Unet_SR_FPN
 from utils.losses import OhemCrossEntropy,annealing_softmax_focalloss,softmax_focalloss,weight_softmax_focalloss

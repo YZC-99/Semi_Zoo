@@ -97,7 +97,7 @@ def normalize(img, mask=None,mean=[0.0,0.0,0.0],std=[1.0,1.0,1.0]):
     """
     img = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.0,), (1.0,))
+        transforms.Normalize(mean=mean, std=std)
     ])(img)
     if mask is not None:
         mask = torch.from_numpy(np.array(mask)).long()
