@@ -394,6 +394,7 @@ class SR_Unet_woSR(SegmentationModel):
             classes: int = 1,
             activation: Optional[Union[str, callable]] = None,
             aux_params: Optional[dict] = None,
+            fpn_pretrained = False,
     ):
         super().__init__()
 
@@ -421,6 +422,26 @@ class SR_Unet_woSR(SegmentationModel):
             out_channels=self.fpn_out_channels,
             conv_block=fpn.default_conv_block,
             top_blocks=None, )
+
+        if fpn_pretrained :
+            # Update SceneRelation weights
+            ckpt_apth = 'pretrained/farseg50.pth'
+            sd = torch.load(ckpt_apth)
+            fpn_state_dict = self.fpn.state_dict()
+            for name, param in sd['model'].items():
+
+                if 'module.fpn' in name:
+                    # 移除 'module.' 前缀
+                    name = name.replace('module.', '')
+                    # Update SceneRelation state_dict
+                    fpn_state_dict[name] = param
+            # Load the modified SceneRelation state_dict
+
+            self.fpn.load_state_dict(fpn_state_dict,strict=False)
+            print("================加载FPN权重成功！===============")
+            print(fpn_state_dict.keys())
+            # --------------
+
 
         self.encoder_fpn_out_channels = [self.fpn_out_channels for i in range(len(fpn_in_channels_list))]
 
