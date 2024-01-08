@@ -27,6 +27,8 @@ class SR_Unet(SegmentationModel):
         classes: int = 1,
         activation: Optional[Union[str, callable]] = None,
         aux_params: Optional[dict] = None,
+        fpn_pretrained = False,
+        sr_pretrained = False,
     ):
         super().__init__()
 
@@ -56,6 +58,26 @@ class SR_Unet(SegmentationModel):
                             out_channels=self.fpn_out_channels,
                             conv_block=fpn.default_conv_block,
                             top_blocks=None,)
+
+        if fpn_pretrained:
+            # Update SceneRelation weights
+            ckpt_apth = 'pretrained/farseg50.pth'
+            sd = torch.load(ckpt_apth)
+            fpn_state_dict = self.fpn.state_dict()
+            for name, param in sd['model'].items():
+
+                if 'module.fpn' in name:
+                    # 移除 'module.' 前缀
+                    name = name.replace('module.', '')
+                    # Update SceneRelation state_dict
+                    fpn_state_dict[name] = param
+            # Load the modified SceneRelation state_dict
+
+            self.fpn.load_state_dict(fpn_state_dict, strict=False)
+            print("================加载FPN权重成功！===============")
+            print(fpn_state_dict.keys())
+
+
         self.sr_out_channels = [self.fpn_out_channels for i in range(len(fpn_in_channels_list))]
         self.sr = SceneRelation(
                             in_channels=self.encoder.out_channels[-1],
@@ -68,6 +90,26 @@ class SR_Unet(SegmentationModel):
             self.sr_out_channels.insert(1,0)
 
         self.sr_out_channels[:-4] = self.encoder.out_channels[:-4]
+
+        if sr_pretrained:
+            # --------------
+            ## 加载sr的预训练权重
+            ckpt_apth = 'pretrained/farseg50.pth'
+            sd = torch.load(ckpt_apth)
+            # Update SceneRelation weights
+            sr_state_dict = self.sr.state_dict()
+            for name, param in sd['model'].items():
+
+                if 'module.sr' in name:
+                    # 移除 'module.' 前缀
+                    name = name.replace('module.', '')
+                    # Update SceneRelation state_dict
+                    sr_state_dict[name] = param
+            # Load the modified SceneRelation state_dict
+            self.sr.load_state_dict(sr_state_dict, strict=False)
+            print("================加载SR权重成功！===============")
+            print(sr_state_dict.keys())
+            # --------------
         self.decoder = UnetDecoder(
             encoder_channels=self.sr_out_channels,
             decoder_channels=decoder_channels,
