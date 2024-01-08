@@ -5,20 +5,14 @@ from dataloader.samplers import TwoStreamBatchSampler, LabeledBatchSampler,Unlab
 import torch
 import glob
 import argparse
-import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import StepLR,LambdaLR
 from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss,MSELoss
 from torch.utils.data import DataLoader, WeightedRandomSampler
-from torch.cuda.amp import autocast,GradScaler
 import torch.nn.functional as F
 # from torch.utils.tensorboard import SummaryWriter
 from tensorboardX import SummaryWriter
 import segmentation_models_pytorch as smp
-from segmentation_models_pytorch.encoders import  get_preprocessing_fn
-from utils import ramps,losses
-from model.netwotks.sr_unet import SR_Unet,SR_Unet_woFPN,SR_Unet_SR_FPN,SR_Unet_woSR
-from model.netwotks.sr_light_net import LightNet_wFPN,LightNet_wSR,LightNet_wFPN_wSR
 from utils.losses import OhemCrossEntropy,annealing_softmax_focalloss,softmax_focalloss,weight_softmax_focalloss
 from utils.test_utils import DR_metrics,Sklearn_DR_metrics
 from utils.util import color_map,gray_to_color
@@ -37,52 +31,11 @@ import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 
 
-
 parser = argparse.ArgumentParser()
-parser.add_argument('--seed',type=int,default=42)
-parser.add_argument('--device',type=int,default=0)
-parser.add_argument('--num_works',type=int,default=0)
-parser.add_argument('--model',type=str,default='unet')
-parser.add_argument('--backbone',type=str,default='b2')
-parser.add_argument('--lr_decouple',action='store_true')
-
-parser.add_argument('--exp',type=str,default='IDRID')
-parser.add_argument('--save_period',type=int,default=5000)
-parser.add_argument('--val_period',type=int,default=100)
-
-parser.add_argument('--dataset_name',type=str,default='IDRID')
-parser.add_argument('--unlabeled_txt',type=str,default='unlabeled_addDDR.txt')
-parser.add_argument('--CLAHE',type=int,default=2)
-
-parser.add_argument('--optim',type=str,default='AdamW')
-parser.add_argument('--amp',type=bool,default=True)
-parser.add_argument('--num_classes',type=int,default=5)
-parser.add_argument('--base_lr',type=float,default=0.00025)
-parser.add_argument('--scheduler',type=str,default='poly-v2')
-
-
-parser.add_argument('--batch_size',type=int,default=4)
-parser.add_argument('--labeled_bs',type=int,default=16)
-
-parser.add_argument('--od_rim',type=bool,default=True)
-parser.add_argument('--oc_label',type=int,default=2)
-parser.add_argument('--image_size',type=int,default=512)
-
-
-parser.add_argument('--scale_num',type=int,default=2)
-parser.add_argument('--max_iterations',type=int,default=10000)
-parser.add_argument('--warmup',type=float,default=0.01)
-
-parser.add_argument('--ce_weight', type=float, nargs='+', default=[0.001,1.0,0.1,0.1,0.1], help='List of floating-point values')
-parser.add_argument('--ohem',type=float,default=-1.0)
-parser.add_argument('--annealing_softmax_focalloss',action='store_true')
-parser.add_argument('--softmax_focalloss',action='store_true')
-parser.add_argument('--weight_softmax_focalloss',action='store_true')
-parser.add_argument('--with_dice',action='store_true')
-
-parser.add_argument('--autodl',action='store_true')
 
 # ==============model===================
+parser.add_argument('--model',type=str,default='unet')
+parser.add_argument('--backbone',type=str,default='b2')
 parser.add_argument('--fpn_out_c',type=int,default=-1)
 parser.add_argument('--fpn_pretrained',action='store_true')
 parser.add_argument('--sr_out_c',type=int,default=128)
@@ -90,6 +43,40 @@ parser.add_argument('--sr_pretrained',action='store_true')
 parser.add_argument('--decoder_attention_type',type=str,default=None,choices=['scse'])
 parser.add_argument('--ckpt_weight',type=str,default=None)
 # ==============model===================
+
+# ==============loss===================
+parser.add_argument('--ce_weight', type=float, nargs='+', default=[0.001,1.0,0.1,0.1,0.1], help='List of floating-point values')
+parser.add_argument('--ohem',type=float,default=-1.0)
+parser.add_argument('--annealing_softmax_focalloss',action='store_true')
+parser.add_argument('--softmax_focalloss',action='store_true')
+parser.add_argument('--weight_softmax_focalloss',action='store_true')
+parser.add_argument('--with_dice',action='store_true')
+# ==============loss===================
+
+# ==============lr===================
+parser.add_argument('--base_lr',type=float,default=0.00025)
+parser.add_argument('--lr_decouple',action='store_true')
+parser.add_argument('--warmup',type=float,default=0.01)
+parser.add_argument('--scheduler',type=str,default='poly-v2')
+# ==============lr===================
+
+# ==============training params===================
+parser.add_argument('--seed',type=int,default=42)
+parser.add_argument('--device',type=int,default=0)
+parser.add_argument('--num_works',type=int,default=0)
+parser.add_argument('--num_classes',type=int,default=5)
+parser.add_argument('--exp',type=str,default='IDRID')
+parser.add_argument('--save_period',type=int,default=5000)
+parser.add_argument('--val_period',type=int,default=100)
+parser.add_argument('--dataset_name',type=str,default='IDRID')
+parser.add_argument('--CLAHE',type=int,default=2)
+parser.add_argument('--optim',type=str,default='AdamW')
+parser.add_argument('--batch_size',type=int,default=4)
+parser.add_argument('--image_size',type=int,default=512)
+parser.add_argument('--max_iterations',type=int,default=10000)
+parser.add_argument('--autodl',action='store_true')
+
+
 
 
 def step_decay(current_epoch,total_epochs=60,base_lr=0.0001):
@@ -123,7 +110,6 @@ args = parser.parse_args()
 snapshot_path = "./exp_2d_dr/" + args.exp + "/"
 max_iterations = args.max_iterations
 base_lr = args.base_lr
-labeled_bs = args.labeled_bs
 
 
 if __name__ == '__main__':
