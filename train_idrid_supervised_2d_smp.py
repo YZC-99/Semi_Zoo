@@ -83,6 +83,7 @@ parser.add_argument('--autodl',action='store_true')
 
 # ==============model===================
 parser.add_argument('--fpn_out_c',type=int,default=-1)
+parser.add_argument('--fpn_pretrained',action='store_true')
 parser.add_argument('--sr_out_c',type=int,default=128)
 parser.add_argument('--decoder_attention_type',type=str,default=None,choices=['scse'])
 parser.add_argument('--ckpt_weight',type=str,default=None)
@@ -173,7 +174,8 @@ def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt_weig
             in_channels=in_chns,
             classes=class_num1,
             fpn_out_channels = args.fpn_out_c,
-            decoder_attention_type =  args.decoder_attention_type
+            decoder_attention_type =  args.decoder_attention_type,
+            fpn_pretrained=args.fpn_pretrained
         )
 
 
