@@ -81,28 +81,28 @@ class Light_Decoder(nn.Module):
         encoder_channels = encoder_channels[::-1]
 
         self.convc5 = nn.Sequential(
-            md.Conv2dReLU(256,256,3,1,1,use_batchnorm=use_batchnorm),
+            md.Conv2dReLU(256,256/2,3,1,1,use_batchnorm=use_batchnorm),
             nn.UpsamplingBilinear2d(scale_factor=2),
-            md.Conv2dReLU(256, 256, 3, 1, 1, use_batchnorm=use_batchnorm),
+            md.Conv2dReLU(256/2, 256/2, 3, 1, 1, use_batchnorm=use_batchnorm),
             nn.UpsamplingBilinear2d(scale_factor=2),
-            md.Conv2dReLU(256, 256, 3, 1, 1, use_batchnorm=use_batchnorm),
+            md.Conv2dReLU(256/2, 256/2, 3, 1, 1, use_batchnorm=use_batchnorm),
             nn.UpsamplingBilinear2d(scale_factor=2),
         )
 
         self.convc4 = nn.Sequential(
-            md.Conv2dReLU(256,256,3,1,1,use_batchnorm=use_batchnorm),
+            md.Conv2dReLU(256,256/2,3,1,1,use_batchnorm=use_batchnorm),
             nn.UpsamplingBilinear2d(scale_factor=2),
-            md.Conv2dReLU(256, 256, 3, 1, 1, use_batchnorm=use_batchnorm),
+            md.Conv2dReLU(256/2, 256/2, 3, 1, 1, use_batchnorm=use_batchnorm),
             nn.UpsamplingBilinear2d(scale_factor=2),
         )
 
         self.convc3 = nn.Sequential(
-            md.Conv2dReLU(256,256,3,1,1,use_batchnorm=use_batchnorm),
+            md.Conv2dReLU(256,256/2,3,1,1,use_batchnorm=use_batchnorm),
             nn.UpsamplingBilinear2d(scale_factor=2),
         )
 
         self.convc2 = nn.Sequential(
-            md.Conv2dReLU(256,256,3,1,1,use_batchnorm=use_batchnorm),
+            md.Conv2dReLU(256,256/2,3,1,1,use_batchnorm=use_batchnorm),
         )
 
     def forward(self, *features):
