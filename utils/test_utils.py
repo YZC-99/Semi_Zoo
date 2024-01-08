@@ -89,6 +89,7 @@ class DR_metrics(object):
         self.IoU = JaccardIndex(num_classes=2, task='binary', average='micro').to(device)
 
         self.background_count = 0
+        self.obj_count = 0
         self.MA_count = 0
         self.HE_count = 0
         self.EX_count = 0
@@ -136,6 +137,9 @@ class DR_metrics(object):
                 self.auc_pr[i] += current_auc_pr[i]
                 self.auc_roc[i] += current_auc_roc[i]
 
+        if len(current_labels) > 1 :
+            self.obj_count += 1
+
         self.background_count += 1
         if 1 in current_labels:
             self.MA_count += 1
@@ -148,6 +152,7 @@ class DR_metrics(object):
 
     def my_reset(self):
         self.background_count = 0
+        self.obj_count = 0
         self.MA_count = 0
         self.HE_count = 0
         self.EX_count = 0
@@ -160,8 +165,8 @@ class DR_metrics(object):
     def get_metrics(self):
         auc_pr = self.auc_pr
         auc_roc = self.auc_roc
-        Dice = self.dice /self.background_count
-        IoU = self.iou /self.background_count
+        Dice = self.dice /self.obj_count
+        IoU = self.iou /self.obj_count
 
         results = [{
             'MA_AUC_PR': auc_pr[1] / self.MA_count,
