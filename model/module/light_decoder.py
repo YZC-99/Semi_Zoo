@@ -88,6 +88,7 @@ class Light_Decoder(nn.Module):
             md.Conv2dReLU(128, 128, 3, 1, 1, use_batchnorm=use_batchnorm),
             nn.UpsamplingBilinear2d(scale_factor=2),
         )
+        self.attention5 = md.Attention(attention_type, in_channels=128)
 
         self.convc4 = nn.Sequential(
             md.Conv2dReLU(256,128,3,1,1,use_batchnorm=use_batchnorm),
@@ -95,22 +96,33 @@ class Light_Decoder(nn.Module):
             md.Conv2dReLU(128, 128, 3, 1, 1, use_batchnorm=use_batchnorm),
             nn.UpsamplingBilinear2d(scale_factor=2),
         )
+        self.attention4 = md.Attention(attention_type, in_channels=128)
 
         self.convc3 = nn.Sequential(
             md.Conv2dReLU(256,128,3,1,1,use_batchnorm=use_batchnorm),
             nn.UpsamplingBilinear2d(scale_factor=2),
         )
+        self.attention3 = md.Attention(attention_type, in_channels=128)
 
         self.convc2 = nn.Sequential(
             md.Conv2dReLU(256,128,3,1,1,use_batchnorm=use_batchnorm),
         )
+        self.attention2 = md.Attention(attention_type, in_channels=128)
 
     def forward(self, *features):
 
         out_c5 = self.convc5(features[-1])
+        out_c5 = self.attention5(out_c5)
+
         out_c4 = self.convc4(features[-2])
+        out_c4 = self.attention4(out_c4)
+
         out_c3 = self.convc3(features[-3])
+        out_c3 = self.attention3(out_c3)
+
         out_c2 = self.convc2(features[-4])
+        out_c2 = self.attention2(out_c2)
+
 
         out_feat = (out_c5 + out_c4 + out_c3 + out_c2) / 4.
 
