@@ -144,7 +144,7 @@ class LightNet_wSR(SegmentationModel):
             classes: int = 1,
             activation: Optional[Union[str, callable]] = None,
             aux_params: Optional[dict] = None,
-            fpn_pretrained=False,
+            sr_pretrained=False,
     ):
         super().__init__()
 
@@ -169,32 +169,33 @@ class LightNet_wSR(SegmentationModel):
             out_channels=self.sr_out_channels,
             scale_aware_proj=True,
         )
-        # --------------
-        ## 加载sr的预训练权重
-        ckpt_apth = 'pretrained/farseg50.pth'
-        sd = torch.load(ckpt_apth)
-        # Update SceneRelation weights
-        sr_state_dict = self.sr.state_dict()
-        for name, param in sd['model'].items():
-
-            if 'module.sr' in name:
-                # 移除 'module.' 前缀
-                name = name.replace('module.', '')
-                # Update SceneRelation state_dict
-                sr_state_dict[name] = param
-        # Load the modified SceneRelation state_dict
-        self.sr.load_state_dict(sr_state_dict,strict=False)
-        print("================加载SR权重成功！===============")
-        print(sr_state_dict.keys())
+        if sr_pretrained:
             # --------------
+            ## 加载sr的预训练权重
+            ckpt_apth = 'pretrained/farseg50.pth'
+            sd = torch.load(ckpt_apth)
+            # Update SceneRelation weights
+            sr_state_dict = self.sr.state_dict()
+            for name, param in sd['model'].items():
+
+                if 'module.sr' in name:
+                    # 移除 'module.' 前缀
+                    name = name.replace('module.', '')
+                    # Update SceneRelation state_dict
+                    sr_state_dict[name] = param
+            # Load the modified SceneRelation state_dict
+            self.sr.load_state_dict(sr_state_dict,strict=False)
+            print("================加载SR权重成功！===============")
+            print(sr_state_dict.keys())
+                # --------------
 
         # --------------
         # if self.zero_layer:
         #     self.sr_out_channels.insert(1, 0)
 
         self.decoder = Light_Decoder(
-            encoder_channels=self.encoder_fpn_out_channels,
-            decoder_channels=self.encoder_fpn_out_channels[1:],
+            encoder_channels=self.sr_out_channels_list,
+            decoder_channels=1,
             n_blocks=encoder_depth,
             use_batchnorm=decoder_use_batchnorm,
             attention_type=decoder_attention_type,
@@ -227,12 +228,9 @@ class LightNet_wSR(SegmentationModel):
 
         c_last = self.gap(features[-1])
 
-        # refined_feature = self.sr(c_last, fpn_features)
+        refined_feature = self.sr(c_last, features[-4:])
 
-
-        fpn_features = self.fpn(features)
-
-        decoder_output = self.decoder(*fpn_features)
+        decoder_output = self.decoder(*refined_feature)
 
         masks = self.segmentation_head(decoder_output)
 
@@ -259,7 +257,7 @@ if __name__ == '__main__':
     in_chns = 3
     class_num1 = 5
 
-    model = LightNet_wFPN(
+    model = LightNet_wSR(
         encoder_name=backbone,
         encoder_weights='imagenet',
         in_channels=in_chns,

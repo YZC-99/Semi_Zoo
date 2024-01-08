@@ -68,12 +68,12 @@ class Light_Decoder(nn.Module):
     ):
         super().__init__()
 
-        if n_blocks != len(decoder_channels):
-            raise ValueError(
-                "Model depth is {}, but you provide `decoder_channels` for {} blocks.".format(
-                    n_blocks, len(decoder_channels)
-                )
-            )
+        # if n_blocks != len(decoder_channels):
+        #     raise ValueError(
+        #         "Model depth is {}, but you provide `decoder_channels` for {} blocks.".format(
+        #             n_blocks, len(decoder_channels)
+        #         )
+        #     )
 
         # remove first skip with same spatial resolution
         encoder_channels = encoder_channels[-4:]

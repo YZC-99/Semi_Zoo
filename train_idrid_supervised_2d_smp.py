@@ -18,7 +18,7 @@ import segmentation_models_pytorch as smp
 from segmentation_models_pytorch.encoders import  get_preprocessing_fn
 from utils import ramps,losses
 from model.netwotks.sr_unet import SR_Unet,SR_Unet_woFPN,SR_Unet_SR_FPN,SR_Unet_woSR
-from model.netwotks.sr_light_net import LightNet_wFPN
+from model.netwotks.sr_light_net import LightNet_wFPN,LightNet_wSR
 from utils.losses import OhemCrossEntropy,annealing_softmax_focalloss,softmax_focalloss,weight_softmax_focalloss
 from utils.test_utils import DR_metrics,Sklearn_DR_metrics
 from utils.util import color_map,gray_to_color
@@ -169,6 +169,16 @@ def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt_weig
         )
     elif model == 'LightNet_wFPN':
         net = LightNet_wFPN(
+            encoder_name=backbone,
+            encoder_weights='imagenet',
+            in_channels=in_chns,
+            classes=class_num1,
+            fpn_out_channels = args.fpn_out_c,
+            decoder_attention_type =  args.decoder_attention_type,
+            fpn_pretrained=args.fpn_pretrained
+        )
+    elif model == 'LightNet_wSR':
+        net = LightNet_wSR(
             encoder_name=backbone,
             encoder_weights='imagenet',
             in_channels=in_chns,
