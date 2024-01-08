@@ -208,8 +208,8 @@ def HRF():
 
 
 def IDRID():
-    data_path = "/home/gu721/yzc/data/dr/IDRID/"  # 数据路径
-    save_path = "/home/gu721/yzc/data/dr/IDRID/all_index.txt"
+    data_path = "/home/gu721/yzc/data/dr/patch_IDRID/"  # 数据路径
+    save_path = "/home/gu721/yzc/data/dr/patch_IDRID/all_index.txt"
     img_path = []
     for root,dir,files in os.walk(data_path):
         if 'images' in root:
@@ -231,4 +231,4 @@ def DDR_seg():
             name = i.replace(data_path,'')
             f.write(name + ' ' + name.replace('.jpg','.png').replace('images','labels_fused') + '\n')
 
-DDR_seg()
+IDRID()
