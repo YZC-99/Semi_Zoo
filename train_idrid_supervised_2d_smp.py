@@ -18,7 +18,7 @@ import segmentation_models_pytorch as smp
 from segmentation_models_pytorch.encoders import  get_preprocessing_fn
 from utils import ramps,losses
 from model.netwotks.sr_unet import SR_Unet,SR_Unet_woFPN,SR_Unet_SR_FPN,SR_Unet_woSR
-from model.netwotks.sr_light_net import LightNet_wFPN,LightNet_wSR
+from model.netwotks.sr_light_net import LightNet_wFPN,LightNet_wSR,LightNet_wFPN_wSR
 from utils.losses import OhemCrossEntropy,annealing_softmax_focalloss,softmax_focalloss,weight_softmax_focalloss
 from utils.test_utils import DR_metrics,Sklearn_DR_metrics
 from utils.util import color_map,gray_to_color
@@ -85,6 +85,7 @@ parser.add_argument('--autodl',action='store_true')
 parser.add_argument('--fpn_out_c',type=int,default=-1)
 parser.add_argument('--fpn_pretrained',action='store_true')
 parser.add_argument('--sr_out_c',type=int,default=128)
+parser.add_argument('--sr_pretrained',action='store_true')
 parser.add_argument('--decoder_attention_type',type=str,default=None,choices=['scse'])
 parser.add_argument('--ckpt_weight',type=str,default=None)
 # ==============model===================
@@ -183,9 +184,21 @@ def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt_weig
             encoder_weights='imagenet',
             in_channels=in_chns,
             classes=class_num1,
-            fpn_out_channels = args.fpn_out_c,
+            sr_out_channels = args.sr_out_c,
             decoder_attention_type =  args.decoder_attention_type,
-            fpn_pretrained=args.fpn_pretrained
+            sr_pretrained=args.sr_pretrained
+        )
+    elif model == 'LightNet_wFPN_wSR':
+        net = LightNet_wFPN_wSR(
+            encoder_name=backbone,
+            encoder_weights='imagenet',
+            in_channels=in_chns,
+            classes=class_num1,
+            sr_out_channels = args.sr_out_c,
+            fpn_out_channels = args.sr_out_c,
+            decoder_attention_type =  args.decoder_attention_type,
+            fpn_pretrained=args.fpn_pretrained,
+            sr_pretrained=args.sr_pretrained
         )
 
 
