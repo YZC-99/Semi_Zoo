@@ -194,8 +194,8 @@ def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt_weig
             encoder_weights='imagenet',
             in_channels=in_chns,
             classes=class_num1,
-            sr_out_channels = args.sr_out_c,
-            fpn_out_channels = args.sr_out_c,
+            fpn_out_channels = args.fpn_out_c,
+            sr_out_channels=args.sr_out_c,
             decoder_attention_type =  args.decoder_attention_type,
             fpn_pretrained=args.fpn_pretrained,
             sr_pretrained=args.sr_pretrained

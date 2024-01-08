@@ -5,7 +5,7 @@ python train_idrid_supervised_2d_smp.py \
     --dataset_name crop_IDRID         \
     --val_period 54         \
     --image_size 1440         \
-    --model LightNet_wFPN         \
+    --model LightNet_wFPN_wSR         \
     --optim Adam         \
     --batch_size 2         \
     --warmup 0.0         \
@@ -14,5 +14,6 @@ python train_idrid_supervised_2d_smp.py \
     --ce_weight 1 1 1 1 1         \
     --max_iterations 5000         \
     --autodl         \
+    --fpn_out_c 256 \
     --fpn_out_c 256 \
     --backbone resnet50
