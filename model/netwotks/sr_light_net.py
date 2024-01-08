@@ -92,7 +92,7 @@ class LightNet_wFPN(SegmentationModel):
         )
 
         self.segmentation_head = SegmentationHead(
-            in_channels=self.encoder_fpn_out_channels[-1] / 2,
+            in_channels=128,
             out_channels=classes,
             activation=activation,
             upsampling = 0,
