@@ -52,14 +52,14 @@ class SR_Unet(SegmentationModel):
 
         self.gap = GlobalAvgPool2D()
         self.fpn = fpn.FPN(
-                            in_channels_list=fpn_in_channels_list,
+                            in_channels_list=fpn_in_channels_list[-4:],
                             out_channels=self.fpn_out_channels,
                             conv_block=fpn.default_conv_block,
                             top_blocks=None,)
         self.sr_out_channels = [self.fpn_out_channels for i in range(len(fpn_in_channels_list))]
         self.sr = SceneRelation(
                             in_channels=self.encoder.out_channels[-1],
-                            channel_list=self.sr_out_channels,
+                            channel_list=self.sr_out_channels[-4:],
                             out_channels=self.fpn_out_channels,
                             scale_aware_proj=True,
                         )
@@ -67,6 +67,7 @@ class SR_Unet(SegmentationModel):
         if self.zero_layer:
             self.sr_out_channels.insert(1,0)
 
+        self.sr_out_channels[:-4] = self.encoder.out_channels[:-4]
         self.decoder = UnetDecoder(
             encoder_channels=self.sr_out_channels,
             decoder_channels=decoder_channels,
@@ -99,20 +100,20 @@ class SR_Unet(SegmentationModel):
         features = self.encoder(x)
 
         c_last = self.gap(features[-1])
-        if self.zero_layer:
-            org_feature = features.pop(1)
+        # if self.zero_layer:
+        #     org_feature = features.pop(1)
 
-        fpn_features = self.fpn(features)
+        fpn_features = self.fpn(features[-4:])
 
         refined_fpn_feature = self.sr(c_last, fpn_features)
+        features[-4:] = refined_fpn_feature
+        # if self.zero_layer:
+        #     refined_fpn_feature_list = list(refined_fpn_feature)
+        #     refined_fpn_feature_list.insert(1,org_feature)
+        #     refined_fpn_feature = tuple(refined_fpn_feature_list)
 
-        if self.zero_layer:
-            refined_fpn_feature_list = list(refined_fpn_feature)
-            refined_fpn_feature_list.insert(1,org_feature)
-            refined_fpn_feature = tuple(refined_fpn_feature_list)
 
-
-        decoder_output = self.decoder(*refined_fpn_feature)
+        decoder_output = self.decoder(*features)
 
 
 
@@ -499,7 +500,7 @@ if __name__ == '__main__':
     ssl._create_default_https_context = ssl._create_unverified_context
 
     data = torch.randn(4,3,256,256)
-    backbone='resnet34'
+    backbone='resnet50'
     # backbone='mit_b0'
     # backbone='mit_b2'
     # backbone='efficientnet-b0'
@@ -507,10 +508,11 @@ if __name__ == '__main__':
     in_chns = 3
     class_num1 = 5
 
-    model = SR_Unet_woSR(
+    model = SR_Unet(
         encoder_name=backbone,
         encoder_weights='imagenet',
         in_channels=in_chns,
+        fpn_out_channels = 256,
         classes=class_num1,
     )
     out = model(data)

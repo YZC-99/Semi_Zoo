@@ -1,7 +1,7 @@
 python train_idrid_supervised_2d_smp.py \
     --num_works 8        \
     --device 0         \
-    --exp crop_IDRID_smp_LightNet_wFPN_ex/resnet50_shuffle/fpn-c256_imgz1440_bs2_Adam_CLAHE2_warmup0_newschduler_max_iterations-5000_polyv2_lr3e-4         \
+    --exp crop_IDRID_smp_LightNet_wFPN-pre_wSR_ex/resnet50_shuffle/imgz1440_bs2_Adam_CLAHE2_warmup0_newschduler_max_iterations-5000_polyv2_lr3e-4         \
     --dataset_name crop_IDRID         \
     --val_period 54         \
     --image_size 1440         \
@@ -15,5 +15,6 @@ python train_idrid_supervised_2d_smp.py \
     --max_iterations 5000         \
     --autodl         \
     --fpn_out_c 256 \
-    --fpn_out_c 256 \
+    --sr_out_c 256 \
+    --fpn_pretrained \
     --backbone resnet50
