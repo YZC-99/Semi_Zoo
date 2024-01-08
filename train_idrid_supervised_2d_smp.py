@@ -25,6 +25,7 @@ from utils.util import color_map,gray_to_color
 from utils.scheduler.poly_lr import PolyLRScheduler
 import random
 from utils.util import get_optimizer,PolyLRwithWarmup, compute_sdf,compute_sdf_luoxd,compute_sdf_multi_class
+from utils.bulid_model import build_model
 import time
 import logging
 import os
@@ -99,121 +100,6 @@ def step_decay(current_epoch,total_epochs=60,base_lr=0.0001):
 
 
 
-def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt_weight=None):
-    # scse
-    if model == "UNet":
-        net =  smp.Unet(
-            encoder_name = backbone,
-            encoder_weights = 'imagenet',
-            in_channels = in_chns,
-            classes= class_num1,
-            decoder_attention_type = args.decoder_attention_type
-        )
-    elif model == 'PAN':
-        net =  smp.PAN(
-            encoder_name = backbone,
-            encoder_weights = 'imagenet',
-            in_channels = in_chns,
-            classes= class_num1,
-        )
-    elif model == 'MAnet':
-        net =  smp.MAnet(
-            encoder_name = backbone,
-            encoder_weights = 'imagenet',
-            in_channels = in_chns,
-            classes= class_num1
-        )
-    elif model == 'DeepLabV3p':
-        net =  smp.DeepLabV3Plus(
-            encoder_name = backbone,
-            encoder_weights = 'imagenet',
-            in_channels = in_chns,
-            classes= class_num1
-        )
-    elif model == 'SR_Unet':
-        net =  SR_Unet(
-            encoder_name = backbone,
-            encoder_weights = 'imagenet',
-            in_channels = in_chns,
-            classes= class_num1,
-            fpn_out_channels = args.fpn_out_c,
-            decoder_attention_type = args.decoder_attention_type,
-            fpn_pretrained=args.fpn_pretrained,
-            sr_pretrained=args.sr_pretrained
-        )
-    elif model == 'SR_Unet_SR_FPN':
-        net =  SR_Unet_SR_FPN(
-            encoder_name = backbone,
-            encoder_weights = 'imagenet',
-            in_channels = in_chns,
-            classes= class_num1,
-            fpn_out_channels = args.fpn_out_c,
-            sr_out_channels=args.sr_out_c,
-            decoder_attention_type =  args.decoder_attention_type
-        )
-    elif model == 'SR_Unet_woFPN':
-        net = SR_Unet_woFPN(
-            encoder_name=backbone,
-            encoder_weights='imagenet',
-            in_channels=in_chns,
-            classes=class_num1,
-            sr_out_channels = args.sr_out_c,
-            decoder_attention_type =  args.decoder_attention_type
-        )
-
-    elif model == 'SR_Unet_woSR':
-        net = SR_Unet_woSR(
-            encoder_name=backbone,
-            encoder_weights='imagenet',
-            in_channels=in_chns,
-            classes=class_num1,
-            fpn_out_channels = args.fpn_out_c,
-            decoder_attention_type =  args.decoder_attention_type
-        )
-    elif model == 'LightNet_wFPN':
-        net = LightNet_wFPN(
-            encoder_name=backbone,
-            encoder_weights='imagenet',
-            in_channels=in_chns,
-            classes=class_num1,
-            fpn_out_channels = args.fpn_out_c,
-            decoder_attention_type =  args.decoder_attention_type,
-            fpn_pretrained=args.fpn_pretrained
-        )
-    elif model == 'LightNet_wSR':
-        net = LightNet_wSR(
-            encoder_name=backbone,
-            encoder_weights='imagenet',
-            in_channels=in_chns,
-            classes=class_num1,
-            sr_out_channels = args.sr_out_c,
-            decoder_attention_type =  args.decoder_attention_type,
-            sr_pretrained=args.sr_pretrained
-        )
-    elif model == 'LightNet_wFPN_wSR':
-        net = LightNet_wFPN_wSR(
-            encoder_name=backbone,
-            encoder_weights='imagenet',
-            in_channels=in_chns,
-            classes=class_num1,
-            fpn_out_channels = args.fpn_out_c,
-            sr_out_channels=args.sr_out_c,
-            decoder_attention_type =  args.decoder_attention_type,
-            fpn_pretrained=args.fpn_pretrained,
-            sr_pretrained=args.sr_pretrained
-        )
-
-
-
-
-    if ckpt_weight is not None:
-        df = torch.load(ckpt_weight,map_location='cpu')
-        net.load_state_dict(df)
-        print("===================================")
-        print("成功加载权重:{}".format(ckpt_weight))
-        print("===================================")
-    return net
-
 
 def create_version_folder(snapshot_path):
     # 检查是否存在版本号文件夹
@@ -261,7 +147,7 @@ if __name__ == '__main__':
     logging.info(str(args))
 
     # init model
-    model = build_model(model=args.model,backbone=args.backbone,in_chns=3,class_num1=args.num_classes,class_num2=2,fuse_type=None,ckpt_weight=args.ckpt_weight)
+    model = build_model(args,model=args.model,backbone=args.backbone,in_chns=3,class_num1=args.num_classes,class_num2=2,fuse_type=None,ckpt_weight=args.ckpt_weight)
     model.to(device)
 
     # init dataset
