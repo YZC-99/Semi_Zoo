@@ -76,39 +76,43 @@ class Light_Decoder(nn.Module):
             )
 
         # remove first skip with same spatial resolution
-        encoder_channels = encoder_channels[1:]
+        encoder_channels = encoder_channels[-4:]
         # reverse channels to start from head of encoder
         encoder_channels = encoder_channels[::-1]
 
-        # computing blocks input and output channels
-        head_channels = encoder_channels[0]
-        in_channels = [head_channels] + list(decoder_channels[:-1])
-        out_channels = decoder_channels
+        self.convc5 = nn.Sequential(
+            md.Conv2dReLU(256,256,3,1,1,use_batchnorm=use_batchnorm),
+            nn.UpsamplingBilinear2d(scale_factor=2),
+            md.Conv2dReLU(256, 256, 3, 1, 1, use_batchnorm=use_batchnorm),
+            nn.UpsamplingBilinear2d(scale_factor=2),
+            md.Conv2dReLU(256, 256, 3, 1, 1, use_batchnorm=use_batchnorm),
+            nn.UpsamplingBilinear2d(scale_factor=2),
+        )
 
-        if center:
-            self.center = CenterBlock(head_channels, head_channels, use_batchnorm=use_batchnorm)
-        else:
-            self.center = nn.Identity()
+        self.convc4 = nn.Sequential(
+            md.Conv2dReLU(256,256,3,1,1,use_batchnorm=use_batchnorm),
+            nn.UpsamplingBilinear2d(scale_factor=2),
+            md.Conv2dReLU(256, 256, 3, 1, 1, use_batchnorm=use_batchnorm),
+            nn.UpsamplingBilinear2d(scale_factor=2),
+        )
 
-        # combine decoder keyword arguments
-        kwargs = dict(use_batchnorm=use_batchnorm, attention_type=attention_type)
-        blocks = [
-            DecoderBlock(in_ch,out_ch, **kwargs)
-            for in_ch,out_ch in zip(in_channels, out_channels)
-        ]
-        self.blocks = nn.ModuleList(blocks)
+        self.convc3 = nn.Sequential(
+            md.Conv2dReLU(256,256,3,1,1,use_batchnorm=use_batchnorm),
+            nn.UpsamplingBilinear2d(scale_factor=2),
+        )
+
+        self.convc2 = nn.Sequential(
+            md.Conv2dReLU(256,256,3,1,1,use_batchnorm=use_batchnorm),
+        )
 
     def forward(self, *features):
 
-        features = features[1:]  # remove first skip with same spatial resolution
-        features = features[::-1]  # reverse channels to start from head of encoder
+        out_c5 = self.convc5(features[-1])
+        out_c4 = self.convc4(features[-2])
+        out_c3 = self.convc3(features[-3])
+        out_c2 = self.convc2(features[-4])
 
-        head = features[0]
-        skips = features[1:]
+        out_feat = (out_c5 + out_c4 + out_c3 + out_c2) / 4.
 
-        x = self.center(head)
-        for i, decoder_block in enumerate(self.blocks):
-            skip = skips[i] if i < len(skips) else None
-            x = decoder_block(x, skip)
 
-        return x
+        return out_feat

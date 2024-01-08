@@ -11,13 +11,16 @@ from model.module.gap import GlobalAvgPool2D
 from model.module import fpn
 from model.module.light_decoder import Light_Decoder
 from model.module.farseg import SceneRelation
+import torch.nn as nn
+
+
 
 class LightNet_wFPN(SegmentationModel):
 
     def __init__(
             self,
             encoder_name: str = "resnet34",
-            encoder_depth: int = 4,
+            encoder_depth: int = 5,
             encoder_weights: Optional[str] = "imagenet",
             fpn_out_channels=256,
             decoder_use_batchnorm: bool = True,
@@ -85,7 +88,6 @@ class LightNet_wFPN(SegmentationModel):
             decoder_channels=self.encoder_fpn_out_channels[1:],
             n_blocks=encoder_depth,
             use_batchnorm=decoder_use_batchnorm,
-            center=True if encoder_name.startswith("vgg") else False,
             attention_type=decoder_attention_type,
         )
 
@@ -93,8 +95,11 @@ class LightNet_wFPN(SegmentationModel):
             in_channels=self.encoder_fpn_out_channels[-1],
             out_channels=classes,
             activation=activation,
+            upsampling = 0,
             kernel_size=3,
         )
+
+        self.upsample4x_op = nn.UpsamplingBilinear2d(scale_factor=4)
 
         if aux_params is not None:
             self.classification_head = ClassificationHead(in_channels=self.encoder.out_channels[-1], **aux_params)
@@ -121,6 +126,8 @@ class LightNet_wFPN(SegmentationModel):
             labels = self.classification_head(features[-1])
             return masks, labels
 
+        masks = self.upsample4x_op(masks)
+
         return masks
 
 
@@ -130,7 +137,7 @@ if __name__ == '__main__':
     ssl._create_default_https_context = ssl._create_unverified_context
 
     data = torch.randn(4, 3, 256, 256)
-    backbone = 'resnet34'
+    backbone = 'resnet50'
     # backbone='mit_b0'
     # backbone='mit_b2'
     # backbone='efficientnet-b0'
@@ -138,11 +145,11 @@ if __name__ == '__main__':
     in_chns = 3
     class_num1 = 5
 
-    model = SR_Unet_woSR(
+    model = LightNet_wFPN(
         encoder_name=backbone,
         encoder_weights='imagenet',
         in_channels=in_chns,
         classes=class_num1,
     )
-    out = model(data)
+    out = model.forward(data)
     print(out.shape)
