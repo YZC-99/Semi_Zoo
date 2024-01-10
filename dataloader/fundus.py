@@ -93,7 +93,7 @@ class SemiDataset(Dataset):
                 img, mask = random_scale_and_crop(img, mask, target_size=(self.size, self.size), min_scale=0.8,
                                               max_scale=1.2)
         else:
-            img, mask = resize(img, mask, self.size)
+            img, mask = resize(img, mask, self.size,self.size)
         img, mask = normalize(img, mask)
         if self.preprocess:
             image_edges_info = np.load(img_path.replace('images_cropped','img2canny-dog2npy').replace('jpg','npy'),allow_pickle=True)
