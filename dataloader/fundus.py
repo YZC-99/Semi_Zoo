@@ -15,6 +15,9 @@ import numpy as np
 from scipy import ndimage
 from torchvision.transforms import functional
 import scipy.io
+import torch.multiprocessing
+torch.multiprocessing.set_sharing_strategy('file_system')
+
 
 MEAN_RGB = [0.485 , 0.456 , 0.406 ]
 STDDEV_RGB = [0.229 , 0.224 , 0.225 ]
