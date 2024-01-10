@@ -94,7 +94,7 @@ class SemiDataset(Dataset):
                                               max_scale=1.2)
         else:
             img, mask = resize(img, mask, self.size,self.size)
-        img, mask = normalize(img, mask)
+        img, mask = normalize(img, mask, mean=MEAN_RGB, std=STDDEV_RGB)
         if self.preprocess:
             image_edges_info = np.load(img_path.replace('images_cropped','img2canny-dog2npy').replace('jpg','npy'),allow_pickle=True)
             image_edges_info = image_edges_info / 255
