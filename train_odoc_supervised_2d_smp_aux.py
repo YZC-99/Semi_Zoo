@@ -6,6 +6,7 @@ import glob
 import argparse
 from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss,MSELoss
 from torch.utils.data import DataLoader, WeightedRandomSampler
+from dataloader.samplers import TwoStreamBatchSampler, LabeledBatchSampler,UnlabeledBatchSampler
 from tensorboardX import SummaryWriter
 import segmentation_models_pytorch as smp
 from utils.losses import OhemCrossEntropy,annealing_softmax_focalloss,softmax_focalloss,weight_softmax_focalloss
@@ -52,7 +53,17 @@ parser.add_argument('--warmup',type=float,default=0.01)
 parser.add_argument('--scheduler',type=str,default='poly-v2')
 # ==============lr===================
 
+# ==============aux params===================
+parser.add_argument('--batch_size',type=int,default=8)
+parser.add_argument('--labeled_bs',type=int,default=4)
+parser.add_argument('--labeled_num',type=int,default=99,help="RIM-ONE:99")
+parser.add_argument('--total_num',type=int,default=144,help="HRF:45")
+
+parser.add_argument('--vessel_loss_weight',type=float,default=0.1)
+
+
 # ==============training params===================
+parser.add_argument('--image_size',type=int,default=256)
 parser.add_argument('--seed',type=int,default=42)
 parser.add_argument('--device',type=int,default=0)
 parser.add_argument('--num_works',type=int,default=0)
@@ -63,8 +74,6 @@ parser.add_argument('--val_period',type=int,default=100)
 parser.add_argument('--dataset_name',type=str,default='RIM-ONE')
 parser.add_argument('--CLAHE',type=int,default=2)
 parser.add_argument('--optim',type=str,default='AdamW')
-parser.add_argument('--batch_size',type=int,default=4)
-parser.add_argument('--image_size',type=int,default=256)
 parser.add_argument('--max_iterations',type=int,default=10000)
 parser.add_argument('--autodl',action='store_true')
 
@@ -102,6 +111,8 @@ args = parser.parse_args()
 snapshot_path = "./exp_2d_odoc/" + args.exp + "/"
 max_iterations = args.max_iterations
 base_lr = args.base_lr
+base_lr = args.base_lr
+labeled_bs = args.labeled_bs
 
 
 if __name__ == '__main__':
@@ -129,30 +140,42 @@ if __name__ == '__main__':
     model.to(device)
 
     # init dataset
-    root_base = '/home/gu721/yzc/data/odoc/'
+    root_base = '/home/gu721/yzc/data/'
     if args.autodl:
         root_base = '/root/autodl-tmp/'
 
-    labeled_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
-                                  root="{}{}".format(root_base,args.dataset_name),
+    odoc_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
+                                  root="{}odoc/{}".format(root_base,args.dataset_name),
                                   mode='semi_train',
                                   size=args.image_size,
-                                  id_path='train.txt')
+                                  id_path='train_addHRF.txt')
+    vessel_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
+                                  root="{}vessel".format(root_base),
+                                  mode='semi_train',
+                                  size=args.image_size,
+                                  id_path='train_addHRF.txt')
+
+    odoc_idxs = list(range(args.labeled_num))
+    vessel_idxs = list(range(args.labeled_num,args.total_num))
+
+    odoc_batch_sampler = LabeledBatchSampler(odoc_idxs,labeled_bs)
+    vessel_batch_sampler = UnlabeledBatchSampler(vessel_idxs, args.batch_size - args.labeled_bs)
+    # init dataloader
+    def worker_init_fn(worker_id):
+        random.seed(args.seed + worker_id)
 
 
+    odoc_trainloader = DataLoader(odoc_dataset, batch_sampler=odoc_batch_sampler, num_workers=args.num_works,
+                                  pin_memory=True, worker_init_fn=worker_init_fn)
+    vessel_trainloader = DataLoader(vessel_dataset, batch_sampler=vessel_batch_sampler, num_workers=args.num_works,
+                                    pin_memory=True, worker_init_fn=worker_init_fn)
 
-    labeledtrainloader = DataLoader(labeled_dataset,
-                                    batch_size=args.batch_size,
-                                    num_workers=args.num_works,
-                                    pin_memory=True,
-                                    shuffle=True
-                                    )
 
     # 验证集
     # init dataset
     val_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
                                     # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
-                                  root="{}{}".format(root_base,args.dataset_name),
+                                  root="{}odoc/{}".format(root_base,args.dataset_name),
                                   mode='val',
                                   size=args.image_size)
 
@@ -177,11 +200,11 @@ if __name__ == '__main__':
     writer = SummaryWriter(snapshot_path + '/log')
 
     iter_num = 0
-    max_epoch = args.max_iterations // len(labeledtrainloader) + 1
+    max_epoch = args.max_iterations // len(odoc_trainloader) + 1
     lr_ = args.base_lr
     model.train()
 
-    # ce_loss = BCEWithLogitsLoss()
+    vessel_ce_loss = BCEWithLogitsLoss()
     # class_weights = [0.001,1.0,0.1,0.01,0.1]
     class_weights = args.ce_weight
     if args.ohem > 0:
@@ -205,35 +228,30 @@ if __name__ == '__main__':
     for epoch_num in iterator:
         torch.cuda.empty_cache()
         time1 = time.time()
-        for i_batch,labeled_sampled_batch in enumerate(labeledtrainloader):
+        for i_batch,(odoc_sampled_batch,vessel_sampled_batch) in enumerate(zip(odoc_trainloader,vessel_trainloader)):
             time2 = time.time()
 
-            labeled_batch, label_label_batch = labeled_sampled_batch['image'].to(device), labeled_sampled_batch['label'].to(device)
+            odoc_labeled_batch, odoc_label_batch = odoc_sampled_batch['image'].to(device), odoc_sampled_batch[
+                'label'].to(device)
+            vessel_labeled_batch, vessel_label_batch = vessel_sampled_batch['image'].to(device), vessel_sampled_batch[
+                'label'].to(device)
 
-            all_batch = labeled_batch
-            all_label_batch = label_label_batch
+            all_batch = torch.cat([odoc_labeled_batch,vessel_labeled_batch],dim=0)
 
-            outputs = model(all_batch)
+            outputs_odoc,outputs_vessel = model(all_batch)
 
+            # calculate the loss of od and oc
+            odoc_label_batch[odoc_label_batch > 2] = 0
             loss_seg_dice = torch.zeros(1,device=device)
-            # calculate the loss
-            outputs_soft = torch.argmax(outputs,dim=1)
-            all_label_batch[all_label_batch > 2] = 0
-            if args.annealing_softmax_focalloss:
-                loss_seg_ce = annealing_softmax_focalloss(outputs,all_label_batch,
-                                                         t=iter_num,t_max=args.max_iterations * 0.6)
-            elif args.softmax_focalloss:
-                loss_seg_ce = softmax_focalloss(outputs,all_label_batch)
-            elif args.weight_softmax_focalloss:
-                loss_seg_ce = weight_softmax_focalloss(outputs,all_label_batch,weight=torch.tensor(class_weights,device=device))
-            else:
-                loss_seg_ce = ce_loss(outputs,all_label_batch)
+            loss_seg_ce_odoc = ce_loss(outputs_odoc[:labeled_bs,...],odoc_label_batch)
+            loss_seg_ce_vessel = vessel_ce_loss(outputs_vessel[labeled_bs:,0, ...], vessel_label_batch.float())
 
-            if args.with_dice:
-                loss_seg_dice = dice_loss(outputs,all_label_batch)
-                loss = loss_seg_ce + loss_seg_dice
-            else:
-                loss = loss_seg_ce
+
+            loss_seg_ce = loss_seg_ce_odoc + args.vessel_loss_weight * loss_seg_ce_vessel
+
+            loss = loss_seg_ce
+
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -258,13 +276,13 @@ if __name__ == '__main__':
                     image = all_batch[0]
                     writer.add_image('train/Image', image, iter_num)
 
-                    image = torch.argmax(outputs,dim=1)
+                    image = torch.argmax(outputs_odoc,dim=1)
                     image = image[0]
                     colored_image = gray_to_color(image, color_map)
                     writer.add_image('train/Predicted_label', colored_image, iter_num,dataformats='CHW')
 
 
-                    image = all_label_batch[0]
+                    image = odoc_label_batch[0]
                     colored_image = gray_to_color(image, color_map)
                     writer.add_image('train/Groundtruth_label',
                                      colored_image, iter_num,dataformats='CHW')
@@ -277,15 +295,15 @@ if __name__ == '__main__':
                     show_id = random.randint(0,len(val_iteriter))
                     for id,data in enumerate(val_iteriter):
                         img,label = data['image'].to(device),data['label'].to(device)
-                        outputs = model(img)
+                        outputs_odoc,outputs_vessel = model(img)
 
-                        ODOC_val_metrics.add_multi_class(outputs.detach(),label)
+                        ODOC_val_metrics.add_multi_class(outputs_odoc.detach(),label)
 
                         if id == show_id:
                             image = img[0]
                             writer.add_image('val/image', image, iter_num)
 
-                            image = torch.argmax(outputs,dim=1)
+                            image = torch.argmax(outputs_odoc,dim=1)
                             image = gray_to_color(image,color_map)
                             writer.add_image('val/pred', image, iter_num,dataformats='CHW')
                             image = label

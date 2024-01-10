@@ -2,6 +2,7 @@ import torch
 import segmentation_models_pytorch as smp
 from model.netwotks.sr_unet import SR_Unet,SR_Unet_woFPN,SR_Unet_SR_FPN,SR_Unet_woSR
 from model.netwotks.sr_light_net import LightNet_wFPN,LightNet_wSR,LightNet_wFPN_wSR
+from model.netwotks.dual_decoer_unet import Dual_Decoder_Unet,Dual_Seg_Head_Unet
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -110,6 +111,20 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             sr_pretrained=args.sr_pretrained
         )
 
+    elif model == 'Dual_Decoder_Unet':
+        net = Dual_Decoder_Unet(
+            encoder_name=backbone,
+            encoder_weights='imagenet',
+            in_channels=in_chns,
+            classes=class_num1,
+        )
+    elif model == 'Dual_Seg_Head_Unet':
+        net = Dual_Seg_Head_Unet(
+            encoder_name=backbone,
+            encoder_weights='imagenet',
+            in_channels=in_chns,
+            classes=class_num1,
+        )
 
 
 

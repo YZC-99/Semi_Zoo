@@ -222,9 +222,6 @@ if __name__ == '__main__':
                 odoc_labeled_batch_edges_info = odoc_sampled_batch['image_edges_info'].to(device)
                 vessel_labeled_batch_edges_info = vessel_sampled_batch['image_edges_info'].to(device)
 
-
-
-
             all_batch = torch.cat([odoc_labeled_batch,vessel_labeled_batch],dim=0)
 
             outputs_odoc,outputs_vessel = model(all_batch)
