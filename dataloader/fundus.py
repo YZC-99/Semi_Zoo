@@ -23,7 +23,10 @@ STDDEV_RGB = [0.229 , 0.224 , 0.225 ]
 
 class SemiDataset(Dataset):
     def __init__(self,name, root, mode, size,
-                 id_path=None,h5_file=False,CLAHE = False,preprocess = False):
+                 id_path=None,
+                 h5_file=False,
+                 CLAHE = False,
+                 preprocess = False):
         """
         :param name: dataset name, pascal or cityscapes
         :param root: root path of the dataset.
@@ -84,7 +87,7 @@ class SemiDataset(Dataset):
             img, mask = vflip(img, mask, p=0.5)
             img, mask = random_rotate(img, mask, p=0.5)
             img, mask = random_scale_and_crop(img, mask, target_size=(self.size, self.size), min_scale=0.8,
-                                              max_scale=1.2, p=0.0)
+                                              max_scale=1.2)
 
         img, mask = resize(img, mask, self.size)
         img, mask = normalize(img, mask)
