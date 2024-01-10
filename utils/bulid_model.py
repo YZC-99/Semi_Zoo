@@ -68,7 +68,6 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             sr_out_channels = args.sr_out_c,
             decoder_attention_type =  args.decoder_attention_type
         )
-
     elif model == 'SR_Unet_woSR':
         net = SR_Unet_woSR(
             encoder_name=backbone,
