@@ -175,7 +175,7 @@ if __name__ == '__main__':
     # init dataset
     val_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
                                     # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
-                                  root="{}{}".format(root_base,args.dataset_name),
+                                  root="{}odoc/{}".format(root_base,args.dataset_name),
                                   mode='val',
                                   size=args.image_size)
 
