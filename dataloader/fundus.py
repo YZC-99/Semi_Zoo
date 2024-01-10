@@ -82,14 +82,18 @@ class SemiDataset(Dataset):
 
         if self.mode == 'semi_train':
 
-
-            img, mask = hflip(img, mask, p=0.5)
-            img, mask = vflip(img, mask, p=0.5)
-            img, mask = random_rotate(img, mask, p=0.5)
-            img, mask = random_scale_and_crop(img, mask, target_size=(self.size, self.size), min_scale=0.8,
+            if random.random() < 0.5:
+                img, mask = hflip(img, mask)
+            if random.random() < 0.5:
+                img, mask = vflip(img, mask)
+            if random.random() < 0.5:
+                img, mask = random_rotate(img, mask)
+            img, mask = resize(img, mask, self.size, self.size)
+            if random.random() < 0.5:
+                img, mask = random_scale_and_crop(img, mask, target_size=(self.size, self.size), min_scale=0.8,
                                               max_scale=1.2)
-
-        img, mask = resize(img, mask, self.size)
+        else:
+            img, mask = resize(img, mask, self.size)
         img, mask = normalize(img, mask)
         if self.preprocess:
             image_edges_info = np.load(img_path.replace('images_cropped','img2canny-dog2npy').replace('jpg','npy'),allow_pickle=True)
