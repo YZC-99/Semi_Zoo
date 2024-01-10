@@ -37,7 +37,7 @@ parser.add_argument('--ckpt_weight',type=str,default=None)
 # ==============model===================
 
 # ==============loss===================
-parser.add_argument('--ce_weight', type=float, nargs='+', default=[1,1,1], help='List of floating-point values')
+parser.add_argument('--ce_weight', type=float, nargs='+', default=[1.0,1.0,1.0], help='List of floating-point values')
 parser.add_argument('--ohem',type=float,default=-1.0)
 parser.add_argument('--annealing_softmax_focalloss',action='store_true')
 parser.add_argument('--softmax_focalloss',action='store_true')
