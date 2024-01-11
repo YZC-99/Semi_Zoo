@@ -65,7 +65,7 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             encoder_weights='imagenet',
             in_channels=in_chns,
             classes=class_num1,
-            fpn_out_channels=args.fpn_out_c,
+            sr_out_channels=args.sr_out_c,
             decoder_attention_type=args.decoder_attention_type,
             sr_pretrained=args.sr_pretrained,
         )
