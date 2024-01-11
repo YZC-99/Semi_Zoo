@@ -86,7 +86,8 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             in_channels=in_chns,
             classes=class_num1,
             sr_out_channels = args.sr_out_c,
-            decoder_attention_type =  args.decoder_attention_type
+            decoder_attention_type =  args.decoder_attention_type,
+            sr_pretrained=args.sr_pretrained,
         )
     elif model == 'SR_Unet_woSR':
         net = SR_Unet_woSR(
@@ -95,7 +96,8 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             in_channels=in_chns,
             classes=class_num1,
             fpn_out_channels = args.fpn_out_c,
-            decoder_attention_type =  args.decoder_attention_type
+            decoder_attention_type =  args.decoder_attention_type,
+            fpn_pretrained=args.fpn_pretrained,
         )
     elif model == 'LightNet_wFPN':
         net = LightNet_wFPN(
