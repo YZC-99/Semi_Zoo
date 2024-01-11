@@ -166,9 +166,9 @@ if __name__ == '__main__':
 
 
     odoc_trainloader = DataLoader(odoc_dataset, batch_sampler=odoc_batch_sampler, num_workers=args.num_works,
-                                  pin_memory=True, worker_init_fn=worker_init_fn)
+                                  pin_memory=False, worker_init_fn=worker_init_fn)
     vessel_trainloader = DataLoader(vessel_dataset, batch_sampler=vessel_batch_sampler, num_workers=args.num_works,
-                                    pin_memory=True, worker_init_fn=worker_init_fn)
+                                    pin_memory=False, worker_init_fn=worker_init_fn)
 
 
     # 验证集
