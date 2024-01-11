@@ -165,9 +165,9 @@ if __name__ == '__main__':
         random.seed(args.seed + worker_id)
 
 
-    odoc_trainloader = DataLoader(odoc_dataset, batch_sampler=odoc_batch_sampler, num_workers=args.num_works,
+    odoc_trainloader = DataLoader(odoc_dataset, batch_sampler=odoc_batch_sampler, num_workers=args.num_works / 2,
                                   pin_memory=True, worker_init_fn=worker_init_fn)
-    vessel_trainloader = DataLoader(vessel_dataset, batch_sampler=vessel_batch_sampler, num_workers=args.num_works,
+    vessel_trainloader = DataLoader(vessel_dataset, batch_sampler=vessel_batch_sampler, num_workers=args.num_works / 2,
                                     pin_memory=True, worker_init_fn=worker_init_fn)
 
 
