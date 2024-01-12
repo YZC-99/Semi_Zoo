@@ -210,7 +210,7 @@ class ODOC_Vessel_Dataset(Dataset):
 
     def __getitem__(self, item):
         if self.pseudo_vessel:
-            self.get_item_odoc_vessel(item)
+            sample = self.get_item_odoc_vessel(item)
         else:
             sample = self.get_item_nor(item)
 
