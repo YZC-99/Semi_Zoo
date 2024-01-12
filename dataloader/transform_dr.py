@@ -151,7 +151,7 @@ def normalize_four(img,   mask1=None,mask2=None,mask3=None,mask4=None,mean=[0.0,
     """
     img = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.0,), (1.0,))
+        transforms.Normalize(mean, std)
     ])(img)
     if mask1 is not None:
         mask1 = torch.from_numpy(np.array(mask1)).long()

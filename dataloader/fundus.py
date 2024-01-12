@@ -29,7 +29,8 @@ class SemiDataset(Dataset):
                  id_path=None,
                  h5_file=False,
                  CLAHE = False,
-                 preprocess = False):
+                 preprocess = False,
+                 pseudo_vessel = False ):
         """
         :param name: dataset name, pascal or cityscapes
         :param root: root path of the dataset.
@@ -51,6 +52,7 @@ class SemiDataset(Dataset):
         self.h5_file = h5_file
         self.CLAHE = CLAHE
         self.preprocess = preprocess
+        self.pseudo_vessel = pseudo_vessel
 
         if mode == 'semi_train':
             id_path = '%s/%s' %(name,id_path)
@@ -106,6 +108,109 @@ class SemiDataset(Dataset):
 
     def __getitem__(self, item):
         sample = self.get_item_nor(item)
+
+        return sample
+
+    def __len__(self):
+        return len(self.ids)
+
+
+class ODOC_Vessel_Dataset(Dataset):
+    def __init__(self,name, root, mode, size,
+                 id_path=None,
+                 pseudo_vessel = False ):
+        """
+        :param name: dataset name, pascal or cityscapes
+        :param root: root path of the dataset.
+        :param mode: train: supervised learning only with labeled images, no unlabeled images are leveraged.
+                     label: pseudo labeling the remaining unlabeled images.
+                     semi_train: semi-supervised learning with both labeled and unlabeled images.
+                     val: validation.
+
+        :param size: crop size of training images.
+        :param labeled_id_path: path of labeled image ids, needed in train or semi_train mode.
+        :param unlabeled_id_path: path of unlabeled image ids, needed in semi_train or label mode.
+        :param pseudo_mask_path: path of generated pseudo masks, needed in semi_train mode.
+        """
+
+        self.name = name
+        self.root = root
+        self.mode = mode
+        self.size = size
+        self.pseudo_vessel = pseudo_vessel
+
+        if mode == 'semi_train':
+            id_path = '%s/%s' %(name,id_path)
+        elif mode == 'val':
+            id_path = '%s/val.txt' % name
+        elif mode == 'test':
+            id_path = '%s/test.txt' % name
+
+        with open(id_path, 'r') as f:
+            self.ids = f.read().splitlines()
+
+    def get_item_nor(self,item):
+        id = self.ids[item]
+        img_path = os.path.join(self.root, id.split(' ')[0])
+        img = Image.open(img_path)
+
+        if "HRF" in id or 'CHASEDB1' in id or 'DRIVE' in id:
+            mask_path = os.path.join(self.root, id.split(' ')[1])
+            mask = Image.open(mask_path).convert('L')
+            mask_arr = np.array(mask) / 255
+            mask_arr[mask_arr > 2] = 0
+            mask = Image.fromarray(mask_arr)
+        else:
+            mask_path = os.path.join(self.root, id.split(' ')[1])
+            mask = Image.open(mask_path)
+
+        if self.mode == 'semi_train':
+
+            if random.random() < 0.5:
+                img, mask = hflip(img, mask)
+            if random.random() < 0.5:
+                img, mask = vflip(img, mask)
+            if random.random() < 0.5:
+                img, mask = random_rotate(img, mask)
+            img, mask = resize(img, mask, self.size, self.size)
+            if random.random() < 0.5:
+                img, mask = random_scale_and_crop(img, mask, target_size=(self.size, self.size), min_scale=0.8,
+                                              max_scale=1.2)
+        else:
+            img, mask = resize(img, mask, self.size,self.size)
+        img, mask = normalize(img, mask, mean=MEAN_RGB, std=STDDEV_RGB)
+
+        return {'image': img, 'label': mask,'name':id.split(' ')[1]}
+
+    def get_item_odoc_vessel(self, item):
+        id = self.ids[item]
+        img_path = os.path.join(self.root, id.split(' ')[0])
+        img = Image.open(img_path)
+        odoc_mask_path = os.path.join(self.root, id.split(' ')[1])
+        odoc_mask = Image.open(odoc_mask_path)
+        vessel_mask_path = odoc_mask_path.replace('my_gts_cropped','v_my_gts_cropped')
+        vessel_mask = Image.open(vessel_mask_path)
+
+        if random.random() < 0.5:
+            img, odoc_mask, vessel_mask, _,_ = hflip_four(img, odoc_mask, vessel_mask)
+        if random.random() < 0.5:
+            img, odoc_mask, vessel_mask, _,_ = vflip_four(img, odoc_mask, vessel_mask)
+        if random.random() < 0.5:
+            img, odoc_mask, vessel_mask, _,_ = random_rotate_four(img, odoc_mask, vessel_mask,height=self.size,width=self.size)
+        if random.random() < 0.5:
+            img, odoc_mask, vessel_mask, _,_ = random_translate_four(img, odoc_mask, vessel_mask,height=self.size,width=self.size)
+        img, odoc_mask, vessel_mask, _,_ = resize_four(img, odoc_mask, vessel_mask,height=self.size,width=self.size)
+        if random.random() < 0.5:
+            img, odoc_mask, vessel_mask, _,_ = random_scale_and_crop_four(img, odoc_mask, vessel_mask,
+                                                                                 target_size=(self.size, self.size))
+        img, odoc_mask, vessel_mask, _,_ = normalize_fourimg, odoc_mask, vessel_mask, mean=MEAN_RGB, std=STDDEV_RGB)
+        return {'image': img, 'odoc_label': odoc_mask,'vessel_mask':vessel_mask,'name':id.split(' ')[1]}
+
+    def __getitem__(self, item):
+        if self.pseudo_vessel:
+            self.get_item_odoc_vessel(item)
+        else:
+            sample = self.get_item_nor(item)
 
         return sample
 
