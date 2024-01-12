@@ -210,4 +210,3 @@ DRIVE/images_cropped/19.tif DRIVE/gts_cropped/19_manual1.png
 DRIVE/images_cropped/31.tif DRIVE/gts_cropped/31_manual1.png
 DRIVE/images_cropped/15.tif DRIVE/gts_cropped/15_manual1.png
 DRIVE/images_cropped/37.tif DRIVE/gts_cropped/37_manual1.png
-
