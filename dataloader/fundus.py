@@ -60,6 +60,8 @@ class SemiDataset(Dataset):
             id_path = '%s/val.txt' % name
         elif mode == 'test':
             id_path = '%s/test.txt' % name
+        elif mode == 'all':
+            id_path = '%s/all.txt' % name
 
         with open(id_path, 'r') as f:
             self.ids = f.read().splitlines()

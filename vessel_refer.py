@@ -110,7 +110,7 @@ if __name__ == '__main__':
 
     labeled_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
                                   root="{}{}".format(root_base, args.dataset_name),
-                                  mode='test',
+                                  mode='all',
                                   size=args.image_size,
                                   id_path='train.txt')
 

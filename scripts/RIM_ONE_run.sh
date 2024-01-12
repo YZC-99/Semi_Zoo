@@ -33,7 +33,6 @@ python train_odoc_supervised_2d_smp_aux_pseudo_vessel.py \
     --base_lr 0.0003         \
     --max_iterations 3000         \
     --backbone resnet50 \
-    --fpn_pretrained \
     --autodl
 
 
