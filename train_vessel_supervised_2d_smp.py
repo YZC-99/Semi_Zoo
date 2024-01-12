@@ -187,7 +187,7 @@ if __name__ == '__main__':
         # online hard example mining
         ce_loss = OhemCrossEntropy(thres=args.ohem,weight=torch.tensor(class_weights,device=device))
     else:
-        ce_loss = CrossEntropyLoss(ignore_index=255,weight=torch.tensor(class_weights,device=device))
+        ce_loss = CrossEntropyLoss(ignore_index=255)
     # ce_loss = BCEWithLogitsLoss()
     dice_loss = smp.losses.DiceLoss(mode='multiclass',from_logits=True)
     # mse_loss = MSELoss()
