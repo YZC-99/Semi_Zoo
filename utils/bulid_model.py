@@ -77,7 +77,9 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             classes= class_num1,
             fpn_out_channels = args.fpn_out_c,
             sr_out_channels=args.sr_out_c,
-            decoder_attention_type =  args.decoder_attention_type
+            decoder_attention_type =  args.decoder_attention_type,
+            sr_pretrained=args.sr_pretrained,
+            fpn_pretrained=args.fpn_pretrained,
         )
     elif model == 'SR_Unet_woFPN':
         net = SR_Unet_woFPN(
