@@ -246,7 +246,7 @@ if __name__ == '__main__':
             odoc_label_batch = odoc_sampled_batch['odoc_label'].to(device)
             pseudo_vessel_label_batch = odoc_sampled_batch['vessel_mask'].to(device)
             if args.v_cross_c:
-                pseudo_vessel_label_batch[odoc_label_batch != 2] = 0
+                pseudo_vessel_label_batch[odoc_label_batch != 1] = 0
 
             vessel_labeled_batch, vessel_label_batch = vessel_sampled_batch['image'].to(device), vessel_sampled_batch[
                 'label'].to(device)
