@@ -27,6 +27,16 @@ color_map = {
     9: [128, 0, 128],  # 紫色
 }
 
+def color_map_fn():
+    cmap = np.zeros((256, 3), dtype='uint8')
+    cmap[0] = np.array([0, 0, 0])
+    cmap[1] = np.array([255, 0, 0])
+    cmap[2] = np.array([0, 255, 0])
+    cmap[3] = np.array([0, 0, 255])
+    cmap[4] = np.array([255, 255, 0])
+
+    return cmap
+
 # 将灰度图像转换为彩色图像
 def gray_to_color(image, color_map):
     image = image.squeeze()

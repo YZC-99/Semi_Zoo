@@ -12,5 +12,6 @@ python train_vessel_supervised_2d_smp.py \
     --base_lr 0.0003         \
     --max_iterations 3000         \
     --backbone resnet50 \
+    --save_period 500 \
     --autodl
 
