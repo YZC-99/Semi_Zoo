@@ -101,7 +101,7 @@ class SemiDataset(Dataset):
             image_edges_info = np.load(img_path.replace('images_cropped','img2canny-dog2npy').replace('jpg','npy'),allow_pickle=True)
             image_edges_info = image_edges_info / 255
             image_edges_info = torch.from_numpy(image_edges_info)
-        return {'image': img, 'label': mask}
+        return {'image': img, 'label': mask,'name':id.split(' ')[1]}
 
 
     def __getitem__(self, item):
