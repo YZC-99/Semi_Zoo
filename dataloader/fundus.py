@@ -200,7 +200,7 @@ class ODOC_Vessel_Dataset(Dataset):
         if random.random() < 0.5:
             img, odoc_mask, vessel_mask, _,_ = random_rotate_four(img, odoc_mask, vessel_mask)
         if random.random() < 0.5:
-            img, odoc_mask, vessel_mask, _,_ = random_translate_four(img, odoc_mask, vessel_mask,height=self.size,width=self.size)
+            img, odoc_mask, vessel_mask, _,_ = random_translate_four(img, odoc_mask, vessel_mask)
         img, odoc_mask, vessel_mask, _,_ = resize_four(img, odoc_mask, vessel_mask,height=self.size,width=self.size)
         if random.random() < 0.5:
             img, odoc_mask, vessel_mask, _,_ = random_scale_and_crop_four(img, odoc_mask, vessel_mask,
