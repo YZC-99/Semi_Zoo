@@ -59,6 +59,7 @@ parser.add_argument('--labeled_bs',type=int,default=4)
 parser.add_argument('--labeled_num',type=int,default=99,help="RIM-ONE:99")
 parser.add_argument('--total_num',type=int,default=144,help="HRF:45--CHASEDB1:28--DRIVE:40")
 parser.add_argument('--vessel_loss_weight',type=float,default=0.1)
+parser.add_argument('--only_pseudo',action='store_true')
 parser.add_argument('--add_vessel',type=str,default='HRF',choices=['HRF','CHASEDB1','HRF-CHASEDB1','HRF-CHASEDB1-DRIVE'])
 parser.add_argument('--v_cross_c',action='store_true')
 
@@ -200,13 +201,7 @@ if __name__ == '__main__':
 
     # scheduler = StepLR(optimizer,step_size=100,gamma=0.999)
     scheduler = PolyLRwithWarmup(optimizer,total_steps=args.max_iterations,warmup_steps=args.max_iterations * args.warmup)
-    # scheduler = PolyLRScheduler(optimizer,
-    #                             t_initial=args.max_iterations,
-    #                             power = 0.9,
-    #                             warmup_t = args.max_iterations * args.warmup,
-    #                             t_in_epochs = False,
-    #                             cycle_mul = 1
-    #                             )
+
     # init summarywriter
     writer = SummaryWriter(snapshot_path + '/log')
 
@@ -216,7 +211,6 @@ if __name__ == '__main__':
     model.train()
 
     vessel_ce_loss = BCEWithLogitsLoss()
-    # class_weights = [0.001,1.0,0.1,0.01,0.1]
     class_weights = args.ce_weight
     if args.ohem > 0:
         # online hard example mining
@@ -239,32 +233,35 @@ if __name__ == '__main__':
     for epoch_num in iterator:
         torch.cuda.empty_cache()
         time1 = time.time()
+
         for i_batch,(odoc_sampled_batch,vessel_sampled_batch) in enumerate(zip(odoc_trainloader,vessel_trainloader)):
             time2 = time.time()
-
             odoc_labeled_batch = odoc_sampled_batch['image'].to(device)
             odoc_label_batch = odoc_sampled_batch['odoc_label'].to(device)
             pseudo_vessel_label_batch = odoc_sampled_batch['vessel_mask'].to(device)
             if args.v_cross_c:
                 pseudo_vessel_label_batch[odoc_label_batch != 1] = 0
 
-            vessel_labeled_batch, vessel_label_batch = vessel_sampled_batch['image'].to(device), vessel_sampled_batch[
-                'label'].to(device)
+            if not args.only_pseudo:
+                vessel_labeled_batch, vessel_label_batch = vessel_sampled_batch['image'].to(device), vessel_sampled_batch[
+                    'label'].to(device)
+                all_batch = torch.cat([odoc_labeled_batch,vessel_labeled_batch],dim=0)
+                outputs_odoc,outputs_vessel = model(all_batch)
 
-            all_batch = torch.cat([odoc_labeled_batch,vessel_labeled_batch],dim=0)
+                # calculate the loss of od and oc
+                odoc_label_batch[odoc_label_batch > 2] = 0
+                loss_seg_dice = torch.zeros(1,device=device)
+                loss_seg_ce_odoc = ce_loss(outputs_odoc[:labeled_bs,...],odoc_label_batch)
+                loss_seg_ce_vessel1 = vessel_ce_loss(outputs_vessel[labeled_bs:,0, ...], vessel_label_batch.float())
+                loss_seg_ce_vessel2 = vessel_ce_loss(outputs_vessel[:labeled_bs,0, ...], pseudo_vessel_label_batch.float())
+                loss_seg_ce_vessel = loss_seg_ce_vessel1 + loss_seg_ce_vessel2
 
-            outputs_odoc,outputs_vessel = model(all_batch)
-
-            # calculate the loss of od and oc
-            odoc_label_batch[odoc_label_batch > 2] = 0
-            loss_seg_dice = torch.zeros(1,device=device)
-            loss_seg_ce_odoc = ce_loss(outputs_odoc[:labeled_bs,...],odoc_label_batch)
-            loss_seg_ce_vessel1 = vessel_ce_loss(outputs_vessel[labeled_bs:,0, ...], vessel_label_batch.float())
-            loss_seg_ce_vessel2 = vessel_ce_loss(outputs_vessel[:labeled_bs,0, ...], pseudo_vessel_label_batch.float())
-            loss_seg_ce_vessel = loss_seg_ce_vessel1 + loss_seg_ce_vessel2
-
-            loss_seg_ce = loss_seg_ce_odoc + args.vessel_loss_weight * loss_seg_ce_vessel
-
+                loss_seg_ce = loss_seg_ce_odoc + args.vessel_loss_weight * loss_seg_ce_vessel
+            else:
+                outputs_odoc, outputs_vessel = model(odoc_labeled_batch)
+                loss_seg_ce_odoc = ce_loss(outputs_odoc, odoc_label_batch)
+                loss_seg_ce_vessel = vessel_ce_loss(outputs_vessel, pseudo_vessel_label_batch)
+                loss_seg_ce = loss_seg_ce_odoc + args.vessel_loss_weight * loss_seg_ce_vessel
             loss = loss_seg_ce
 
 
