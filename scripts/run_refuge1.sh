@@ -155,3 +155,23 @@ python train_odoc_supervised_2d_smp.py \
     --fpn_pretrained \
     --autodl
 
+#TODO
+python train_odoc_supervised_2d_smp.py \
+    --num_works 4        \
+    --device 0         \
+    --exp REFUGE/SR_Unet_SR_FPN/resnet50/imgz256_bs8_Adam_warmup0_iterations-6400_polyv2_lr3e-4        \
+    --dataset_name REFUGE        \
+    --image_size 256         \
+    --model SR_Unet_SR_FPN         \
+    --optim Adam         \
+    --batch_size 8         \
+    --warmup 0.0         \
+    --base_lr 0.0003         \
+    --max_iterations 6400         \
+    --backbone resnet50 \
+    --autodl
+
+
+
+    --sr_pretrained \
+    --fpn_pretrained \

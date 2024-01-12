@@ -72,13 +72,12 @@ class SemiDataset(Dataset):
 
         if "DDR" in id or "G1020" in id or "ACRIMA" in id:
             mask = Image.fromarray(np.zeros((2, 2)))
-        elif "HRF" in id:
+        elif "HRF" in id or 'CHASEDB1' in id:
             mask_path = os.path.join(self.root, id.split(' ')[1])
             mask = Image.open(mask_path).convert('L')
             mask_arr = np.array(mask) / 255
             mask_arr[mask_arr > 2] = 0
             mask = Image.fromarray(mask_arr)
-            # print(np.unique(np.array(mask)))
         else:
             mask_path = os.path.join(self.root, id.split(' ')[1])
             mask = Image.open(mask_path)

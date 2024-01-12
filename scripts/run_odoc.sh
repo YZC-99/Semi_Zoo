@@ -293,3 +293,21 @@ python train_odoc_supervised_2d_smp_aux.py \
     --backbone resnet50 \
     --autodl
 
+###TODO
+# 18、Dual_Decoder_SR_Unet-fpn_pretrained-sr_pretrained
+python train_odoc_supervised_2d_smp.py \
+    --num_works 4        \
+    --device 0         \
+    --exp REFUGE/SR_Unet-fpn_pretrained-sr_pretrained/resnet50/imgz256_bs8_Adam_warmup0_iterations-6400_polyv2_lr3e-4        \
+    --dataset_name REFUGE        \
+    --image_size 256         \
+    --model SR_Unet         \
+    --optim Adam         \
+    --batch_size 8         \
+    --warmup 0.0         \
+    --base_lr 0.0003         \
+    --max_iterations 6400         \
+    --backbone resnet50 \
+    --sr_pretrained \
+    --fpn_pretrained \
+    --autodl

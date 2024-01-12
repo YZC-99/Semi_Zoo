@@ -231,4 +231,4 @@ def DDR_seg():
             name = i.replace(data_path,'')
             f.write(name + ' ' + name.replace('.jpg','.png').replace('images','labels_fused') + '\n')
 
-IDRID()
+CHASEDB1()

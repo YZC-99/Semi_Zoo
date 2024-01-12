@@ -57,9 +57,10 @@ parser.add_argument('--scheduler',type=str,default='poly-v2')
 parser.add_argument('--batch_size',type=int,default=8)
 parser.add_argument('--labeled_bs',type=int,default=4)
 parser.add_argument('--labeled_num',type=int,default=99,help="RIM-ONE:99")
-parser.add_argument('--total_num',type=int,default=144,help="HRF:45")
-
+parser.add_argument('--total_num',type=int,default=144,help="HRF:45--CHASEDB1:28")
 parser.add_argument('--vessel_loss_weight',type=float,default=0.1)
+
+parser.add_argument('--add_vessel',type=str,default='HRF',choices=['HRF','CHASEDB1','HRF-CHASEDB1'])
 
 
 # ==============training params===================
@@ -148,13 +149,19 @@ if __name__ == '__main__':
                                   root="{}odoc/{}".format(root_base,args.dataset_name),
                                   mode='semi_train',
                                   size=args.image_size,
-                                  id_path='train_addHRF.txt')
+                                  id_path='train_add{}.txt'.format(args.add_vessel))
     vessel_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
                                   root="{}vessel".format(root_base),
                                   mode='semi_train',
                                   size=args.image_size,
-                                  id_path='train_addHRF.txt')
+                                  id_path='train_add{}.txt'.format(args.add_vessel))
 
+    if args.add_vessel == 'HRF':
+        args.total_num = 144
+    elif args.add_vessel == 'CHASEDB1':
+        args.total_num = 127
+    elif args.add_vessel == 'HRF-CHASEDB1':
+        args.total_num = 175
     odoc_idxs = list(range(args.labeled_num))
     vessel_idxs = list(range(args.labeled_num,args.total_num))
 
