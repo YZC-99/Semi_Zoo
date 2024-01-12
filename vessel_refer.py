@@ -24,6 +24,7 @@ parser.add_argument('--backbone', type=str, default='resnet50')
 parser.add_argument('--ckpt_weight', type=str,
                     default='/root/autodl-tmp/Semi_Zoo/exp_2d_vessel/DRIVE/UNet/resnet50/imgz256_bs8_Adam_warmup0_iterations-3000_polyv2_lr3e-4/version01/iter_1000.pth')
 parser.add_argument('--decoder_attention_type', type=str, default=None)
+parser.add_argument('--exclude_keys', type=str, default=None)
 # ==============model===================
 
 
