@@ -1,6 +1,6 @@
 import random
 from tqdm import tqdm
-from dataloader.fundus import SemiDataset,IDRIDDataset
+from dataloader.fundus import SemiDataset,IDRIDDataset,VesselDataset
 import torch
 import glob
 import argparse
@@ -133,7 +133,7 @@ if __name__ == '__main__':
     if args.autodl:
         root_base = '/root/autodl-tmp/vessel/'
 
-    labeled_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
+    labeled_dataset = VesselDataset(name='./dataset/{}'.format(args.dataset_name),
                                   root="{}{}".format(root_base,args.dataset_name),
                                   mode='semi_train',
                                   size=args.image_size,

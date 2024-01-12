@@ -112,6 +112,91 @@ class SemiDataset(Dataset):
     def __len__(self):
         return len(self.ids)
 
+
+class VesselDataset(Dataset):
+    def __init__(self,name, root, mode, size,
+                 id_path=None,
+                 h5_file=False,
+                 CLAHE = False,
+                 preprocess = False):
+        """
+        :param name: dataset name, pascal or cityscapes
+        :param root: root path of the dataset.
+        :param mode: train: supervised learning only with labeled images, no unlabeled images are leveraged.
+                     label: pseudo labeling the remaining unlabeled images.
+                     semi_train: semi-supervised learning with both labeled and unlabeled images.
+                     val: validation.
+
+        :param size: crop size of training images.
+        :param labeled_id_path: path of labeled image ids, needed in train or semi_train mode.
+        :param unlabeled_id_path: path of unlabeled image ids, needed in semi_train or label mode.
+        :param pseudo_mask_path: path of generated pseudo masks, needed in semi_train mode.
+        """
+
+        self.name = name
+        self.root = root
+        self.mode = mode
+        self.size = size
+        self.h5_file = h5_file
+        self.CLAHE = CLAHE
+        self.preprocess = preprocess
+
+        if mode == 'semi_train':
+            id_path = '%s/%s' %(name,id_path)
+        elif mode == 'val':
+            id_path = '%s/val.txt' % name
+        elif mode == 'test':
+            id_path = '%s/test.txt' % name
+
+        with open(id_path, 'r') as f:
+            self.ids = f.read().splitlines()
+
+    def get_item_nor(self,item):
+        id = self.ids[item]
+        img_path = os.path.join(self.root, id.split(' ')[0])
+        # if self.CLAHE:
+        #     img = CLAHE(img_path)
+        # else:
+        img = Image.open(img_path)
+
+
+        mask_path = os.path.join(self.root, id.split(' ')[1])
+        mask = Image.open(mask_path).convert('L')
+        mask_arr = np.array(mask) / 255
+        mask_arr[mask_arr > 2] = 0
+        mask = Image.fromarray(mask_arr)
+
+        if self.mode == 'semi_train':
+
+            if random.random() < 0.5:
+                img, mask = hflip(img, mask)
+            if random.random() < 0.5:
+                img, mask = vflip(img, mask)
+            if random.random() < 0.5:
+                img, mask = random_rotate(img, mask)
+            img, mask = resize(img, mask, self.size, self.size)
+            if random.random() < 0.5:
+                img, mask = random_scale_and_crop(img, mask, target_size=(self.size, self.size), min_scale=0.8,
+                                              max_scale=1.2)
+        else:
+            img, mask = resize(img, mask, self.size,self.size)
+        img, mask = normalize(img, mask, mean=MEAN_RGB, std=STDDEV_RGB)
+        if self.preprocess:
+            image_edges_info = np.load(img_path.replace('images_cropped','img2canny-dog2npy').replace('jpg','npy'),allow_pickle=True)
+            image_edges_info = image_edges_info / 255
+            image_edges_info = torch.from_numpy(image_edges_info)
+        return {'image': img, 'label': mask}
+
+
+    def __getitem__(self, item):
+        sample = self.get_item_nor(item)
+
+        return sample
+
+    def __len__(self):
+        return len(self.ids)
+
+
 class BinaryIDRIDDataset(Dataset):
     def __init__(self,name, root, mode, size,
                  id_path=None,CLAHE = 2):
