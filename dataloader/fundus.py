@@ -203,7 +203,7 @@ class ODOC_Vessel_Dataset(Dataset):
         if random.random() < 0.5:
             img, odoc_mask, vessel_mask, _,_ = random_scale_and_crop_four(img, odoc_mask, vessel_mask,
                                                                                  target_size=(self.size, self.size))
-        img, odoc_mask, vessel_mask, _,_ = normalize_fourimg, odoc_mask, vessel_mask, mean=MEAN_RGB, std=STDDEV_RGB)
+        img, odoc_mask, vessel_mask, _,_ = normalize_four(img, odoc_mask, vessel_mask, mean=MEAN_RGB, std=STDDEV_RGB)
         return {'image': img, 'odoc_label': odoc_mask,'vessel_mask':vessel_mask,'name':id.split(' ')[1]}
 
     def __getitem__(self, item):
