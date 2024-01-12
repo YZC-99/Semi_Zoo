@@ -185,6 +185,27 @@ def CHASEDB1():
         for image_file in image_files:
             ground_truth_path = image_file.replace('images_cropped', 'gts_cropped').replace('jpg', 'png').replace('JPG', 'png')
             f.write(f"{image_file} {ground_truth_path}\n")
+
+def DRIVE():
+    data_path = "/home/gu721/yzc/data/vessel/DRIVE/"  # 数据路径
+
+    images_dir = os.path.join(data_path, 'images_cropped')  # 图像文件夹路径
+
+    save_path = data_path + '/index.txt'
+    ground_truths_dir = os.path.join(data_path, 'gts_cropped')  # ground_truths文件夹路径
+    # 获取images文件夹下的文件列表
+    image_files = [os.path.join(images_dir, file) for file in os.listdir(images_dir) if file.endswith('.tif')]
+    # 获取ground_truths文件夹下对应的文件列表
+    ground_truth_files = [os.path.join(ground_truths_dir, file) for file in os.listdir(ground_truths_dir) if
+                          file.endswith('.png')]
+    # 确保两个文件列表长度相同
+    confirm_length(image_files, ground_truth_files)
+    #     创建index.txt文件并写入内容
+
+    with open(save_path, 'w') as f:
+        for image_file in image_files:
+            ground_truth_path = image_file.replace('images_cropped', 'gts_cropped').replace('tif', 'png')
+            f.write(f"{image_file} {ground_truth_path}\n")
 def HRF():
     data_path = "/home/gu721/yzc/data/vessel/HRF/"  # 数据路径
 
@@ -231,4 +252,4 @@ def DDR_seg():
             name = i.replace(data_path,'')
             f.write(name + ' ' + name.replace('.jpg','.png').replace('images','labels_fused') + '\n')
 
-CHASEDB1()
+DRIVE()

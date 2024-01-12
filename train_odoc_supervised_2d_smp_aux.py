@@ -57,10 +57,10 @@ parser.add_argument('--scheduler',type=str,default='poly-v2')
 parser.add_argument('--batch_size',type=int,default=8)
 parser.add_argument('--labeled_bs',type=int,default=4)
 parser.add_argument('--labeled_num',type=int,default=99,help="RIM-ONE:99")
-parser.add_argument('--total_num',type=int,default=144,help="HRF:45--CHASEDB1:28")
+parser.add_argument('--total_num',type=int,default=144,help="HRF:45--CHASEDB1:28--DRIVE:40")
 parser.add_argument('--vessel_loss_weight',type=float,default=0.1)
 
-parser.add_argument('--add_vessel',type=str,default='HRF',choices=['HRF','CHASEDB1','HRF-CHASEDB1'])
+parser.add_argument('--add_vessel',type=str,default='HRF',choices=['HRF','CHASEDB1','HRF-CHASEDB1','HRF-CHASEDB1-DRIVE'])
 
 
 # ==============training params===================
@@ -162,6 +162,8 @@ if __name__ == '__main__':
         args.total_num = 127
     elif args.add_vessel == 'HRF-CHASEDB1':
         args.total_num = 172
+    elif args.add_vessel == 'HRF-CHASEDB1-DRIVE':
+        args.total_num = 212
     odoc_idxs = list(range(args.labeled_num))
     vessel_idxs = list(range(args.labeled_num,args.total_num))
 
