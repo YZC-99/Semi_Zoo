@@ -163,7 +163,7 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
         filtered_checkpoint = {key: value for key, value in checkpoint.items() if
                                all(exclude_key not in key for exclude_key in exclude_keys)}
 
-        net.load_state_dict(filtered_checkpoint)
+        net.load_state_dict(filtered_checkpoint, strict=False)
         print("===================================")
         print("成功加载权重:{}".format(ckpt_weight))
         print("===================================")
