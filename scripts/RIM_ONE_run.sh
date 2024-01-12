@@ -1,3 +1,26 @@
+# pretrained
+#6、 SR_Unet_woSR-fpn_pretrained
+python train_odoc_supervised_2d_smp.py \
+    --num_works 4        \
+    --device 0         \
+    --exp RIM-ONE/UNet-from-vessel-pretrained/resnet50/imgz256_bs8_Adam_warmup0_iterations-3000_polyv2_lr3e-4        \
+    --dataset_name RIM-ONE        \
+    --image_size 256         \
+    --model UNet         \
+    --optim Adam         \
+    --batch_size 8         \
+    --warmup 0.0         \
+    --base_lr 0.0003         \
+    --max_iterations 3000         \
+    --ckpt_weight /root/autodl-tmp/Semi_Zoo/exp_2d_vessel/DRIVE/UNet/resnet50/imgz256_bs8_Adam_warmup0_iterations-3000_polyv2_lr3e-4/version01/iter_2000.pth \
+    --backbone resnet50 \
+    --autodl
+
+
+
+
+
+
 #6、 SR_Unet_woSR-fpn_pretrained
 python train_odoc_supervised_2d_smp.py \
     --num_works 4        \

@@ -34,6 +34,7 @@ parser.add_argument('--sr_out_c',type=int,default=256,help='the out-channels of 
 parser.add_argument('--sr_pretrained',action='store_true')
 parser.add_argument('--decoder_attention_type',type=str,default=None,choices=['scse'])
 parser.add_argument('--ckpt_weight',type=str,default=None)
+parser.add_argument('--exclude_keys',type=str,default=None)
 # ==============model===================
 
 # ==============loss===================
