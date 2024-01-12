@@ -51,3 +51,23 @@ python train_odoc_supervised_2d_smp_aux.py \
     --backbone resnet50 \
     --fpn_pretrained \
     --autodl
+
+#myArray+=(item)
+
+python train_odoc_supervised_2d_smp_aux.py \
+    --num_works 2        \
+    --device 0         \
+    --exp RIM-ONE/Dual_Decoder_Unet/addHRF-CHASEDB1_resnet50/imgz256_bs8-4_Adam_warmup0_iterations-3000_polyv2_lr3e-4        \
+    --dataset_name RIM-ONE         \
+    --image_size 256         \
+    --model Dual_Decoder_Unet         \
+    --optim Adam         \
+    --batch_size 8         \
+    --labeled_bs 4         \
+    --warmup 0.0         \
+    --base_lr 0.0003         \
+    --max_iterations 3000         \
+    --backbone resnet50 \
+    --fpn_pretrained \
+    --add_vessel HRF-CHASEDB1 \
+    --autodl

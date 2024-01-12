@@ -161,7 +161,7 @@ if __name__ == '__main__':
     elif args.add_vessel == 'CHASEDB1':
         args.total_num = 127
     elif args.add_vessel == 'HRF-CHASEDB1':
-        args.total_num = 175
+        args.total_num = 172
     odoc_idxs = list(range(args.labeled_num))
     vessel_idxs = list(range(args.labeled_num,args.total_num))
 
