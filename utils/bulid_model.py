@@ -159,7 +159,7 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
 
     if ckpt_weight is not None:
         exclude_keys = args.exclude_keys
-        df = torch.load(ckpt_weight, map_location=lambda storage, loc: storage)
+        checkpoint = torch.load(ckpt_weight, map_location=lambda storage, loc: storage)
         filtered_checkpoint = {key: value for key, value in checkpoint.items() if
                                all(exclude_key not in key for exclude_key in exclude_keys)}
 

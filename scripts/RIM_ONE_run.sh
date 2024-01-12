@@ -14,6 +14,7 @@ python train_odoc_supervised_2d_smp.py \
     --max_iterations 3000         \
     --ckpt_weight /root/autodl-tmp/Semi_Zoo/exp_2d_vessel/DRIVE/UNet/resnet50/imgz256_bs8_Adam_warmup0_iterations-3000_polyv2_lr3e-4/version01/iter_2000.pth \
     --backbone resnet50 \
+    --exclude_keys segmentation_head \
     --autodl
 
 
