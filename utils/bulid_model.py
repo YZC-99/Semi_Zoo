@@ -165,7 +165,7 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             net.load_state_dict(filtered_checkpoint, strict = False)
         else:
             checkpoint = torch.load(ckpt_weight, map_location='cpu')
-            net.load_state_dict(filtered_checkpoint)
+            net.load_state_dict(checkpoint)
         print("===================================")
         print("成功加载权重:{}".format(ckpt_weight))
         print("===================================")
