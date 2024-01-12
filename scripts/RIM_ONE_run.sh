@@ -35,6 +35,24 @@ python train_odoc_supervised_2d_smp_aux_pseudo_vessel.py \
     --backbone resnet50 \
     --autodl
 
+python train_odoc_supervised_2d_smp_aux_pseudo_vessel.py \
+    --num_works 2        \
+    --device 0         \
+    --exp RIM-ONE/Dual_Decoder_Unet-PSEUDO-Vessel_v_cross_c/resnet50/imgz256_bs8-4_Adam_warmup0_iterations-3000_polyv2_lr3e-4        \
+    --dataset_name RIM-ONE         \
+    --image_size 256         \
+    --model Dual_Decoder_Unet         \
+    --optim Adam         \
+    --batch_size 8         \
+    --labeled_bs 4         \
+    --warmup 0.0         \
+    --base_lr 0.0003         \
+    --max_iterations 3000         \
+    --backbone resnet50 \
+    --v_cross_c \
+    --autodl
+
+
 
 #6、 SR_Unet_woSR-fpn_pretrained
 python train_odoc_supervised_2d_smp.py \

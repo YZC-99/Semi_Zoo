@@ -59,8 +59,8 @@ parser.add_argument('--labeled_bs',type=int,default=4)
 parser.add_argument('--labeled_num',type=int,default=99,help="RIM-ONE:99")
 parser.add_argument('--total_num',type=int,default=144,help="HRF:45--CHASEDB1:28--DRIVE:40")
 parser.add_argument('--vessel_loss_weight',type=float,default=0.1)
-
 parser.add_argument('--add_vessel',type=str,default='HRF',choices=['HRF','CHASEDB1','HRF-CHASEDB1','HRF-CHASEDB1-DRIVE'])
+parser.add_argument('--v_cross_c',action='store_true')
 
 
 # ==============training params===================
@@ -245,7 +245,8 @@ if __name__ == '__main__':
             odoc_labeled_batch = odoc_sampled_batch['image'].to(device)
             odoc_label_batch = odoc_sampled_batch['odoc_label'].to(device)
             pseudo_vessel_label_batch = odoc_sampled_batch['vessel_mask'].to(device)
-
+            if args.v_cross_c:
+                pseudo_vessel_label_batch[odoc_label_batch != 2] = 0
 
             vessel_labeled_batch, vessel_label_batch = vessel_sampled_batch['image'].to(device), vessel_sampled_batch[
                 'label'].to(device)
