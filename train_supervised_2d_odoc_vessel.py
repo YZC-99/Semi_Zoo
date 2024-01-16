@@ -215,7 +215,7 @@ if __name__ == '__main__':
             odoc_label_batch = labeled_sampled_batch['odoc_label'].to(device)
             pseudo_vessel_label_batch = labeled_sampled_batch['vessel_mask'].to(device)
 
-            if args.vessel_type == 'oc-rim5':
+            if 'oc-rim' in args.vessel_type :
                 # get the boundary of the oc
                 oc_label_batch = torch.zeros_like(odoc_label_batch)
                 oc_label_batch[odoc_label_batch == 2] = 1
