@@ -232,7 +232,8 @@ if __name__ == '__main__':
 
             if 'Dual' in args.model:
                 odoc_outputs,vessel_outputs = model(all_batch)
-                loss_seg_vessel = vessel_bce_loss(vessel_outputs,Kink_mask.float())
+                one_hot_Kink_mask = torch.nn.functional.one_hot(Kink_mask.to(torch.int64), num_classes=2).permute(0,3,1,2).float()
+                loss_seg_vessel = vessel_bce_loss(vessel_outputs,one_hot_Kink_mask)
             else:
                 odoc_outputs = model(all_batch)
 
@@ -283,7 +284,10 @@ if __name__ == '__main__':
                     show_id = random.randint(0,len(val_iteriter))
                     for id,data in enumerate(val_iteriter):
                         img,label = data['image'].to(device),data['label'].to(device)
-                        outputs = model(img)
+                        if 'Dual' in args.model:
+                            outputs,_ = model(img)
+                        else:
+                            outputs = model(img)
 
                         ODOC_val_metrics.add_multi_class(outputs.detach(),label)
 
