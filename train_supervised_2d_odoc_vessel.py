@@ -51,6 +51,7 @@ parser.add_argument('--with_dice',action='store_true')
 
 # ==============aux params===================
 parser.add_argument('--vessel_loss_weight',type=float,default=0.1)
+parser.add_argument('--vessel_type',type=str,default='oc-rim5')
 
 # ==============lr===================
 parser.add_argument('--base_lr',type=float,default=0.00025)
@@ -214,14 +215,23 @@ if __name__ == '__main__':
             odoc_label_batch = labeled_sampled_batch['odoc_label'].to(device)
             pseudo_vessel_label_batch = labeled_sampled_batch['vessel_mask'].to(device)
 
-            # get the boundary of the oc
-            oc_label_batch = torch.zeros_like(odoc_label_batch)
-            oc_label_batch[odoc_label_batch == 2] = 1
-            oc_boundary_label_batch = gt2boundary_tensor(oc_label_batch)
-            # get the area of the pseudo vessel cover the oc-boundary
-            Kink_mask = copy(oc_boundary_label_batch)
-            Kink_mask[Kink_mask != pseudo_vessel_label_batch] = 0
-
+            if args.vessel_type == 'oc-rim5':
+                # get the boundary of the oc
+                oc_label_batch = torch.zeros_like(odoc_label_batch)
+                oc_label_batch[odoc_label_batch == 2] = 1
+                boundary_width = int(args.vessel_type.split('oc-rim')[-1])
+                oc_boundary_label_batch = gt2boundary_tensor(oc_label_batch,boundary_width=boundary_width)
+                # get the area of the pseudo vessel cover the oc-boundary
+                vessel_mask = copy(oc_boundary_label_batch)
+                vessel_mask[vessel_mask != pseudo_vessel_label_batch] = 0
+            elif args.vessel_type == 'all-vessel':
+                vessel_mask = pseudo_vessel_label_batch
+            elif args.vessel_type == 'oc':
+                pseudo_vessel_label_batch[odoc_label_batch !=2] = 0
+                vessel_mask = pseudo_vessel_label_batch
+            elif args.vessel_type == 'od':
+                pseudo_vessel_label_batch[odoc_label_batch !=1] = 0
+                vessel_mask = pseudo_vessel_label_batch
 
             all_batch = odoc_labeled_batch
             all_label_batch = odoc_label_batch
@@ -232,8 +242,8 @@ if __name__ == '__main__':
 
             if 'Dual' in args.model:
                 odoc_outputs,vessel_outputs = model(all_batch)
-                one_hot_Kink_mask = torch.nn.functional.one_hot(Kink_mask.to(torch.int64), num_classes=2).permute(0,3,1,2).float()
-                loss_seg_vessel = vessel_bce_loss(vessel_outputs,one_hot_Kink_mask)
+                one_hot_vessel_mask = torch.nn.functional.one_hot(vessel_mask.to(torch.int64), num_classes=2).permute(0,3,1,2).float()
+                loss_seg_vessel = vessel_bce_loss(vessel_outputs,one_hot_vessel_mask)
             else:
                 odoc_outputs = model(all_batch)
 
