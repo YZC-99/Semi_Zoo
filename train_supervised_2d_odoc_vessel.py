@@ -1,98 +1,90 @@
 import random
 from tqdm import tqdm
-from dataloader.fundus import SemiDataset
-from dataloader.samplers import TwoStreamBatchSampler, LabeledBatchSampler,UnlabeledBatchSampler
+from dataloader.fundus import ODOC_Vessel_Dataset,SemiDataset
 import torch
 import glob
 import argparse
-import torch.optim as optim
-from torch.utils.data import DataLoader
-from torch.optim.lr_scheduler import StepLR,LambdaLR
 from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss,MSELoss
-from torch.cuda.amp import autocast,GradScaler
-import torch.nn.functional as F
-# from torch.utils.tensorboard import SummaryWriter
+from torch.utils.data import DataLoader, WeightedRandomSampler
 from tensorboardX import SummaryWriter
-from model.netwotks.unet import UNet, MCNet2d_compete_v1,UNet_DTC2d
-from model.netwotks.unet_two_decoder import UNet_two_Decoder,UNet_MiT,SR_UNet_two_Decoder,UNet_two_Out
-from utils import ramps,losses
-from utils.losses import OhemCrossEntropy
+import segmentation_models_pytorch as smp
+from utils.losses import OhemCrossEntropy,annealing_softmax_focalloss,softmax_focalloss,weight_softmax_focalloss
 from utils.test_utils import ODOC_metrics
+from utils.util import color_map,gray_to_color
 import random
-from utils.util import get_optimizer,PolyLRwithWarmup, compute_sdf,compute_sdf_luoxd,compute_sdf_multi_class
+from utils.util import get_optimizer,PolyLRwithWarmup
+from utils.boundary_utils import gt2boundary_tensor
+from utils.bulid_model import build_model
 import time
-import logging
 import os
-import shutil
 import logging
+import math
+from copy import copy
 import sys
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 
 parser = argparse.ArgumentParser()
+
+# ==============model===================
+parser.add_argument('--model',type=str,default='unet')
+parser.add_argument('--backbone',type=str,default='b2')
+parser.add_argument('--fpn_out_c',type=int,default=256,help='the out-channels of the FPN module')
+parser.add_argument('--fpn_pretrained',action='store_true')
+parser.add_argument('--sr_out_c',type=int,default=256,help='the out-channels of the SR module')
+parser.add_argument('--sr_pretrained',action='store_true')
+parser.add_argument('--decoder_attention_type',type=str,default=None,choices=['scse'])
+parser.add_argument('--ckpt_weight',type=str,default=None)
+parser.add_argument('--exclude_keys',type=str,default=None)
+# ==============model===================
+
+# ==============loss===================
+parser.add_argument('--ce_weight', type=float, nargs='+', default=[1.0,1.0,1.0], help='List of floating-point values')
+parser.add_argument('--ohem',type=float,default=-1.0)
+parser.add_argument('--annealing_softmax_focalloss',action='store_true')
+parser.add_argument('--softmax_focalloss',action='store_true')
+parser.add_argument('--weight_softmax_focalloss',action='store_true')
+parser.add_argument('--with_dice',action='store_true')
+# ==============loss===================
+
+
+# ==============aux params===================
+parser.add_argument('--vessel_loss_weight',type=float,default=0.1)
+
+# ==============lr===================
+parser.add_argument('--base_lr',type=float,default=0.00025)
+parser.add_argument('--lr_decouple',action='store_true')
+parser.add_argument('--warmup',type=float,default=0.01)
+parser.add_argument('--scheduler',type=str,default='poly-v2')
+# ==============lr===================
+
+# ==============training params===================
 parser.add_argument('--seed',type=int,default=42)
 parser.add_argument('--device',type=int,default=0)
 parser.add_argument('--num_works',type=int,default=0)
-parser.add_argument('--model',type=str,default='unet')
-parser.add_argument('--backbone',type=str,default='b2')
-parser.add_argument('--fuse_type',type=str,default=None)
-parser.add_argument('--lr_decouple',action='store_true')
-
-# parser.add_argument('--exp',type=str,default='supervised/RIM-ONE_Vessel')
-parser.add_argument('--exp',type=str,default='demo')
-
-
+parser.add_argument('--num_classes',type=int,default=3)
+parser.add_argument('--exp',type=str,default='RIM-ONE')
 parser.add_argument('--save_period',type=int,default=5000)
 parser.add_argument('--val_period',type=int,default=100)
-
 parser.add_argument('--dataset_name',type=str,default='RIM-ONE')
-parser.add_argument('--unlabeled_txt',type=str,default='unlabeled_addDDR.txt')
-
+parser.add_argument('--CLAHE',type=int,default=2)
 parser.add_argument('--optim',type=str,default='AdamW')
-parser.add_argument('--amp',type=bool,default=True)
-parser.add_argument('--num_classes',type=int,default=3)
-parser.add_argument('--base_lr',type=float,default=0.005)
-parser.add_argument('--vessel_loss_weight',type=float,default=0.1)
-parser.add_argument('--no_vessel_weight_decay',action='store_false')
-parser.add_argument('--CLAHE',action='store_true')
-parser.add_argument('--preprocess',action='store_true')
-
-parser.add_argument('--batch_size',type=int,default=16)
-parser.add_argument('--labeled_bs',type=int,default=8)
-
-parser.add_argument('--oc_label',type=int,default=2)
+parser.add_argument('--batch_size',type=int,default=4)
 parser.add_argument('--image_size',type=int,default=256)
-
-parser.add_argument('--labeled_num',type=int,default=99,help="RIM-ONE:99")
-parser.add_argument('--total_num',type=int,default=144,help="HRF:45")
-
-
-parser.add_argument('--scale_num',type=int,default=2)
 parser.add_argument('--max_iterations',type=int,default=10000)
-
-parser.add_argument('--ohem',type=float,default=-1.0)
-parser.add_argument('--ce_weight',action='store_true')
-parser.add_argument('--with_ce',action='store_false')
-parser.add_argument('--with_softfocal',action='store_true')
-parser.add_argument('--with_dice',action='store_true')
+parser.add_argument('--autodl',action='store_true')
 
 
 
-def build_model(model,backbone,in_chns,class_num1,class_num2,fuse_type):
-    if model == "UNet":
-        return UNet(in_chns=in_chns,class_num=class_num1)
-    elif model == 'UNet_MiT':
-        return UNet_MiT(in_chns=in_chns, class_num=class_num1,phi=backbone,pretrained=True)
-    elif model == 'UNet_two_Decoder':
-        return UNet_two_Decoder(in_chns=in_chns, class_num1=class_num1,class_num2=class_num2,phi=backbone,fuse_type=fuse_type)
-    elif model == 'SR_UNet_two_Decoder':
-        return SR_UNet_two_Decoder(in_chns=in_chns, class_num1=class_num1,class_num2=class_num2,phi=backbone)
-    elif model == 'UNet_two_Out':
-        return UNet_two_Out(in_chns=in_chns, class_num1=class_num1,class_num2=class_num2,phi=backbone,fuse_type=fuse_type)
 
-def get_vessel_loss_weight(iter):
-    # 发现训练容易塌陷，所以考虑对vessel的权重进行退火衰减
-    weight = args.vessel_loss_weight * ( 1 - iter / args.max_iterations)
-    return weight
+def step_decay(current_epoch,total_epochs=60,base_lr=0.0001):
+    initial_lrate = base_lr
+    epochs_drop = total_epochs
+    lrate = initial_lrate * math.pow(1-(1+current_epoch)/epochs_drop,0.9)
+    return lrate
+
+
 
 
 def create_version_folder(snapshot_path):
@@ -114,15 +106,17 @@ def create_version_folder(snapshot_path):
 
 
 args = parser.parse_args()
-snapshot_path = "./exp_2d/" + args.exp + "/"
+snapshot_path = "./exp_2d_odoc/" + args.exp + "/"
 max_iterations = args.max_iterations
 base_lr = args.base_lr
-labeled_bs = args.labeled_bs
 
 
 if __name__ == '__main__':
-    assert args.with_ce  or args.with_dice or args.with_softfocal,"ce , dice , focal至少有一个！！！！！"
-
+    """
+    1、搜寻snapshot_path下面的含有version的文件夹，如果没有就创建version0，即：
+    snapshot_path = snapshot_path + "/" + "version0"
+    2、如果有version的文件夹，如果当前文件夹下有version0和version01，则创建version02，以此类推
+    """
 
     if not os.path.exists(snapshot_path):
         os.makedirs(snapshot_path)
@@ -138,210 +132,188 @@ if __name__ == '__main__':
     logging.info(str(args))
 
     # init model
-    in_chns = 3
-    model = build_model(model=args.model,backbone=args.backbone,in_chns=in_chns,class_num1=args.num_classes,class_num2=2,fuse_type=args.fuse_type)
+    model = build_model(args,model=args.model,backbone=args.backbone,in_chns=3,class_num1=args.num_classes,class_num2=2,fuse_type=None,ckpt_weight=args.ckpt_weight)
     model.to(device)
 
     # init dataset
-    odoc_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
-                                  root="/home/gu721/yzc/data/odoc/{}".format(args.dataset_name),
+    root_base = '/home/gu721/yzc/data/odoc/'
+    if args.autodl:
+        root_base = '/root/autodl-tmp/'
+
+    labeled_dataset = ODOC_Vessel_Dataset(name='./dataset/{}'.format(args.dataset_name),
+                                  root="{}{}".format(root_base,args.dataset_name),
                                   mode='semi_train',
                                   size=args.image_size,
-                                  id_path='train_addHRF.txt',CLAHE=args.CLAHE,preprocess=args.preprocess)
-
-    vessel_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
-                                  root="/home/gu721/yzc/data/vessel/{}".format(''),
-                                  mode='semi_train',
-                                  size=args.image_size,
-                                  id_path='train_addHRF.txt',CLAHE=args.CLAHE,preprocess=args.preprocess)
-
-    odoc_idxs = list(range(args.labeled_num))
-    vessel_idxs = list(range(args.labeled_num,args.total_num))
-
-    odoc_batch_sampler = LabeledBatchSampler(odoc_idxs,labeled_bs)
-    vessel_batch_sampler = UnlabeledBatchSampler(vessel_idxs, args.batch_size - args.labeled_bs)
-
-    # init dataloader
-    def worker_init_fn(worker_id):
-        random.seed(args.seed + worker_id)
-    odoc_trainloader = DataLoader(odoc_dataset,batch_sampler = odoc_batch_sampler, num_workers=args.num_works, pin_memory=True,worker_init_fn=worker_init_fn)
-    vessel_trainloader = DataLoader(vessel_dataset,batch_sampler = vessel_batch_sampler, num_workers=args.num_works, pin_memory=True,worker_init_fn=worker_init_fn)
+                                  id_path='train.txt',
+                                  pseudo_vessel=True
+                                          )
 
 
 
-    model.train()
-    # init optimizer
-    # init optimizer
-    optimizer = get_optimizer(model=model,name=args.optim,base_lr=args.base_lr,lr_decouple=args.lr_decouple)
-
-    # scheduler = StepLR(optimizer,step_size=100,gamma=0.999)
-    scheduler = PolyLRwithWarmup(optimizer,total_steps=args.max_iterations,warmup_steps=args.max_iterations * 0.01)
-    # init summarywriter
-    writer = SummaryWriter(snapshot_path + '/log')
-
-    iter_num = 0
-    max_epoch = args.max_iterations // len(odoc_trainloader) + 1
-    lr_ = args.base_lr
-    model.train()
-
-    ce_loss_vessel = BCEWithLogitsLoss()
-    if args.ohem > 0:
-        ce_loss_odoc = OhemCrossEntropy(thres=args.ohem,weight=torch.tensor([1.0,4.0,8.0],device=device))
-    if args.ce_weight:
-        ce_loss_odoc = CrossEntropyLoss(weight=torch.tensor([1.0,4.0,8.0],device=device))
-    else:
-        ce_loss_odoc = CrossEntropyLoss()
-    # mse_loss = MSELoss()
-
+    labeledtrainloader = DataLoader(labeled_dataset,
+                                    batch_size=args.batch_size,
+                                    num_workers=args.num_works,
+                                    pin_memory=True,
+                                    shuffle=True
+                                    )
 
     # 验证集
     # init dataset
     val_dataset = SemiDataset(name='./dataset/{}'.format(args.dataset_name),
-                                    # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
-                                  root="/home/gu721/yzc/data/odoc/{}".format(args.dataset_name),
+                                  root="{}{}".format(root_base,args.dataset_name),
                                   mode='val',
-                                  size=args.image_size,CLAHE=args.CLAHE,preprocess=args.preprocess)
+                                  size=args.image_size)
 
-    val_labeledtrainloader = DataLoader(val_dataset,batch_size=1,num_workers=args.num_works)
+    val_labeledtrainloader = DataLoader(val_dataset,batch_size=1,num_workers=1)
     val_iteriter = tqdm(val_labeledtrainloader)
 
+    model.train()
+    # init optimizer
+    optimizer = get_optimizer(model=model,name=args.optim,base_lr=args.base_lr,lr_decouple=args.lr_decouple)
+
+
+    # scheduler = StepLR(optimizer,step_size=100,gamma=0.999)
+    scheduler = PolyLRwithWarmup(optimizer,total_steps=args.max_iterations,warmup_steps=args.max_iterations * args.warmup)
+
+    # init summarywriter
+    writer = SummaryWriter(snapshot_path + '/log')
+
+    iter_num = 0
+    max_epoch = args.max_iterations // len(labeledtrainloader) + 1
+    lr_ = args.base_lr
+    model.train()
+
+    vessel_bce_loss = BCEWithLogitsLoss()
+    # class_weights = [0.001,1.0,0.1,0.01,0.1]
+    class_weights = args.ce_weight
+    if args.ohem > 0:
+        # online hard example mining
+        ce_loss = OhemCrossEntropy(thres=args.ohem,weight=torch.tensor(class_weights,device=device))
+    else:
+        ce_loss = CrossEntropyLoss(ignore_index=255,weight=torch.tensor(class_weights,device=device))
+
+    dice_loss = smp.losses.DiceLoss(mode='multiclass',from_logits=True)
+    # mse_loss = MSELoss()
+
+
+
+
+    print("=================共计训练epoch: {}====================".format(max_epoch))
 
     # 开始训练
     iterator = tqdm(range(max_epoch), ncols=70)
-
     ODOC_val_metrics = ODOC_metrics(device)
     best_OD_DICE,best_OC_DICE = 0,0
     for epoch_num in iterator:
+        torch.cuda.empty_cache()
         time1 = time.time()
-        for i_batch,(odoc_sampled_batch,vessel_sampled_batch) in enumerate(zip(odoc_trainloader,vessel_trainloader)):
+        for i_batch,labeled_sampled_batch in enumerate(labeledtrainloader):
             time2 = time.time()
 
-            odoc_labeled_batch, odoc_label_batch = odoc_sampled_batch['image'].to(device), odoc_sampled_batch['label'].to(device)
-            vessel_labeled_batch, vessel_label_batch = vessel_sampled_batch['image'].to(device), vessel_sampled_batch['label'].to(device)
-            if args.preprocess:
-                odoc_labeled_batch_edges_info = odoc_sampled_batch['image_edges_info'].to(device)
-                vessel_labeled_batch_edges_info = vessel_sampled_batch['image_edges_info'].to(device)
+            odoc_labeled_batch = labeled_sampled_batch['image'].to(device)
+            odoc_label_batch = labeled_sampled_batch['odoc_label'].to(device)
+            pseudo_vessel_label_batch = labeled_sampled_batch['vessel_mask'].to(device)
 
-            all_batch = torch.cat([odoc_labeled_batch,vessel_labeled_batch],dim=0)
+            # get the boundary of the oc
+            oc_label_batch = torch.zeros_like(odoc_label_batch)
+            oc_label_batch[odoc_label_batch == 2] = 1
+            oc_boundary_label_batch = gt2boundary_tensor(oc_label_batch)
+            # get the area of the pseudo vessel cover the oc-boundary
+            Kink_mask = copy(oc_boundary_label_batch)
+            Kink_mask[Kink_mask != pseudo_vessel_label_batch] = 0
 
-            outputs_odoc,outputs_vessel = model(all_batch)
 
-            # calculate the loss of od and oc
-            odoc_label_batch[odoc_label_batch > 2] = 0
+            all_batch = odoc_labeled_batch
+            all_label_batch = odoc_label_batch
 
-            loss_seg_softfocal_odoc = torch.zeros(1,device=device)
-            loss_seg_dice_odoc = torch.zeros(1,device=device)
-            loss_seg_ce_odoc = ce_loss_odoc(outputs_odoc[:labeled_bs,...],odoc_label_batch)
-            loss_seg_ce_vessel = ce_loss_vessel(outputs_vessel[labeled_bs:,0, ...], vessel_label_batch.float())
+            loss_seg_dice = torch.zeros(1,device=device)
+            loss_seg_vessel = torch.zeros(1,device=device)
 
-            if args.with_dice:
-                outputs_odoc_soft = torch.argmax(outputs_odoc[:labeled_bs,...], dim=1)
-                loss_seg_dice_odoc = losses.dice_loss(outputs_odoc_soft, odoc_label_batch)
-            if not args.with_ce:
-                loss_seg_ce_odoc = torch.zeros(1,device=device)
-            if args.with_softfocal:
-                loss_seg_softfocal_odoc = losses.softmax_focalloss(outputs_odoc[:labeled_bs,...],odoc_label_batch)
 
-            if not args.no_vessel_weight_decay:
-                vessel_loss_weight = args.vessel_loss_weight
+            if 'Dual' in args.model:
+                odoc_outputs,vessel_outputs = model(all_batch)
+                loss_seg_vessel = vessel_bce_loss(vessel_outputs,Kink_mask.float())
             else:
-                vessel_loss_weight = get_vessel_loss_weight(iter_num)
-            loss = loss_seg_ce_odoc + \
-                   loss_seg_dice_odoc + \
-                   vessel_loss_weight * loss_seg_ce_vessel + \
-                   loss_seg_softfocal_odoc
+                odoc_outputs = model(all_batch)
+
+            loss_seg_ce = ce_loss(odoc_outputs,all_label_batch) + args.vessel_loss_weight * loss_seg_vessel
+
+            loss = loss_seg_ce
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            scheduler.step()
+
+            if args.scheduler == 'poly':
+                scheduler.step()
+            elif args.scheduler == 'poly-v2':
+                current_lr = step_decay(epoch_num,max_epoch,args.base_lr)
+                for param_group in optimizer.param_groups:
+                    param_group['lr'] = current_lr
 
             iter_num = iter_num + 1
             writer.add_scalar('lr', optimizer.param_groups[0]['lr'], iter_num)
             writer.add_scalar('loss/loss', loss, iter_num)
-            writer.add_scalar('loss/vessel_loss_weight', vessel_loss_weight, iter_num)
-            writer.add_scalar('loss/loss_seg_ce_odoc', loss_seg_ce_odoc, iter_num)
-            writer.add_scalar('loss/loss_seg_softfocal_odoc', loss_seg_softfocal_odoc, iter_num)
-            writer.add_scalar('loss/loss_seg_dice_odoc', loss_seg_dice_odoc, iter_num)
-            writer.add_scalar('loss/loss_seg_ce_vessel', loss_seg_ce_vessel, iter_num)
-
-            logging.info(
-                'iteration %d : loss : %f' %
-                (iter_num, loss.item()))
+            writer.add_scalar('loss/loss_seg', loss_seg_ce, iter_num)
+            writer.add_scalar('loss/loss_dice', loss_seg_dice, iter_num)
             writer.add_scalar('loss/loss', loss, iter_num)
-            logging.info('iteration %d : loss : %f' % (iter_num, loss.item()))
-            logging.info('iteration %d : loss_seg_ce_odoc : %f' % (iter_num, loss_seg_ce_odoc.item()))
-            logging.info('iteration %d : loss_seg_softfocal_odoc : %f' % (iter_num, loss_seg_softfocal_odoc.item()))
-            logging.info('iteration %d : loss_seg_dice_odoc : %f' % (iter_num, loss_seg_dice_odoc.item()))
-            logging.info('iteration %d : loss_seg_ce_vessel : %f' % (iter_num, loss_seg_ce_vessel.item()))
 
-            if iter_num % 50 == 0:
-                with torch.no_grad():
+
+            with torch.no_grad():
+                if iter_num % 50 == 0:
                     image = all_batch[0]
                     writer.add_image('train/Image', image, iter_num)
 
-
-                    image = torch.argmax(outputs_vessel,dim=1)
+                    image = torch.argmax(outputs,dim=1)
                     image = image[0]
-                    writer.add_image('train/Predicted_label_vessel', image.unsqueeze(0), iter_num)
-
-                    image = vessel_label_batch[0].unsqueeze(0)
-                    image = image / 2
-                    writer.add_image('train/Groundtruth_label_vessel',
-                                     image, iter_num)
-
-                    image = torch.argmax(outputs_odoc,dim=1)
-                    image = image[0] / (args.num_classes - 1)
-                    writer.add_image('train/Predicted_label', image.unsqueeze(0), iter_num)
+                    colored_image = gray_to_color(image, color_map)
+                    writer.add_image('train/Predicted_label', colored_image, iter_num,dataformats='CHW')
 
 
-                    image = odoc_label_batch[0].unsqueeze(0)
-                    image = image / (args.num_classes - 1)
+                    image = all_label_batch[0]
+                    colored_image = gray_to_color(image, color_map)
                     writer.add_image('train/Groundtruth_label',
-                                     image, iter_num)
+                                     colored_image, iter_num,dataformats='CHW')
 
 
             # eval
-            if iter_num % args.val_period == 0:
-                with torch.no_grad():
+            with torch.no_grad():
+                if iter_num % (54 / args.batch_size) == 0:
                     model.eval()
                     show_id = random.randint(0,len(val_iteriter))
                     for id,data in enumerate(val_iteriter):
                         img,label = data['image'].to(device),data['label'].to(device)
-                        outputs_odoc,_ = model(img)
+                        outputs = model(img)
 
-                        ODOC_val_metrics.add_multi_class(outputs_odoc,label)
+                        ODOC_val_metrics.add_multi_class(outputs.detach(),label)
 
                         if id == show_id:
                             image = img[0]
                             writer.add_image('val/image', image, iter_num)
-                            image = torch.argmax(outputs_odoc,dim=1)
-                            image = image[0] / (args.num_classes - 1)
-                            writer.add_image('val/pred', image.unsqueeze(0), iter_num)
-                            image = label
-                            image = image / (args.num_classes - 1)
-                            writer.add_image('val/Groundtruth_label',
-                                             image, iter_num)
 
-                    Dice_IoU = ODOC_val_metrics.get_metrics()
-                    OD_DICE,OD_IOU,OC_DICE,OC_IOU =  Dice_IoU['od_dice'],Dice_IoU['od_iou'],Dice_IoU['oc_dice'],Dice_IoU['oc_iou']
-                    OD_BIOU,OC_BIOU =  Dice_IoU['od_biou'],Dice_IoU['oc_biou']
-                    logging.info("OD_Dice:{}--OD_IoU:--{}--OC_Dice:{}--OC_IoU:--{}".format(
-                                                                                            OD_DICE,
-                                                                                            OD_IOU,
-                                                                                            OC_DICE,
-                                                                                           OC_IOU,
-                                                                                           ))
-                    writer.add_scalar('val/OD_Dice',OD_DICE, iter_num)
-                    writer.add_scalar('val/OD_IOU',OD_IOU, iter_num)
-                    writer.add_scalar('val/OD_BIOU',OD_BIOU, iter_num)
-                    writer.add_scalar('val/OC_Dice',OC_DICE, iter_num)
-                    writer.add_scalar('val/OC_IOU',OC_IOU, iter_num)
-                    writer.add_scalar('val/OC_BIOU',OC_BIOU, iter_num)
+                            image = torch.argmax(outputs,dim=1)
+                            image = gray_to_color(image,color_map)
+                            writer.add_image('val/pred', image, iter_num,dataformats='CHW')
+                            image = label
+                            image = gray_to_color(image,color_map)
+                            writer.add_image('val/Groundtruth_label',
+                                             image, iter_num,dataformats='CHW')
+                    torch.cuda.empty_cache()
+                    val_metrics = ODOC_val_metrics.get_metrics()
+                    OD_DICE, OD_IOU, OC_DICE, OC_IOU = val_metrics['od_dice'], val_metrics['od_iou'], val_metrics['oc_dice'], \
+                                                       val_metrics['oc_iou']
+                    OD_BIOU, OC_BIOU = val_metrics['od_biou'], val_metrics['oc_biou']
+                    writer.add_scalar('val/OD_Dice', OD_DICE, iter_num)
+                    writer.add_scalar('val/OD_IOU', OD_IOU, iter_num)
+                    writer.add_scalar('val/OD_BIOU', OD_BIOU, iter_num)
+                    writer.add_scalar('val/OC_Dice', OC_DICE, iter_num)
+                    writer.add_scalar('val/OC_IOU', OC_IOU, iter_num)
+                    writer.add_scalar('val/OC_BIOU', OC_BIOU, iter_num)
+                    model.train()
 
                     if OD_DICE > best_OD_DICE:
                         best_OD_DICE = OD_DICE
-                        name = "OD_DICE" + str(round(best_OD_DICE.item(), 4)) +'_iter_' + str(iter_num)  + '.pth'
+                        name = "OD_DICE" + str(round(best_OD_DICE.item(), 4)) + '_iter_' + str(iter_num) + '.pth'
                         save_mode_path = os.path.join(
                             snapshot_path, name)
 
@@ -357,26 +329,21 @@ if __name__ == '__main__':
                         previous_files = glob.glob(os.path.join(snapshot_path, '*OC_DICE*.pth'))
                         for file_path in previous_files:
                             os.remove(file_path)
-                        name = "OC_DICE" + str(round(best_OC_DICE.item(), 4)) +'_iter_' + str(iter_num)  + '.pth'
+                        name = "OC_DICE" + str(round(best_OC_DICE.item(), 4)) + '_iter_' + str(iter_num) + '.pth'
                         save_mode_path = os.path.join(
                             snapshot_path, name)
                         torch.save(model.state_dict(), save_mode_path)
                         logging.info("save model to {}".format(save_mode_path))
-                model.train()
-            # change lr
-            # if iter_num % 2500 == 0:
-            #     lr_ = base_lr * 0.1 ** (iter_num // 2500)
-            #     for param_group in optimizer.param_groups:
-            #         param_group['lr'] = lr_
-            if iter_num % args.save_period == 0:
-                save_mode_path = os.path.join(
-                    snapshot_path, 'iter_' + str(iter_num) + '.pth')
-                torch.save(model.state_dict(), save_mode_path)
-                logging.info("save model to {}".format(save_mode_path))
 
-            if iter_num >= max_iterations:
-                break
-            time1 = time.time()
+                if iter_num % args.save_period == 0:
+                    save_mode_path = os.path.join(
+                        snapshot_path, 'iter_' + str(iter_num) + '.pth')
+                    torch.save(model.state_dict(), save_mode_path)
+                    # logging.info("save model to {}".format(save_mode_path))
+
+                if iter_num >= max_iterations:
+                    break
+                time1 = time.time()
         if iter_num >= max_iterations:
             iterator.close()
             break

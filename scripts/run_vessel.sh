@@ -1,9 +1,12 @@
+
+
+
 #1、 UNet
-python train_vessel_supervised_2d_smp.py \
+python train_supervised_2d_odoc_vessel.py \
     --num_works 4        \
     --device 0         \
-    --exp DRIVE/UNet/resnet50/imgz256_bs8_Adam_warmup0_iterations-3000_polyv2_lr3e-4        \
-    --dataset_name DRIVE        \
+    --exp RIM-ONE_only-pseudo-cover-oc-rim-5p/UNet/resnet50/imgz256_bs8_Adam_warmup0_iterations-3000_polyv2_lr3e-4        \
+    --dataset_name RIM-ONE        \
     --image_size 256         \
     --model UNet         \
     --optim Adam         \
@@ -14,4 +17,5 @@ python train_vessel_supervised_2d_smp.py \
     --backbone resnet50 \
     --save_period 500 \
     --autodl
+
 
