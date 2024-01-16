@@ -252,8 +252,18 @@ if __name__ == '__main__':
                 odoc_label_batch[odoc_label_batch > 2] = 0
                 loss_seg_dice = torch.zeros(1,device=device)
                 loss_seg_ce_odoc = ce_loss(outputs_odoc[:labeled_bs,...],odoc_label_batch)
-                loss_seg_ce_vessel1 = vessel_ce_loss(outputs_vessel[labeled_bs:,0, ...], vessel_label_batch.float())
-                loss_seg_ce_vessel2 = vessel_ce_loss(outputs_vessel[:labeled_bs,0, ...], pseudo_vessel_label_batch.float())
+
+                one_hot_vessel_label_batch = torch.nn.functional.one_hot(vessel_label_batch.to(torch.int64), num_classes=2).permute(0, 3,
+                                                                                                                  1,
+                                                                                                                  2).float()
+
+                one_hot_pseudo_vessel_label_batch = torch.nn.functional.one_hot(pseudo_vessel_label_batch.to(torch.int64),
+                                                                         num_classes=2).permute(0, 3,
+                                                                                                1,
+                                                                                                2).float()
+
+                loss_seg_ce_vessel1 = vessel_ce_loss(outputs_vessel[labeled_bs:,...], one_hot_vessel_label_batch)
+                loss_seg_ce_vessel2 = vessel_ce_loss(outputs_vessel[:labeled_bs,...], one_hot_pseudo_vessel_label_batch)
                 loss_seg_ce_vessel = loss_seg_ce_vessel1 + loss_seg_ce_vessel2
 
                 loss_seg_ce = loss_seg_ce_odoc + args.vessel_loss_weight * loss_seg_ce_vessel

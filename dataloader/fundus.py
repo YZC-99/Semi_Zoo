@@ -121,19 +121,6 @@ class ODOC_Vessel_Dataset(Dataset):
     def __init__(self,name, root, mode, size,
                  id_path=None,
                  pseudo_vessel = False ):
-        """
-        :param name: dataset name, pascal or cityscapes
-        :param root: root path of the dataset.
-        :param mode: train: supervised learning only with labeled images, no unlabeled images are leveraged.
-                     label: pseudo labeling the remaining unlabeled images.
-                     semi_train: semi-supervised learning with both labeled and unlabeled images.
-                     val: validation.
-
-        :param size: crop size of training images.
-        :param labeled_id_path: path of labeled image ids, needed in train or semi_train mode.
-        :param unlabeled_id_path: path of unlabeled image ids, needed in semi_train or label mode.
-        :param pseudo_mask_path: path of generated pseudo masks, needed in semi_train mode.
-        """
 
         self.name = name
         self.root = root
