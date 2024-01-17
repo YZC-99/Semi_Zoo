@@ -273,12 +273,13 @@ if __name__ == '__main__':
             else:
                 if args.KinkLoss > 0:
                     features = model.forward_logits(all_batch)
+                    loss_kink = args.KinkLoss * kink_loss(features, odoc_labeled_batch, vessel_mask)
+
                     odoc_outputs = model.forward_seg(features)
                 else:
                     odoc_outputs = model(all_batch)
 
             if args.KinkLoss > 0:
-                loss_kink = args.KinkLoss * kink_loss(features,odoc_labeled_batch,vessel_mask)
                 loss_seg_ce = ce_loss(odoc_outputs, all_label_batch) + loss_kink
             else:
                 loss_seg_ce = ce_loss(odoc_outputs,all_label_batch) + args.vessel_loss_weight * loss_seg_vessel
