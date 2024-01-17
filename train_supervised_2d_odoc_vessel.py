@@ -6,6 +6,7 @@ import glob
 import argparse
 from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss,MSELoss
 from torch.utils.data import DataLoader, WeightedRandomSampler
+from utils.vessel_prior_loss import KinkLoss
 from tensorboardX import SummaryWriter
 import segmentation_models_pytorch as smp
 from utils.losses import OhemCrossEntropy,annealing_softmax_focalloss,softmax_focalloss,weight_softmax_focalloss
@@ -50,6 +51,8 @@ parser.add_argument('--with_dice',action='store_true')
 
 
 # ==============aux params===================
+parser.add_argument('--KinkLoss',type=float,default=-1)
+
 parser.add_argument('--vessel_loss_weight',type=float,default=0.1)
 parser.add_argument('--vessel_type',type=str,default='oc-rim5')
 
@@ -259,16 +262,24 @@ if __name__ == '__main__':
 
             loss_seg_dice = torch.zeros(1,device=device)
             loss_seg_vessel = torch.zeros(1,device=device)
+            loss_kink_loss = torch.zeros(1,device=device)
 
-
+            features = 0
             if 'Dual' in args.model:
                 odoc_outputs,vessel_outputs = model(all_batch)
                 one_hot_vessel_mask = torch.nn.functional.one_hot(vessel_mask.to(torch.int64), num_classes=2).permute(0,3,1,2).float()
                 loss_seg_vessel = vessel_bce_loss(vessel_outputs,one_hot_vessel_mask)
             else:
-                odoc_outputs = model(all_batch)
+                if args.KinkLoss > 0:
+                    features = model.forward_logits(all_batch)
+                    odoc_outputs = model.forward_seg(features)
+                else:
+                    odoc_outputs = model(all_batch)
 
-            loss_seg_ce = ce_loss(odoc_outputs,all_label_batch) + args.vessel_loss_weight * loss_seg_vessel
+            if args.KinkLoss > 0:
+                loss_seg_ce = ce_loss(odoc_outputs, all_label_batch) + args.KinkLoss * loss_kink_loss(features,odoc_labeled_batch,vessel_mask)
+            else:
+                loss_seg_ce = ce_loss(odoc_outputs,all_label_batch) + args.vessel_loss_weight * loss_seg_vessel
 
             loss = loss_seg_ce
 
@@ -287,6 +298,7 @@ if __name__ == '__main__':
             writer.add_scalar('lr', optimizer.param_groups[0]['lr'], iter_num)
             writer.add_scalar('loss/loss', loss, iter_num)
             writer.add_scalar('loss/loss_seg', loss_seg_ce, iter_num)
+            writer.add_scalar('loss/loss_kink_loss', loss_kink_loss, iter_num)
             writer.add_scalar('loss/loss_dice', loss_seg_dice, iter_num)
             writer.add_scalar('loss/loss', loss, iter_num)
 
