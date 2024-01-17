@@ -278,7 +278,7 @@ if __name__ == '__main__':
                     odoc_outputs = model(all_batch)
 
             if args.KinkLoss > 0:
-                loss_kink = args.KinkLoss * kink_loss(features, odoc_labeled_batch, vessel_mask)
+                loss_kink = args.KinkLoss * kink_loss(features, odoc_label_batch, vessel_mask)
                 loss_seg_ce = ce_loss(odoc_outputs, all_label_batch) + loss_kink
             else:
                 loss_seg_ce = ce_loss(odoc_outputs,all_label_batch) + args.vessel_loss_weight * loss_seg_vessel
