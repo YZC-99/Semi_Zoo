@@ -1,7 +1,7 @@
 python train_supervised_2d_odoc_vessel.py \
     --num_works 4        \
     --device 0         \
-    --exp RIM-ONE/UNet_KinkLoss1e/resnet50_only-pseudo-cover-oc-rim-50p/imgz256_bs8_AdamW_warmup0_iterations-4000_polyv2_lr3e-4        \
+    --exp RIM-ONE/UNet_KinkLoss1e/resnet50_only-pseudo-cover-oc-rim-50p/center-no-detach    \
     --dataset_name RIM-ONE        \
     --image_size 256         \
     --model UNet        \

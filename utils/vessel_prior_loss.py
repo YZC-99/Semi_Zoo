@@ -15,33 +15,53 @@ class KinkLoss(nn.Module):
         oc_features_center = torch.mean(features_at_oc,dim=0,keepdim=True)
         return oc_features_center
 
-    def forward(self, features, odoc_mask, kink_mask):
-        """
-        :param features: 语义分割模型的logits输出
-        :param odoc_mask: 包含0，1，2的标签
-        :param kink_mask: 只包含0和1的标签
-        :return: CE Loss
-        """
+
+    def mse(self, features, odoc_mask, kink_mask):
+
 
         # 获取 kink_mask 中值为 1 的位置的索引
         kink_indices = torch.nonzero(kink_mask == 1, as_tuple=False)
 
-        # odoc_mask_at_kink = torch.zeros_like(odoc_mask)
-
-        # 从 features 和 odoc_mask 中提取对应索引位置的值
         features_at_kink = features[kink_indices[:, 0], :, kink_indices[:, 1], kink_indices[:, 2]]
-        # odoc_mask_at_kink = odoc_mask[kink_indices[:, 0], kink_indices[:, 1], kink_indices[:, 2]]
-        # odoc_mask_at_kink[kink_mask == 1] = 1
 
         oc_features_center = self.oc_features_center(features, odoc_mask)
         oc_features_center = oc_features_center.tile((features_at_kink.shape[0],1))
 
-        # simi = F.cosine_similarity(oc_features_center, features_at_kink)
-        #
-        # odoc_mask_at_kink = torch.reshape(odoc_mask_at_kink,(simi.shape[0],-1))
-        # 计算交叉熵损失
         mse_loss = F.mse_loss(oc_features_center, features_at_kink)
-        # mse_loss = F.mse_loss(simi, odoc_mask_at_kink.float())
+        return mse_loss
+
+
+    def cos_mse(self, features, odoc_mask, kink_mask):
+
+        # 获取 kink_mask 中值为 1 的位置的索引
+        kink_indices = torch.nonzero(kink_mask == 1, as_tuple=False)
+
+        odoc_mask_at_kink = torch.zeros_like(odoc_mask)
+
+        # 从 features 和 odoc_mask 中提取对应索引位置的值
+        features_at_kink = features[kink_indices[:, 0], :, kink_indices[:, 1], kink_indices[:, 2]]
+        odoc_mask_at_kink[kink_mask == 1] = 1
+
+        oc_features_center = self.oc_features_center(features, odoc_mask)
+        oc_features_center = oc_features_center.tile((features_at_kink.shape[0],1))
+
+        simi = F.cosine_similarity(oc_features_center, features_at_kink)
+        #
+        odoc_mask_at_kink = torch.reshape(odoc_mask_at_kink,(simi.shape[0],-1))
+        # 计算交叉熵损失
+        mse_loss = F.mse_loss(simi, odoc_mask_at_kink.float())
+
+
+        if torch.isnan(mse_loss):
+            return torch.zeros(1,device=features.device)
+        return mse_loss
+
+
+    def forward(self, features, odoc_mask, kink_mask,mse_type='mse'):
+        if mse_type == 'mse':
+            mse_loss = self.mse(features, odoc_mask, kink_mask)
+        else:
+            mse_loss = self.cos_mse(features, odoc_mask, kink_mask)
 
 
         if torch.isnan(mse_loss):
