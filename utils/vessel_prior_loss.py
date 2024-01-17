@@ -29,10 +29,11 @@ class KinkLoss(nn.Module):
         # 从 features 和 odoc_mask 中提取对应索引位置的值
         features_at_kink = features[kink_indices[:, 0], :, kink_indices[:, 1], kink_indices[:, 2]]
         odoc_mask_at_kink = odoc_mask[kink_indices[:, 0], kink_indices[:, 1], kink_indices[:, 2]]
+
         oc_features_center = self.oc_features_center(features, odoc_mask)
         oc_features_center = oc_features_center.tile((features_at_kink.shape[0],1))
 
-        simi = F.cosine_similarity(oc_features_center.detach(), features_at_kink)
+        simi = F.cosine_similarity(oc_features_center, features_at_kink)
 
         # 计算交叉熵损失
         # mse_loss = F.mse_loss(oc_features_center.detach(), features_at_kink)
