@@ -224,6 +224,16 @@ if __name__ == '__main__':
                 # get the area of the pseudo vessel cover the oc-boundary
                 vessel_mask = copy(oc_boundary_label_batch)
                 vessel_mask[vessel_mask != pseudo_vessel_label_batch] = 0
+
+            elif 'all-oc-rim' in args.vessel_type:
+                # get the boundary of the oc
+                oc_label_batch = torch.zeros_like(odoc_label_batch)
+                oc_label_batch[odoc_label_batch == 2] = 1
+                boundary_width = int(args.vessel_type.split('all-oc-rim')[-1])
+                oc_boundary_label_batch = gt2boundary_tensor(oc_label_batch, boundary_width=boundary_width)
+                # get the area of the pseudo vessel cover the oc-boundary
+                vessel_mask = oc_boundary_label_batch
+
             elif 'minus-od-rim' in args.vessel_type :
                 # get the boundary of the od
                 od_label_batch = torch.zeros_like(odoc_label_batch)
@@ -327,10 +337,15 @@ if __name__ == '__main__':
                     val_metrics = ODOC_val_metrics.get_metrics()
                     OD_DICE, OD_IOU, OC_DICE, OC_IOU = val_metrics['od_dice'], val_metrics['od_iou'], val_metrics['oc_dice'], \
                                                        val_metrics['oc_iou']
+                    OD_rim_DICE, OD_rim_IOU = val_metrics['od_rim_dice'],val_metrics['od_rim_iou']
                     OD_BIOU, OC_BIOU = val_metrics['od_biou'], val_metrics['oc_biou']
                     writer.add_scalar('val/OD_Dice', OD_DICE, iter_num)
                     writer.add_scalar('val/OD_IOU', OD_IOU, iter_num)
                     writer.add_scalar('val/OD_BIOU', OD_BIOU, iter_num)
+
+                    writer.add_scalar('val/OD_rim_DICE', OD_rim_DICE, iter_num)
+                    writer.add_scalar('val/OD_rim_IOU', OD_rim_IOU, iter_num)
+
                     writer.add_scalar('val/OC_Dice', OC_DICE, iter_num)
                     writer.add_scalar('val/OC_IOU', OC_IOU, iter_num)
                     writer.add_scalar('val/OC_BIOU', OC_BIOU, iter_num)

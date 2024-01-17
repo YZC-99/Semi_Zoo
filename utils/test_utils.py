@@ -8,7 +8,9 @@ import numpy as np
 class ODOC_metrics(object):
     def __init__(self,device):
         self.od_dice_score = Dice(num_classes=1, multiclass=False,average='samples').to(device)
+        self.od_rim_dice_score = Dice(num_classes=1, multiclass=False,average='samples').to(device)
         self.od_binary_jaccard = JaccardIndex(num_classes=2, task='binary', average='micro').to(device)
+        self.od_rim_binary_jaccard = JaccardIndex(num_classes=2, task='binary', average='micro').to(device)
         self.od_binary_boundary_jaccard = BoundaryIoU(num_classes=2, task='binary').to(device)
 
         self.oc_dice_score = Dice(num_classes=1, multiclass=False,average='samples').to(device)
@@ -25,6 +27,15 @@ class ODOC_metrics(object):
         self.od_dice_score.update(od_pred,od_label)
         self.od_binary_jaccard.update(od_pred,od_label)
         self.od_binary_boundary_jaccard.update(od_pred,od_label)
+
+        # 不包含oc的od
+        od_rim_pred = torch.zeros_like(pred)
+        od_rim_label = torch.zeros_like(label)
+        od_rim_pred[pred == 1] = 1
+        od_rim_label[label == 1] = 1
+        self.od_rim_dice_score.update(od_rim_pred, od_rim_label)
+        self.od_rim_binary_jaccard.update(od_rim_pred, od_rim_label)
+
         #oc
         oc_pred = torch.zeros_like(pred)
         oc_label = torch.zeros_like(label)
@@ -61,12 +72,18 @@ class ODOC_metrics(object):
         od_dice = self.od_dice_score.compute()
         od_iou = self.od_binary_jaccard.compute()
         od_biou = self.od_binary_boundary_jaccard.compute()
+
+        od_rim_dice = self.od_rim_dice_score.compute()
+        od_rim_iou = self.od_rim_binary_jaccard.compute()
+
         oc_dice = self.oc_dice_score.compute()
         oc_iou = self.oc_binary_jaccard.compute()
         oc_biou = self.oc_binary_boundary_jaccard.compute()
         self.od_dice_score.reset()
         self.od_binary_jaccard.reset()
         self.od_binary_boundary_jaccard.reset()
+        self.od_rim_dice_score.reset()
+        self.od_rim_binary_jaccard.reset()
         self.oc_dice_score.reset()
         self.oc_binary_jaccard.reset()
         self.oc_binary_boundary_jaccard.reset()
@@ -74,6 +91,8 @@ class ODOC_metrics(object):
                    "od_dice":od_dice,
                    "od_iou":od_iou,
                    "od_biou":od_biou,
+                   "od_rim_dice":od_rim_dice,
+                   "od_rim_iou":od_rim_iou,
                    "oc_dice":oc_dice,
                    "oc_iou":oc_iou,
                    "oc_biou":oc_biou,
