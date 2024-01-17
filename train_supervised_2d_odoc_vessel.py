@@ -224,14 +224,16 @@ if __name__ == '__main__':
                 # get the area of the pseudo vessel cover the oc-boundary
                 vessel_mask = copy(oc_boundary_label_batch)
                 vessel_mask[vessel_mask != pseudo_vessel_label_batch] = 0
-            elif 'od-rim' in args.vessel_type :
+            elif 'minus-od-rim' in args.vessel_type :
                 # get the boundary of the od
                 od_label_batch = torch.zeros_like(odoc_label_batch)
                 od_label_batch[odoc_label_batch == 1] = 1
-                boundary_width = int(args.vessel_type.split('od-rim')[-1])
+                boundary_width = int(args.vessel_type.split('minus-od-rim')[-1])
                 od_boundary_label_batch = gt2boundary_tensor(od_label_batch,boundary_width=boundary_width)
+                # minus the od-rim
+                od_label_batch[od_boundary_label_batch > 0] = 0
                 # get the area of the pseudo vessel cover the od-boundary
-                vessel_mask = copy(od_boundary_label_batch)
+                vessel_mask = copy(od_label_batch)
                 vessel_mask[vessel_mask != pseudo_vessel_label_batch] = 0
             elif args.vessel_type == 'all-vessel':
                 vessel_mask = pseudo_vessel_label_batch
