@@ -261,15 +261,21 @@ if __name__ == '__main__':
             all_batch = odoc_labeled_batch
             all_label_batch = odoc_label_batch
 
+            loss_seg_ce = torch.zeros(1,device=device)
             loss_seg_dice = torch.zeros(1,device=device)
             loss_seg_vessel = torch.zeros(1,device=device)
             loss_kink = torch.zeros(1,device=device)
 
             features = 0
             if 'Dual' in args.model:
-                odoc_outputs,vessel_outputs = model(all_batch)
-                one_hot_vessel_mask = torch.nn.functional.one_hot(vessel_mask.to(torch.int64), num_classes=2).permute(0,3,1,2).float()
-                loss_seg_vessel = vessel_bce_loss(vessel_outputs,one_hot_vessel_mask)
+                if args.KinkLoss > 0:
+                    features1,features2 = model.forward_logits(all_batch)
+                    odoc_outputs,vessel_outputs = model.forward_seg(features1,features2)
+                    loss_seg_vessel = vessel_bce_loss(vessel_outputs, one_hot_vessel_mask)
+                else:
+                    odoc_outputs,vessel_outputs = model(all_batch)
+                    one_hot_vessel_mask = torch.nn.functional.one_hot(vessel_mask.to(torch.int64), num_classes=2).permute(0,3,1,2).float()
+                    loss_seg_vessel = vessel_bce_loss(vessel_outputs,one_hot_vessel_mask)
             else:
                 if args.KinkLoss > 0:
                     features = model.forward_logits(all_batch)
@@ -277,13 +283,14 @@ if __name__ == '__main__':
                 else:
                     odoc_outputs = model(all_batch)
 
+            loss_seg_ce = ce_loss(odoc_outputs, all_label_batch)
+
             if args.KinkLoss > 0:
                 loss_kink = args.KinkLoss * kink_loss(features, odoc_label_batch, vessel_mask)
-                loss_seg_ce = ce_loss(odoc_outputs, all_label_batch) + loss_kink
-            else:
-                loss_seg_ce = ce_loss(odoc_outputs,all_label_batch) + args.vessel_loss_weight * loss_seg_vessel
+            if args.vessel_loss_weight > 0:
+                loss_seg_vessel =  args.vessel_loss_weight * loss_seg_vessel
 
-            loss = loss_seg_ce
+            loss = loss_seg_ce + loss_kink + loss_seg_vessel
 
             optimizer.zero_grad()
             loss.backward()

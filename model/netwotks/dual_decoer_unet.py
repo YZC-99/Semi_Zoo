@@ -77,6 +77,26 @@ class Dual_Decoder_Unet(SegmentationModel):
         self.name = "u-{}".format(encoder_name)
         self.initialize()
 
+
+
+    def forward_logits(self, x):
+        """Sequentially pass `x` trough model`s encoder, decoder and heads"""
+
+        self.check_input_shape(x)
+
+        features = self.encoder(x)
+        decoder_output = self.decoder(*features)
+        decoder_output2 = self.decoder2(*features)
+
+        return decoder_output,decoder_output2
+
+    def forward_seg(self, logits1,logits2):
+
+        masks = self.segmentation_head(logits1)
+        masks2 = self.segmentation_head2(logits2)
+
+        return masks,masks2
+
     def forward(self, x):
         """Sequentially pass `x` trough model`s encoder, decoder and heads"""
 
