@@ -101,13 +101,13 @@ if __name__ == '__main__':
     # backbone='densenet161'
     in_chns = 3
     class_num1 = 5
-
-    model = SR_Unet(
-        encoder_name=backbone,
-        encoder_weights='imagenet',
-        in_channels=in_chns,
-        fpn_out_channels=256,
-        classes=class_num1,
-    )
-    out = model(data)
-    print(out.shape)
+    #
+    # model = SR_Unet(
+    #     encoder_name=backbone,
+    #     encoder_weights='imagenet',
+    #     in_channels=in_chns,
+    #     fpn_out_channels=256,
+    #     classes=class_num1,
+    # )
+    # out = model(data)
+    # print(out.shape)

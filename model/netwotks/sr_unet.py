@@ -134,6 +134,31 @@ class SR_Unet(SegmentationModel):
         self.name = "u-{}".format(encoder_name)
         self.initialize()
 
+    def forward_logits(self, x):
+        """Sequentially pass `x` trough model`s encoder, decoder and heads"""
+
+        self.check_input_shape(x)
+
+        features = self.encoder(x)
+
+        c_last = self.gap(features[-1])
+
+        fpn_features = self.fpn(features[-4:])
+
+        refined_fpn_feature = self.sr(c_last, fpn_features)
+        features[-4:] = refined_fpn_feature
+
+
+        decoder_output = self.decoder(*features)
+
+        return decoder_output
+
+    def forward_seg(self, logits):
+
+        masks = self.segmentation_head(logits)
+
+        return masks
+
     def forward(self, x):
         """Sequentially pass `x` trough model`s encoder, decoder and heads"""
 
@@ -142,17 +167,11 @@ class SR_Unet(SegmentationModel):
         features = self.encoder(x)
 
         c_last = self.gap(features[-1])
-        # if self.zero_layer:
-        #     org_feature = features.pop(1)
 
         fpn_features = self.fpn(features[-4:])
 
         refined_fpn_feature = self.sr(c_last, fpn_features)
         features[-4:] = refined_fpn_feature
-        # if self.zero_layer:
-        #     refined_fpn_feature_list = list(refined_fpn_feature)
-        #     refined_fpn_feature_list.insert(1,org_feature)
-        #     refined_fpn_feature = tuple(refined_fpn_feature_list)
 
 
         decoder_output = self.decoder(*features)
@@ -405,6 +424,27 @@ class SR_Unet_woFPN(SegmentationModel):
 
         self.name = "u-{}".format(encoder_name)
         self.initialize()
+    def forward_logits(self, x):
+        """Sequentially pass `x` trough model`s encoder, decoder and heads"""
+
+        self.check_input_shape(x)
+
+        features = self.encoder(x)
+
+        c_last = self.gap(features[-1])
+
+
+        refined_feature = self.sr(c_last, features)
+
+        decoder_output = self.decoder(*refined_feature)
+        return decoder_output
+
+    def forward_seg(self, logits):
+
+        masks = self.segmentation_head(logits)
+
+        return masks
+
 
     def forward(self, x):
         """Sequentially pass `x` trough model`s encoder, decoder and heads"""
@@ -522,6 +562,24 @@ class SR_Unet_woSR(SegmentationModel):
 
         self.name = "u-{}".format(encoder_name)
         self.initialize()
+
+    def forward_logits(self, x):
+        self.check_input_shape(x)
+
+        features = self.encoder(x)
+
+        fpn_features = self.fpn(features)
+
+        decoder_output = self.decoder(*fpn_features)
+
+        return decoder_output
+
+    def forward_seg(self, logits):
+
+        masks = self.segmentation_head(logits)
+
+        return masks
+
 
     def forward(self, x):
         """Sequentially pass `x` trough model`s encoder, decoder and heads"""
