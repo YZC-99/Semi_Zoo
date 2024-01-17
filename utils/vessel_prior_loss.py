@@ -28,13 +28,17 @@ class KinkLoss(nn.Module):
 
         # 从 features 和 odoc_mask 中提取对应索引位置的值
         features_at_kink = features[kink_indices[:, 0], :, kink_indices[:, 1], kink_indices[:, 2]]
-        # odoc_mask_at_kink = odoc_mask[kink_indices[:, 0], kink_indices[:, 1], kink_indices[:, 2]]
+        odoc_mask_at_kink = odoc_mask[kink_indices[:, 0], kink_indices[:, 1], kink_indices[:, 2]]
         oc_features_center = self.oc_features_center(features, odoc_mask)
         oc_features_center = oc_features_center.tile((features_at_kink.shape[0],1))
-        # 计算交叉熵损失
 
-        mse_loss = F.mse_loss(oc_features_center.detach(), features_at_kink)
-        # mse_loss = F.cosine_similarity(oc_features_center.detach(), features_at_kink)
+        simi = F.cosine_similarity(oc_features_center.detach(), features_at_kink)
+
+        # 计算交叉熵损失
+        # mse_loss = F.mse_loss(oc_features_center.detach(), features_at_kink)
+        mse_loss = F.mse_loss(simi, odoc_mask_at_kink.float())
+
+
         if torch.isnan(mse_loss):
             return torch.zeros(1,device=features.device)
         return mse_loss
@@ -43,7 +47,7 @@ if __name__ == '__main__':
 
 
     features = torch.randn(4,256,128,128)
-    odoc_mask = torch.ones(4,1,128,128) * 2
+    odoc_mask = torch.ones(4,128,128) * 2
     vessel_mask = torch.ones_like(odoc_mask)
     kink_loss = KinkLoss()
     loss = kink_loss(features,odoc_mask,vessel_mask)
