@@ -27,7 +27,7 @@ class KinkLoss(nn.Module):
         oc_features_center = self.oc_features_center(features, odoc_mask)
         oc_features_center = oc_features_center.tile((features_at_kink.shape[0],1))
 
-        mse_loss = F.mse_loss(oc_features_center, features_at_kink)
+        mse_loss = F.mse_loss(oc_features_center.detach(), features_at_kink)
         return mse_loss
 
 
@@ -44,7 +44,7 @@ class KinkLoss(nn.Module):
         oc_features_center = self.oc_features_center(features, odoc_mask)
         oc_features_center = oc_features_center.tile((features_at_kink.shape[0],1))
 
-        simi = F.cosine_similarity(oc_features_center, features_at_kink)
+        simi = F.cosine_similarity(oc_features_center.detach(), features_at_kink)
         # 计算交叉熵损失
         mse_loss = F.mse_loss(simi, odoc_mask_at_kink.float())
 
