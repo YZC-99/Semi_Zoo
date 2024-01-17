@@ -197,6 +197,7 @@ if __name__ == '__main__':
         ce_loss = CrossEntropyLoss(ignore_index=255,weight=torch.tensor(class_weights,device=device))
 
     dice_loss = smp.losses.DiceLoss(mode='multiclass',from_logits=True)
+    kink_loss = KinkLoss()
     # mse_loss = MSELoss()
 
 
@@ -262,7 +263,7 @@ if __name__ == '__main__':
 
             loss_seg_dice = torch.zeros(1,device=device)
             loss_seg_vessel = torch.zeros(1,device=device)
-            loss_kink_loss = torch.zeros(1,device=device)
+            loss_kink = torch.zeros(1,device=device)
 
             features = 0
             if 'Dual' in args.model:
@@ -277,7 +278,8 @@ if __name__ == '__main__':
                     odoc_outputs = model(all_batch)
 
             if args.KinkLoss > 0:
-                loss_seg_ce = ce_loss(odoc_outputs, all_label_batch) + args.KinkLoss * loss_kink_loss(features,odoc_labeled_batch,vessel_mask)
+                loss_kink = args.KinkLoss * kink_loss(features,odoc_labeled_batch,vessel_mask)
+                loss_seg_ce = ce_loss(odoc_outputs, all_label_batch) + loss_kink
             else:
                 loss_seg_ce = ce_loss(odoc_outputs,all_label_batch) + args.vessel_loss_weight * loss_seg_vessel
 
@@ -298,7 +300,7 @@ if __name__ == '__main__':
             writer.add_scalar('lr', optimizer.param_groups[0]['lr'], iter_num)
             writer.add_scalar('loss/loss', loss, iter_num)
             writer.add_scalar('loss/loss_seg', loss_seg_ce, iter_num)
-            writer.add_scalar('loss/loss_kink_loss', loss_kink_loss, iter_num)
+            writer.add_scalar('loss/loss_kink', loss_kink, iter_num)
             writer.add_scalar('loss/loss_dice', loss_seg_dice, iter_num)
             writer.add_scalar('loss/loss', loss, iter_num)
 

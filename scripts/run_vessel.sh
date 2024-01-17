@@ -12,7 +12,6 @@ python train_supervised_2d_odoc_vessel.py \
     --max_iterations 4000         \
     --backbone resnet50 \
     --vessel_type oc-rim50 \
-    --vessel_loss_weight 0.1 \
     --KinkLoss 1.0 \
     --autodl
 
