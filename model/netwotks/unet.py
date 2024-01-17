@@ -85,9 +85,7 @@ class Unet(SegmentationModel):
             labels = self.classification_head(features[-1])
             return masks, labels
 
-        return {"masks":masks,
-                "logits":decoder_output
-                }
+        return masks
 
 
 if __name__ == '__main__':

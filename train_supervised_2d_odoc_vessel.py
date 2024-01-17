@@ -265,17 +265,20 @@ if __name__ == '__main__':
             loss_seg_vessel = torch.zeros(1,device=device)
             loss_kink = torch.zeros(1,device=device)
 
+            features = 0
             if 'Dual' in args.model:
                 odoc_outputs,vessel_outputs = model(all_batch)
                 one_hot_vessel_mask = torch.nn.functional.one_hot(vessel_mask.to(torch.int64), num_classes=2).permute(0,3,1,2).float()
                 loss_seg_vessel = vessel_bce_loss(vessel_outputs,one_hot_vessel_mask)
             else:
-                outputs = model(all_batch)
-                odoc_outputs = outputs['masks']
-                odoc_features = outputs['logits']
+                if args.KinkLoss > 0:
+                    features = model.forward_logits(all_batch)
+                    odoc_outputs = model.forward_seg(features)
+                else:
+                    odoc_outputs = model(all_batch)
 
             if args.KinkLoss > 0:
-                loss_kink = args.KinkLoss * kink_loss(odoc_features, odoc_labeled_batch, vessel_mask)
+                loss_kink = args.KinkLoss * kink_loss(features, odoc_labeled_batch, vessel_mask)
                 loss_seg_ce = ce_loss(odoc_outputs, all_label_batch) + loss_kink
             else:
                 loss_seg_ce = ce_loss(odoc_outputs,all_label_batch) + args.vessel_loss_weight * loss_seg_vessel
