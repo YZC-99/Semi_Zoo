@@ -271,7 +271,8 @@ if __name__ == '__main__':
                 if args.KinkLoss > 0:
                     features1,features2 = model.forward_logits(all_batch)
                     odoc_outputs,vessel_outputs = model.forward_seg(features1,features2)
-                    loss_seg_vessel = vessel_bce_loss(vessel_outputs, one_hot_vessel_mask)
+                    one_hot_vessel_mask = torch.nn.functional.one_hot(vessel_mask.to(torch.int64), num_classes=2).permute(0,3,1,2).float()
+                    loss_seg_vessel = vessel_bce_loss(vessel_outputs,one_hot_vessel_mask)
                 else:
                     odoc_outputs,vessel_outputs = model(all_batch)
                     one_hot_vessel_mask = torch.nn.functional.one_hot(vessel_mask.to(torch.int64), num_classes=2).permute(0,3,1,2).float()
