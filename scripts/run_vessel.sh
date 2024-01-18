@@ -1,10 +1,10 @@
 python train_supervised_2d_odoc_vessel.py \
     --num_works 4        \
     --device 0         \
-    --exp REFUGE/SR_Unet_woSR/no-kink-loss/resnet50_only-pseudo-cover-oc-rim-50p  \
+    --exp REFUGE/Dual_Decoder_SR_Unet_woSR/no-kink-loss/resnet50_only-pseudo-cover-oc-rim-50p  \
     --dataset_name REFUGE        \
     --image_size 256         \
-    --model SR_Unet_woSR        \
+    --model Dual_Decoder_SR_Unet_woSR        \
     --optim Adam         \
     --batch_size 8         \
     --warmup 0.0         \

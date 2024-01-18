@@ -1,8 +1,6 @@
 import torch
 import torch.nn as nn
 
-from fightingcv_attention.attention.SGE import SpatialGroupEnhance
-from fightingcv_attention.attention.DANet import PositionAttentionModule,ChannelAttentionModule
 from torch.nn import init
 
 class SCSEModule(nn.Module):
@@ -19,22 +17,6 @@ class SCSEModule(nn.Module):
 
     def forward(self, x):
         return x * self.cSE(x) + x * self.sSE(x)
-
-
-class DAModule(nn.Module):
-
-    def __init__(self, in_channels=512, kernel_size=3, H=7, W=7):
-        super().__init__()
-        self.position_attention_module = PositionAttentionModule(d_model=in_channels, kernel_size=3, H=7, W=7)
-        self.channel_attention_module = ChannelAttentionModule(d_model=in_channels, kernel_size=3, H=7, W=7)
-
-    def forward(self, input):
-        bs, c, h, w = input.shape
-        p_out = self.position_attention_module(input)
-        c_out = self.channel_attention_module(input)
-        p_out = p_out.permute(0, 2, 1).view(bs, c, h, w)
-        c_out = c_out.view(bs, c, h, w)
-        return p_out + c_out
 
 
 class PSAModule(nn.Module):
@@ -153,8 +135,7 @@ class Attention(nn.Module):
             self.attention = SCSEModule(**params)
         elif name == 'psa':
             self.attention = PSAModule(**params)
-        elif name == 'dam':
-            self.attention = DAModule(**params)
+
         else:
             raise ValueError("Attention {} is not implemented".format(name))
 
