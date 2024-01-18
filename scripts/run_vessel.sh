@@ -1,21 +1,51 @@
 python train_supervised_2d_odoc_vessel.py \
-    --num_works 4        \
+    --num_works 8        \
     --device 0         \
-    --exp RIM-ONE/Dual_Decoder_Unet_KinkLoss1e_aux-vessel-1e-1/resnet50_only-pseudo-cover-oc-rim-50p/center-detach    \
-    --dataset_name RIM-ONE        \
+    --exp REFUGE/UNet-kink-loss/resnet50_only-pseudo-cover-oc-rim-50p  \
+    --dataset_name REFUGE        \
     --image_size 256         \
-    --model Dual_Decoder_Unet        \
+    --model UNet        \
     --optim Adam         \
     --batch_size 8         \
     --warmup 0.0         \
     --base_lr 0.0003         \
-    --max_iterations 4000         \
+    --max_iterations 5000         \
     --backbone resnet50 \
     --vessel_type oc-rim50 \
     --KinkLoss 1.0 \
     --autodl
 
+center-detach
+    --fpn_pretrained \
 
+
+    --decoder_attention_type scse \
+
+
+
+
+
+python train_odoc_supervised_2d_smp.py \
+    --num_works 4        \
+    --device 0         \
+    --exp CLAHE4-8-REFUGE/UNet/resnet50  \
+    --dataset_name CLAHE4-8-REFUGE        \
+    --image_size 256         \
+    --model UNet        \
+    --optim Adam         \
+    --batch_size 8         \
+    --warmup 0.0         \
+    --base_lr 0.0003         \
+    --max_iterations 5000         \
+    --backbone resnet50 \
+    --autodl
+
+
+    --decoder_attention_type scse \
+
+SR_Unet_woSR-fpn_pretrained
+        --fpn_pretrained \
+        UNet
 
 
 

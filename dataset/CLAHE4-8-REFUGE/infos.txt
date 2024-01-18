@@ -1,0 +1,5 @@
+background_ratio:0.795
+od_ratio:0.151
+oc_ratio:0.054
+
+[1.0,4.0,12.0]

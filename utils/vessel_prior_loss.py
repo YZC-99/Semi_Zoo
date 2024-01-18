@@ -28,6 +28,7 @@ class KinkLoss(nn.Module):
         oc_features_center = oc_features_center.tile((features_at_kink.shape[0],1))
 
         mse_loss = F.mse_loss(oc_features_center.detach(), features_at_kink)
+        F.triplet_margin_loss()
         return mse_loss
 
 
