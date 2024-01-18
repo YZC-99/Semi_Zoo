@@ -1,10 +1,10 @@
 python train_supervised_2d_odoc_vessel.py \
-    --num_works 8        \
+    --num_works 4        \
     --device 0         \
-    --exp REFUGE/UNet-kink-loss/resnet50_only-pseudo-cover-oc-rim-50p  \
+    --exp REFUGE/SR_Unet_woSR/no-kink-loss/resnet50_only-pseudo-cover-oc-rim-50p  \
     --dataset_name REFUGE        \
     --image_size 256         \
-    --model UNet        \
+    --model SR_Unet_woSR        \
     --optim Adam         \
     --batch_size 8         \
     --warmup 0.0         \
@@ -12,7 +12,7 @@ python train_supervised_2d_odoc_vessel.py \
     --max_iterations 5000         \
     --backbone resnet50 \
     --vessel_type oc-rim50 \
-    --KinkLoss 1.0 \
+    --KinkLoss -1 \
     --autodl
 
 center-detach

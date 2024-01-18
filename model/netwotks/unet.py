@@ -6,7 +6,8 @@ from segmentation_models_pytorch.base import (
     SegmentationHead,
     ClassificationHead,
 )
-from segmentation_models_pytorch.decoders.unet.decoder import UnetDecoder
+# from segmentation_models_pytorch.decoders.unet.decoder import UnetDecoder
+from model.netwotks.unet_decoder import UnetDecoder
 
 class Unet(SegmentationModel):
     def __init__(
