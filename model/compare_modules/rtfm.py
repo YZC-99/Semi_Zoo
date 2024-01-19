@@ -1,4 +1,3 @@
-from fightingcv_attention.attention.CBAM import CBAMBlock
 import torch
 import torch.nn as nn
 from torch.nn import init
