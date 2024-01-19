@@ -1,7 +1,7 @@
 python train_supervised_2d_odoc_vessel.py \
     --num_works 4        \
     --device 0         \
-    --exp REFUGE/Dual_Decoder_SR_Unet_woSR/Kink-loss/resnet50_only-pseudo-cover-oc-rim-50p  \
+    --exp REFUGE/Dual_Decoder_SR_Unet_woSR-Kink-loss/dice-loss/resnet50_only-pseudo-cover-oc-rim-50p  \
     --dataset_name REFUGE        \
     --image_size 256         \
     --model Dual_Decoder_SR_Unet_woSR        \
@@ -13,6 +13,7 @@ python train_supervised_2d_odoc_vessel.py \
     --backbone resnet50 \
     --vessel_type oc-rim50 \
     --KinkLoss 1.0 \
+    --main_criteria dice \
     --autodl
 
 center-detach

@@ -283,7 +283,7 @@ if __name__ == '__main__':
                 else:
                     odoc_outputs = model(all_batch)
 
-            loss_seg_main = criteria(args, outputs, all_label_batch, iter_num)
+            loss_seg_main = criteria(args, odoc_outputs, all_label_batch, iter_num)
             # loss_seg_ce = ce_loss(odoc_outputs, all_label_batch)
 
             if args.KinkLoss > 0:
