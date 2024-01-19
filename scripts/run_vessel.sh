@@ -26,10 +26,10 @@ center-detach
 python train_odoc_supervised_2d_smp.py \
     --num_works 4        \
     --device 0         \
-    --exp CLAHE4-8-REFUGE/UNet/resnet50  \
-    --dataset_name CLAHE4-8-REFUGE        \
+    --exp REFUGE/Unet_wRTFM/resnet50  \
+    --dataset_name REFUGE        \
     --image_size 256         \
-    --model UNet        \
+    --model Unet_wRTFM        \
     --optim Adam         \
     --batch_size 8         \
     --warmup 0.0         \
