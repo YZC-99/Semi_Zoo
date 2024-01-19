@@ -327,6 +327,34 @@ class Dual_Decoder_SR_Unet(SegmentationModel):
         self.name = "u-{}".format(encoder_name)
         self.initialize()
 
+
+    def forward_logits(self, x):
+        """Sequentially pass `x` trough model`s encoder, decoder and heads"""
+
+        self.check_input_shape(x)
+
+        features = self.encoder(x)
+
+        c_last = self.gap(features[-1])
+
+        fpn_features = self.fpn(features[-4:])
+
+        refined_fpn_feature = self.sr(c_last, fpn_features)
+        features[-4:] = refined_fpn_feature
+
+        decoder_output = self.decoder(*features)
+        decoder_output2 = self.decoder2(*features)
+
+
+        return decoder_output,decoder_output2
+
+    def forward_seg(self, logits1,logits2):
+
+        masks = self.segmentation_head(logits1)
+        masks2 = self.segmentation_head2(logits2)
+
+        return masks,masks2
+
     def forward(self, x):
         """Sequentially pass `x` trough model`s encoder, decoder and heads"""
 
@@ -345,7 +373,7 @@ class Dual_Decoder_SR_Unet(SegmentationModel):
         decoder_output2 = self.decoder2(*features)
 
         masks = self.segmentation_head(decoder_output)
-        masks2 = self.segmentation_head2(decoder_output)
+        masks2 = self.segmentation_head2(decoder_output2)
 
         if self.classification_head is not None:
             labels = self.classification_head(features[-1])
@@ -451,6 +479,31 @@ class Dual_Decoder_SR_Unet_woFPN(SegmentationModel):
 
         self.name = "u-{}".format(encoder_name)
         self.initialize()
+
+
+    def forward_logits(self, x):
+        """Sequentially pass `x` trough model`s encoder, decoder and heads"""
+
+        self.check_input_shape(x)
+
+        features = self.encoder(x)
+
+        c_last = self.gap(features[-1])
+
+
+        refined_feature = self.sr(c_last, features)
+
+        decoder_output = self.decoder(*refined_feature)
+        decoder_output2 = self.decoder2(*refined_feature)
+
+        return decoder_output,decoder_output2
+
+    def forward_seg(self, logits1,logits2):
+
+        masks = self.segmentation_head(logits1)
+        masks2 = self.segmentation_head2(logits2)
+
+        return masks,masks2
 
     def forward(self, x):
         """Sequentially pass `x` trough model`s encoder, decoder and heads"""

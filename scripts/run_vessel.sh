@@ -1,19 +1,19 @@
 python train_supervised_2d_odoc_vessel.py \
     --num_works 4        \
     --device 0         \
-    --exp REFUGE/Dual_Decoder_SR_Unet_woSR-Kink-loss/dice-loss/resnet50_only-pseudo-cover-oc-rim-50p  \
+    --exp REFUGE/Dual_Decoder_SR_Unet_woSR-Kink-loss/hyperparam  \
     --dataset_name REFUGE        \
     --image_size 256         \
     --model Dual_Decoder_SR_Unet_woSR        \
     --optim Adam         \
     --batch_size 8         \
     --warmup 0.0         \
-    --base_lr 0.0003         \
-    --max_iterations 5000         \
+    --base_lr 0.0006         \
+    --max_iterations 2500         \
     --backbone resnet50 \
     --vessel_type oc-rim50 \
     --KinkLoss 1.0 \
-    --main_criteria dice \
+    --main_criteria ce \
     --autodl
 
 center-detach
