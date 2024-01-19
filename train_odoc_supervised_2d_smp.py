@@ -11,6 +11,7 @@ import segmentation_models_pytorch as smp
 from utils.losses import OhemCrossEntropy,annealing_softmax_focalloss,softmax_focalloss,weight_softmax_focalloss
 from utils.test_utils import ODOC_metrics
 from utils.util import color_map,gray_to_color
+from utils.training_utils import criteria
 import random
 from utils.util import get_optimizer,PolyLRwithWarmup, compute_sdf,compute_sdf_luoxd,compute_sdf_multi_class
 from utils.bulid_model import build_model
@@ -38,12 +39,11 @@ parser.add_argument('--exclude_keys',type=str,default=None)
 # ==============model===================
 
 # ==============loss===================
-parser.add_argument('--ce_weight', type=float, nargs='+', default=[1.0,1.0,1.0], help='List of floating-point values')
-parser.add_argument('--ohem',type=float,default=-1.0)
-parser.add_argument('--annealing_softmax_focalloss',action='store_true')
-parser.add_argument('--softmax_focalloss',action='store_true')
-parser.add_argument('--weight_softmax_focalloss',action='store_true')
-parser.add_argument('--with_dice',action='store_true')
+parser.add_argument('--main_criteria', type=str, default='ce',choices=['ce','dice','ce-dice','softmax_focal','annealing_softmax_focal'])
+# parser.add_argument('--ce_weight', type=float, nargs='+', default=[1.0,1.0,1.0], help='List of floating-point values')
+# parser.add_argument('--ohem',type=float,default=-1.0)
+# parser.add_argument('--annealing_softmax_focalloss',action='store_true')
+# parser.add_argument('--softmax_focalloss',action='store_true')
 # ==============loss===================
 
 # ==============lr===================
@@ -181,17 +181,17 @@ if __name__ == '__main__':
     lr_ = args.base_lr
     model.train()
 
-    # ce_loss = BCEWithLogitsLoss()
-    # class_weights = [0.001,1.0,0.1,0.01,0.1]
-    class_weights = args.ce_weight
-    if args.ohem > 0:
-        # online hard example mining
-        ce_loss = OhemCrossEntropy(thres=args.ohem,weight=torch.tensor(class_weights,device=device))
-    else:
-        ce_loss = CrossEntropyLoss(ignore_index=255,weight=torch.tensor(class_weights,device=device))
-
-    dice_loss = smp.losses.DiceLoss(mode='multiclass',from_logits=True)
-    # mse_loss = MSELoss()
+    # # ce_loss = BCEWithLogitsLoss()
+    # # class_weights = [0.001,1.0,0.1,0.01,0.1]
+    # class_weights = args.ce_weight
+    # if args.ohem > 0:
+    #     # online hard example mining
+    #     ce_loss = OhemCrossEntropy(thres=args.ohem,weight=torch.tensor(class_weights,device=device))
+    # else:
+    #     ce_loss = CrossEntropyLoss(ignore_index=255,weight=torch.tensor(class_weights,device=device))
+    #
+    # dice_loss = smp.losses.DiceLoss(mode='multiclass',from_logits=True)
+    # # mse_loss = MSELoss()
 
 
 
@@ -215,25 +215,10 @@ if __name__ == '__main__':
 
             outputs = model(all_batch)
 
-            loss_seg_dice = torch.zeros(1,device=device)
-            # calculate the loss
-            outputs_soft = torch.argmax(outputs,dim=1)
-            all_label_batch[all_label_batch > 2] = 0
-            if args.annealing_softmax_focalloss:
-                loss_seg_ce = annealing_softmax_focalloss(outputs,all_label_batch,
-                                                         t=iter_num,t_max=args.max_iterations * 0.6)
-            elif args.softmax_focalloss:
-                loss_seg_ce = softmax_focalloss(outputs,all_label_batch)
-            elif args.weight_softmax_focalloss:
-                loss_seg_ce = weight_softmax_focalloss(outputs,all_label_batch,weight=torch.tensor(class_weights,device=device))
-            else:
-                loss_seg_ce = ce_loss(outputs,all_label_batch)
 
-            if args.with_dice:
-                loss_seg_dice = dice_loss(outputs,all_label_batch)
-                loss = loss_seg_ce + loss_seg_dice
-            else:
-                loss = loss_seg_ce
+            loss_seg_main = criteria(args,outputs,all_label_batch,iter_num)
+            loss = loss_seg_main
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -248,9 +233,7 @@ if __name__ == '__main__':
             iter_num = iter_num + 1
             writer.add_scalar('lr', optimizer.param_groups[0]['lr'], iter_num)
             writer.add_scalar('loss/loss', loss, iter_num)
-            writer.add_scalar('loss/loss_seg', loss_seg_ce, iter_num)
-            writer.add_scalar('loss/loss_dice', loss_seg_dice, iter_num)
-            writer.add_scalar('loss/loss', loss, iter_num)
+            writer.add_scalar('loss/loss_seg_main', loss_seg_main, iter_num)
 
 
             with torch.no_grad():

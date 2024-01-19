@@ -16,6 +16,7 @@ import random
 from utils.util import get_optimizer,PolyLRwithWarmup
 from utils.boundary_utils import gt2boundary_tensor
 from utils.bulid_model import build_model
+from utils.training_utils import criteria
 import time
 import os
 import logging
@@ -41,6 +42,7 @@ parser.add_argument('--exclude_keys',type=str,default=None)
 # ==============model===================
 
 # ==============loss===================
+parser.add_argument('--main_criteria', type=str, default='ce',choices=['ce','dice','ce-dice','softmax_focal','annealing_softmax_focal'])
 parser.add_argument('--ce_weight', type=float, nargs='+', default=[1.0,1.0,1.0], help='List of floating-point values')
 parser.add_argument('--ohem',type=float,default=-1.0)
 parser.add_argument('--annealing_softmax_focalloss',action='store_true')
@@ -52,7 +54,6 @@ parser.add_argument('--with_dice',action='store_true')
 
 # ==============aux params===================
 parser.add_argument('--KinkLoss',type=float,default=-1)
-
 parser.add_argument('--vessel_loss_weight',type=float,default=0.1)
 parser.add_argument('--vessel_type',type=str,default='oc-rim5')
 
@@ -261,8 +262,6 @@ if __name__ == '__main__':
             all_batch = odoc_labeled_batch
             all_label_batch = odoc_label_batch
 
-            loss_seg_ce = torch.zeros(1,device=device)
-            loss_seg_dice = torch.zeros(1,device=device)
             loss_seg_vessel = torch.zeros(1,device=device)
             loss_kink = torch.zeros(1,device=device)
 
@@ -284,14 +283,15 @@ if __name__ == '__main__':
                 else:
                     odoc_outputs = model(all_batch)
 
-            loss_seg_ce = ce_loss(odoc_outputs, all_label_batch)
+            loss_seg_main = criteria(args, outputs, all_label_batch, iter_num)
+            # loss_seg_ce = ce_loss(odoc_outputs, all_label_batch)
 
             if args.KinkLoss > 0:
                 loss_kink = args.KinkLoss * kink_loss(features, odoc_label_batch, vessel_mask)
             if args.vessel_loss_weight > 0:
                 loss_seg_vessel =  args.vessel_loss_weight * loss_seg_vessel
 
-            loss = loss_seg_ce + loss_kink + loss_seg_vessel
+            loss = loss_seg_main + loss_kink + loss_seg_vessel
 
             optimizer.zero_grad()
             loss.backward()
@@ -307,10 +307,8 @@ if __name__ == '__main__':
             iter_num = iter_num + 1
             writer.add_scalar('lr', optimizer.param_groups[0]['lr'], iter_num)
             writer.add_scalar('loss/loss', loss, iter_num)
-            writer.add_scalar('loss/loss_seg', loss_seg_ce, iter_num)
+            writer.add_scalar('loss/loss_seg_main', loss_seg_main, iter_num)
             writer.add_scalar('loss/loss_kink', loss_kink, iter_num)
-            writer.add_scalar('loss/loss_dice', loss_seg_dice, iter_num)
-            writer.add_scalar('loss/loss', loss, iter_num)
 
 
             with torch.no_grad():

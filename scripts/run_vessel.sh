@@ -1,7 +1,7 @@
 python train_supervised_2d_odoc_vessel.py \
     --num_works 4        \
     --device 0         \
-    --exp REFUGE/Dual_Decoder_SR_Unet_woSR/kink-loss/resnet50_only-pseudo-cover-oc-rim-50p  \
+    --exp REFUGE/Dual_Decoder_SR_Unet_woSR/Kink-loss/resnet50_only-pseudo-cover-oc-rim-50p  \
     --dataset_name REFUGE        \
     --image_size 256         \
     --model Dual_Decoder_SR_Unet_woSR        \
@@ -17,8 +17,6 @@ python train_supervised_2d_odoc_vessel.py \
 
 center-detach
     --fpn_pretrained \
-
-
 
 
 
@@ -41,7 +39,7 @@ python train_odoc_supervised_2d_smp.py \
 
 
     --decoder_attention_type scse \
-
+Dual_Decoder_Unet
 SR_Unet_woSR-fpn_pretrained
         --fpn_pretrained \
         UNet
@@ -54,10 +52,10 @@ SR_Unet_woSR-fpn_pretrained
 python train_supervised_2d_odoc_vessel.py \
     --num_works 4        \
     --device 0         \
-    --exp RIM-ONE/Dual_Decoder_SR_Unet_vessel-sr_pretrained-fpn_pretrained/resnet50_only-pseudo-cover-oc-rim-50p/imgz256_bs8_AdamW_warmup0_iterations-4000_polyv2_lr3e-4        \
+    --exp RIM-ONE/Dual_Decoder_Unet/resnet50_only-pseudo-cover-oc-rim-50p/imgz256_bs8_AdamW_warmup0_iterations-4000_polyv2_lr3e-4        \
     --dataset_name RIM-ONE        \
     --image_size 256         \
-    --model Dual_Decoder_SR_Unet         \
+    --model Dual_Decoder_Unet         \
     --optim AdamW         \
     --batch_size 8         \
     --warmup 0.0         \
