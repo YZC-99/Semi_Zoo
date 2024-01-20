@@ -98,6 +98,35 @@ class RTFM(nn.Module):
         return mlp_out + residual_1
 
 
+class SA_after_FPN(nn.Module):
+
+    def __init__(self, fpn_out_channels, h=12,dropout=.1):
+        super(SA_after_FPN, self).__init__()
+
+        self.sa_layers = []
+        for idx,in_channels in enumerate(fpn_out_channels,1):
+            sa_layer = 'sa_layer{}'.format(idx)
+            sa_layer_module = ScaledDotProductAttention( in_channels, 64, 64, h,dropout)
+            self.add_module(sa_layer,sa_layer_module)
+            self.sa_layers.append(sa_layer)
+
+
+    def forward(self, fpn_features1,fpn_features2):
+
+        for idx,(feature1,feature2,sa) in enumerate(zip(fpn_features1,fpn_features2,self.sa_layers)):
+            b,c,h,w = feature1.size()
+            seq_feature1 = feature1.reshape(b, c, -1)
+            seq_feature1 = seq_feature1.permute(0, 2, 1)
+            seq_feature2 = feature2.reshape(b, c, -1)
+            seq_feature2 = seq_feature2.permute(0, 2, 1)
+            seq_output = getattr(self,sa)(seq_feature1,seq_feature1,seq_feature2)
+
+            seq_output = seq_output.permute(0, 2, 1)
+            sa_feature_output = seq_output.reshape(b, c, h, w)
+            feature1[idx] = sa_feature_output
+        return fpn_features1
+
+
 
 
 if __name__ == '__main__':

@@ -1,10 +1,10 @@
 python train_supervised_2d_odoc_vessel.py \
     --num_works 4        \
     --device 0         \
-    --exp REFUGE/Dual_Decoder_SR_Unet_woSR/Kink-loss/6e-1  \
+    --exp REFUGE/Dual_Decoder_Unet_DualFPN_CrossAttention/ \
     --dataset_name REFUGE        \
     --image_size 256         \
-    --model Dual_Decoder_SR_Unet_woSR        \
+    --model Dual_Decoder_Unet_DualFPN_CrossAttention        \
     --optim Adam         \
     --batch_size 8         \
     --warmup 0.0         \
@@ -12,7 +12,7 @@ python train_supervised_2d_odoc_vessel.py \
     --max_iterations 5000         \
     --backbone resnet50 \
     --vessel_type oc-rim50 \
-    --KinkLoss 0.6 \
+    --KinkLoss -1.0 \
     --main_criteria ce \
     --autodl
 

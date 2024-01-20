@@ -10,6 +10,7 @@ from segmentation_models_pytorch.decoders.unet.decoder import UnetDecoder
 from model.module.gap import GlobalAvgPool2D
 from model.module import fpn
 from model.module.farseg import SceneRelation
+from model.compare_modules.rtfm import SA_after_FPN
 
 
 class Dual_Decoder_Unet(SegmentationModel):
@@ -683,3 +684,162 @@ class Dual_Decoder_SR_Unet_woSR(SegmentationModel):
             return masks, labels
 
         return masks,masks2
+
+
+class Dual_Decoder_Unet_DualFPN_CrossAttention(SegmentationModel):
+
+    def __init__(
+            self,
+            encoder_name: str = "resnet34",
+            encoder_depth: int = 5,
+            encoder_weights: Optional[str] = "imagenet",
+            fpn_out_channels=256,
+            decoder_use_batchnorm: bool = True,
+            decoder_channels: List[int] = (256, 128, 64, 32, 16),
+            decoder_attention_type: Optional[str] = None,
+            in_channels: int = 3,
+            classes: int = 1,
+            activation: Optional[Union[str, callable]] = None,
+            aux_params: Optional[dict] = None,
+            fpn_pretrained = False,
+    ):
+        super().__init__()
+
+        self.encoder = get_encoder(
+            encoder_name,
+            in_channels=in_channels,
+            depth=encoder_depth,
+            weights=encoder_weights,
+        )
+
+        if fpn_out_channels < 0:
+            self.fpn_out_channels = int(sum(self.encoder.out_channels) / len(self.encoder.out_channels))
+        else:
+            self.fpn_out_channels = fpn_out_channels
+
+        fpn_in_channels_list = self.encoder.out_channels
+        fpn_in_channels_list = [i for i in fpn_in_channels_list if i != 0]
+        # if len(fpn_in_channels_list) != len(self.encoder.out_channels):
+        #     self.zero_layer = True
+
+        self.fpn = fpn.FPN(
+            in_channels_list=fpn_in_channels_list,
+            out_channels=self.fpn_out_channels,
+            conv_block=fpn.default_conv_block,
+            top_blocks=None, )
+
+        self.fpn2 = fpn.FPN(
+            in_channels_list=fpn_in_channels_list,
+            out_channels=self.fpn_out_channels,
+            conv_block=fpn.default_conv_block,
+            top_blocks=None, )
+
+        self.encoder_fpn_out_channels = [self.fpn_out_channels for i in range(len(fpn_in_channels_list))]
+
+        self.sa_after_fpn = SA_after_FPN(self.encoder_fpn_out_channels)
+
+
+
+        self.decoder = UnetDecoder(
+            encoder_channels=self.encoder_fpn_out_channels,
+            decoder_channels=decoder_channels,
+            n_blocks=encoder_depth,
+            use_batchnorm=decoder_use_batchnorm,
+            center=True if encoder_name.startswith("vgg") else False,
+            attention_type=decoder_attention_type,
+        )
+
+        self.segmentation_head = SegmentationHead(
+            in_channels=decoder_channels[-1],
+            out_channels=classes,
+            activation=activation,
+            kernel_size=3,
+        )
+
+        self.decoder2 = UnetDecoder(
+            encoder_channels=self.encoder_fpn_out_channels,
+            decoder_channels=decoder_channels,
+            n_blocks=encoder_depth,
+            use_batchnorm=decoder_use_batchnorm,
+            center=True if encoder_name.startswith("vgg") else False,
+            attention_type=decoder_attention_type,
+        )
+
+        self.segmentation_head2 = SegmentationHead(
+            in_channels=decoder_channels[-1],
+            out_channels=2,
+            activation=activation,
+            kernel_size=3,
+        )
+
+        if aux_params is not None:
+            self.classification_head = ClassificationHead(in_channels=self.encoder.out_channels[-1], **aux_params)
+        else:
+            self.classification_head = None
+
+        self.name = "u-{}".format(encoder_name)
+        self.initialize()
+
+
+    def forward_logits(self, x):
+        """Sequentially pass `x` trough model`s encoder, decoder and heads"""
+
+        self.check_input_shape(x)
+
+        features = self.encoder(x)
+
+        fpn_features = self.fpn(features)
+        fpn_features2 = self.fpn2(features)
+
+
+        sa_features = self.sa_after_fpn(fpn_features,fpn_features2)
+
+        decoder_output = self.decoder(*sa_features)
+        decoder_output2 = self.decoder2(*fpn_features2)
+
+        return decoder_output,decoder_output2
+
+    def forward_seg(self, logits1,logits2):
+
+        masks = self.segmentation_head(logits1)
+        masks2 = self.segmentation_head2(logits2)
+
+        return masks,masks2
+
+
+    def forward(self, x):
+        """Sequentially pass `x` trough model`s encoder, decoder and heads"""
+
+        self.check_input_shape(x)
+
+        features = self.encoder(x)
+
+        fpn_features = self.fpn(features)
+
+        decoder_output = self.decoder(*fpn_features)
+        decoder_output2 = self.decoder2(*fpn_features)
+
+        masks = self.segmentation_head(decoder_output)
+        masks2 = self.segmentation_head2(decoder_output2)
+
+        if self.classification_head is not None:
+            labels = self.classification_head(features[-1])
+            return masks, labels
+
+        return masks,masks2
+if __name__ == '__main__':
+
+
+    data = torch.randn(4, 3, 256, 256)
+    backbone = 'resnet50'
+    in_chns = 3
+    class_num1 = 5
+    #
+    model = Dual_Decoder_Unet_DualFPN_CrossAttention(
+        encoder_name=backbone,
+        encoder_weights='imagenet',
+        in_channels=in_chns,
+        classes=class_num1,
+    )
+    out,out2 = model(data)
+    print(out.shape)
