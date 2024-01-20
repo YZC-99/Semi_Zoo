@@ -143,6 +143,7 @@ class CrissCrossAttention(nn.Module):
 
     def forward(self, x,y):
         self.INF.to(x.device)
+        self.gamma.to(x.device)
         m_batchsize, _, height, width = x.size()
         proj_query = self.query_conv(x)
         proj_query_H = proj_query.permute(0, 3, 1, 2).contiguous().view(m_batchsize * width, -1, height).permute(0, 2,
@@ -171,7 +172,7 @@ class CrissCrossAttention(nn.Module):
         out_H = torch.bmm(proj_value_H, att_H.permute(0, 2, 1)).view(m_batchsize, width, -1, height).permute(0, 2, 3, 1)
         out_W = torch.bmm(proj_value_W, att_W.permute(0, 2, 1)).view(m_batchsize, height, -1, width).permute(0, 2, 1, 3)
         # print(out_H.size(),out_W.size())
-        return self.gamma.to(x.device) * (out_H + out_W) + x
+        return self.gamma * (out_H + out_W) + x
 
 
     # def forward(self, x):
