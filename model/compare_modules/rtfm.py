@@ -76,13 +76,13 @@ class ScaledDotProductAttention(nn.Module):
 
 class RTFM(nn.Module):
 
-    def __init__(self, d_model, d_k, d_v, h=8,dropout=.1):
+    def __init__(self, d_model, d_k, d_v, h=12,dropout=.1):
         super(RTFM, self).__init__()
         self.sa = ScaledDotProductAttention( d_model, d_k, d_v, h,dropout)
         self.LN = nn.Linear(d_model, d_model)
         self.mlp = nn.Sequential(
-            nn.Linear(d_model, d_model),
-            nn.Linear(d_model, d_model),
+            nn.Linear(d_model, 3072),
+            nn.Linear(3072, d_model),
             nn.ReLU()
         )
 
@@ -113,7 +113,7 @@ if __name__ == '__main__':
 
     # seq_input=torch.randn(8,49,512)
     # sa = ScaledDotProductAttention(d_model=512, d_k=512, d_v=512, h=8)
-    sa = RTFM(d_model=512, d_k=512, d_v=512, h=8)
+    sa = RTFM(d_model=512, d_k=64, d_v=64)
     output=sa(odoc_seq_input,odoc_seq_input,vessel_seq_input)
 
     seq_output = output.permute(0, 2, 1)
