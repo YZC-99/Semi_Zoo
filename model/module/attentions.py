@@ -155,7 +155,7 @@ class CrissCrossAttention(nn.Module):
         proj_value = self.value_conv(y)
         proj_value_H = proj_value.permute(0, 3, 1, 2).contiguous().view(m_batchsize * width, -1, height)
         proj_value_W = proj_value.permute(0, 2, 1, 3).contiguous().view(m_batchsize * height, -1, width)
-        energy_H = (torch.bmm(proj_query_H, proj_key_H) + self.INF(m_batchsize, height, width)).to(x.device).view(m_batchsize, width,
+        energy_H = (torch.bmm(proj_query_H, proj_key_H) + self.INF(m_batchsize, height, width).to(x.device)).view(m_batchsize, width,
                                                                                                      height,
                                                                                                      height).permute(0,
                                                                                                                      2,
