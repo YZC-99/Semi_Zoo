@@ -101,7 +101,7 @@ class RTFM(nn.Module):
 
 class SA_after_FPN(nn.Module):
 
-    def __init__(self, fpn_out_channels, h=12,dropout=.1):
+    def __init__(self, fpn_out_channels, h=4,dropout=.1):
         super(SA_after_FPN, self).__init__()
 
         self.sa_layers = []
