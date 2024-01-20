@@ -10,7 +10,7 @@ from segmentation_models_pytorch.decoders.unet.decoder import UnetDecoder
 from model.module.gap import GlobalAvgPool2D
 from model.module import fpn
 from model.module.farseg import SceneRelation
-from model.compare_modules.rtfm import SA_after_FPN
+from model.compare_modules.rtfm import SA_after_FPN,SA_Criss_after_FPN
 
 
 class Dual_Decoder_Unet(SegmentationModel):
@@ -736,7 +736,8 @@ class Dual_Decoder_Unet_DualFPN_CrossAttention(SegmentationModel):
 
         self.encoder_fpn_out_channels = [self.fpn_out_channels for i in range(len(fpn_in_channels_list))]
 
-        self.sa_after_fpn = SA_after_FPN(self.encoder_fpn_out_channels)
+        # self.sa_after_fpn = SA_after_FPN(self.encoder_fpn_out_channels)
+        self.sa_after_fpn = SA_Criss_after_FPN(self.encoder_fpn_out_channels)
 
 
 

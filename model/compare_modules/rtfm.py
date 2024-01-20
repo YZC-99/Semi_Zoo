@@ -132,7 +132,7 @@ class SA_after_FPN(nn.Module):
 class SA_Criss_after_FPN(nn.Module):
 
     def __init__(self, fpn_out_channels, h=12,dropout=.1):
-        super(SA_after_FPN, self).__init__()
+        super(SA_Criss_after_FPN, self).__init__()
 
         self.sa_layers = []
         for idx,in_channels in enumerate(fpn_out_channels,1):
@@ -143,11 +143,11 @@ class SA_Criss_after_FPN(nn.Module):
 
 
     def forward(self, fpn_features1,fpn_features2):
-
+        new_features = []
         for idx,(feature1,feature2,sa) in enumerate(zip(fpn_features1,fpn_features2,self.sa_layers)):
             output = getattr(self,sa)(feature1,feature2)
-            fpn_features1[idx] = output
-        return fpn_features1
+            new_features.append(output)
+        return tuple(new_features)
 
 
 
