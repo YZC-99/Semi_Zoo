@@ -26,7 +26,7 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             classes=class_num1,
             decoder_attention_type=args.decoder_attention_type
         )
-    elif model == "Unet_wSR_wRTFM":
+    elif model == "Unet_wFPN_wRTFM":
         net = Unet_wFPN_wRTFM(
             encoder_name=backbone,
             encoder_weights='imagenet',
@@ -34,8 +34,6 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             classes=class_num1,
             decoder_attention_type=args.decoder_attention_type
         )
-
-
     elif model == 'PAN':
         net =  smp.PAN(
             encoder_name = backbone,
