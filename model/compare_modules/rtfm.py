@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from torch.nn import init
 import numpy as np
+from model.module.attentions import CrissCrossAttention
 
 class ScaledDotProductAttention(nn.Module):
     '''
@@ -123,7 +124,29 @@ class SA_after_FPN(nn.Module):
 
             seq_output = seq_output.permute(0, 2, 1)
             sa_feature_output = seq_output.reshape(b, c, h, w)
-            feature1[idx] = sa_feature_output
+            fpn_features1[idx] = sa_feature_output
+        return fpn_features1
+
+
+
+class SA_Criss_after_FPN(nn.Module):
+
+    def __init__(self, fpn_out_channels, h=12,dropout=.1):
+        super(SA_after_FPN, self).__init__()
+
+        self.sa_layers = []
+        for idx,in_channels in enumerate(fpn_out_channels,1):
+            sa_layer = 'sa_layer{}'.format(idx)
+            sa_layer_module = CrissCrossAttention(in_channels)
+            self.add_module(sa_layer,sa_layer_module)
+            self.sa_layers.append(sa_layer)
+
+
+    def forward(self, fpn_features1,fpn_features2):
+
+        for idx,(feature1,feature2,sa) in enumerate(zip(fpn_features1,fpn_features2,self.sa_layers)):
+            output = getattr(self,sa)(feature1,feature2)
+            fpn_features1[idx] = output
         return fpn_features1
 
 
