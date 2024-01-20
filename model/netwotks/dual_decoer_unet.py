@@ -791,7 +791,6 @@ class Dual_Decoder_Unet_DualFPN_CrossAttention(SegmentationModel):
         fpn_features = self.fpn(features)
         fpn_features2 = self.fpn2(features)
 
-
         sa_features = self.sa_after_fpn(fpn_features,fpn_features2)
 
         decoder_output = self.decoder(*sa_features)
@@ -810,21 +809,9 @@ class Dual_Decoder_Unet_DualFPN_CrossAttention(SegmentationModel):
     def forward(self, x):
         """Sequentially pass `x` trough model`s encoder, decoder and heads"""
 
-        self.check_input_shape(x)
+        decoder_output,decoder_output2 = self.forward_logits(x)
+        masks, masks2 = self.forward_seg(decoder_output,decoder_output2)
 
-        features = self.encoder(x)
-
-        fpn_features = self.fpn(features)
-
-        decoder_output = self.decoder(*fpn_features)
-        decoder_output2 = self.decoder2(*fpn_features)
-
-        masks = self.segmentation_head(decoder_output)
-        masks2 = self.segmentation_head2(decoder_output2)
-
-        if self.classification_head is not None:
-            labels = self.classification_head(features[-1])
-            return masks, labels
 
         return masks,masks2
 if __name__ == '__main__':
