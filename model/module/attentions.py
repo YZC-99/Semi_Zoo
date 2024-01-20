@@ -170,7 +170,7 @@ class CrissCrossAttention(nn.Module):
         out_H = torch.bmm(proj_value_H, att_H.permute(0, 2, 1)).view(m_batchsize, width, -1, height).permute(0, 2, 3, 1)
         out_W = torch.bmm(proj_value_W, att_W.permute(0, 2, 1)).view(m_batchsize, height, -1, width).permute(0, 2, 1, 3)
         # print(out_H.size(),out_W.size())
-        return self.gamma * (out_H + out_W) + x
+        return self.gamma.to(x.device) * (out_H + out_W) + x
 
 
     # def forward(self, x):
