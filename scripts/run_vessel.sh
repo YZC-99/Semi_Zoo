@@ -1,10 +1,10 @@
 python train_supervised_2d_odoc_vessel.py \
     --num_works 4        \
     --device 0         \
-    --exp REFUGE/Dual_Decoder_Unet_DualFPN_CrossAttention/ \
+    --exp REFUGE/Dual_Decoder_SR_Unet_woSR_wRTFM/ \
     --dataset_name REFUGE        \
     --image_size 256         \
-    --model Dual_Decoder_Unet_DualFPN_CrossAttention        \
+    --model Dual_Decoder_SR_Unet_woSR_wRTFM        \
     --optim Adam         \
     --batch_size 8         \
     --warmup 0.0         \
