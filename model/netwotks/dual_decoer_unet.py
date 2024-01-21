@@ -743,7 +743,7 @@ class Dual_Decoder_SR_Unet_woSR_wRTFM(SegmentationModel):
         # if self.zero_layer:
         #     self.sr_out_channels.insert(1, 0)
 
-        self.RTFM = RTFM(self.encoder.out_channels[-1], 64, 64)
+        self.RTFM = RTFM(self.encoder_fpn_out_channels[-1], 64, 64)
 
         self.decoder = UnetDecoder(
             encoder_channels=self.encoder_fpn_out_channels,
