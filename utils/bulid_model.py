@@ -68,6 +68,18 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             decoder_attention_type=args.decoder_attention_type,
             fpn_pretrained=args.fpn_pretrained,
         )
+    elif model == 'Dual_Decoder_Unet_DualFPN_CrossAttention':
+        net = Dual_Decoder_Unet_DualFPN_CrossAttention(
+            encoder_name=backbone,
+            encoder_weights='imagenet',
+            in_channels=in_chns,
+            classes=class_num1,
+            fpn_out_channels=args.fpn_out_c,
+            decoder_attention_type=args.decoder_attention_type,
+            fpn_pretrained=args.fpn_pretrained,
+        )
+
+
     elif model == 'Dual_Decoder_SR_Unet_woFPN':
         net = Dual_Decoder_SR_Unet_woFPN(
             encoder_name=backbone,
