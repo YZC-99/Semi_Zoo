@@ -26,16 +26,16 @@ center-detach
 python train_odoc_supervised_2d_smp.py \
     --num_works 4        \
     --device 0         \
-    --exp REFUGE/Unet_wFPN_wRTFM/resnet34/ce \
+    --exp REFUGE/Two_Encoder_Unet_wRTFM/resnet50 \
     --dataset_name REFUGE        \
     --image_size 256         \
-    --model Unet_wFPN_wRTFM        \
+    --model Two_Encoder_Unet_wRTFM        \
     --optim Adam         \
     --batch_size 8         \
     --warmup 0.0         \
     --base_lr 0.0003         \
     --max_iterations 5000         \
-    --backbone resnet34 \
+    --backbone resnet50 \
     --main_criteria ce \
     --autodl
 

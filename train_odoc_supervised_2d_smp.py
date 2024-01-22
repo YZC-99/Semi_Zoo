@@ -28,7 +28,8 @@ parser = argparse.ArgumentParser()
 
 # ==============model===================
 parser.add_argument('--model',type=str,default='unet')
-parser.add_argument('--backbone',type=str,default='b2')
+parser.add_argument('--backbone',type=str,default='resnet50')
+parser.add_argument('--backbone2',type=str,default='mit_b0')
 parser.add_argument('--fpn_out_c',type=int,default=256,help='the out-channels of the FPN module')
 parser.add_argument('--fpn_pretrained',action='store_true')
 parser.add_argument('--sr_out_c',type=int,default=256,help='the out-channels of the SR module')
