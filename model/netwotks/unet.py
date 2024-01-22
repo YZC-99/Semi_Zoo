@@ -208,7 +208,7 @@ class Two_Encoder_Unet_wRTFM(SegmentationModel):
             weights=encoder_weights,
         )
         self.encoder2 = get_encoder(
-            encoder2_name,
+            encoder_name,
             in_channels=in_channels,
             depth=encoder_depth,
             weights=None,
