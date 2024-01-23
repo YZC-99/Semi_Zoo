@@ -33,9 +33,9 @@ def logs2csv(ex_path=''):
             if 'version' in root and 'log' not in root:
                 ex_num += 1
                 experiment = root.split(path)[-1]
-                OD_DICE = 0
-                OD_DICE_iter = 0
                 conf = {}
+                EX_pr = 0
+                EX_pr_iter = 0
                 for pth in files:
                     if 'EX' in pth:
                         EX_pr = pth.split('EX')[-1].split('_')[0]
