@@ -13,7 +13,7 @@ from model.compare_modules.pmc_modules import *
 
 
 
-class Unet(SegmentationModel):
+class Unet_wPFF_DAB(SegmentationModel):
     def __init__(
         self,
         encoder_name: str = "resnet34",
