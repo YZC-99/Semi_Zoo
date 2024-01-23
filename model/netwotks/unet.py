@@ -403,6 +403,127 @@ class Unet_wFPN_wlightDecoder(SegmentationModel):
         return masks
 
 
+class Unet_wRTFM_wFPN_wlightDecoder(SegmentationModel):
+
+    def __init__(
+            self,
+            encoder_name: str = "resnet34",
+            encoder_depth: int = 5,
+            encoder_weights: Optional[str] = "imagenet",
+            fpn_out_channels=256,
+            decoder_use_batchnorm: bool = True,
+            decoder_channels: List[int] = (256, 128, 64, 32, 16),
+            decoder_attention_type: Optional[str] = None,
+            in_channels: int = 3,
+            classes: int = 1,
+            activation: Optional[Union[str, callable]] = None,
+            aux_params: Optional[dict] = None,
+            fpn_pretrained = False,
+    ):
+        super().__init__()
+
+        self.encoder = get_encoder(
+            encoder_name,
+            in_channels=in_channels,
+            depth=encoder_depth,
+            weights=encoder_weights,
+        )
+
+        self.RTFM = RTFM(self.encoder.out_channels[-1], 64, 64)
+
+
+        # --------------
+        # self.zero_layer = False
+        if fpn_out_channels < 0:
+            self.fpn_out_channels = int(sum(self.encoder.out_channels) / len(self.encoder.out_channels))
+        else:
+            self.fpn_out_channels = fpn_out_channels
+
+        fpn_in_channels_list = self.encoder.out_channels
+        fpn_in_channels_list = [i for i in fpn_in_channels_list if i != 0]
+        # if len(fpn_in_channels_list) != len(self.encoder.out_channels):
+        #     self.zero_layer = True
+
+        self.fpn = fpn.FPN(
+            in_channels_list=fpn_in_channels_list[-4:],
+            out_channels=self.fpn_out_channels,
+            conv_block=fpn.default_conv_block,
+            top_blocks=None, )
+
+        if fpn_pretrained :
+            # Update SceneRelation weights
+            ckpt_apth = 'pretrained/farseg50.pth'
+            sd = torch.load(ckpt_apth)
+            fpn_state_dict = self.fpn.state_dict()
+            for name, param in sd['model'].items():
+
+                if 'module.fpn' in name:
+                    # 移除 'module.' 前缀
+                    name = name.replace('module.', '')
+                    # Update SceneRelation state_dict
+                    fpn_state_dict[name] = param
+            # Load the modified SceneRelation state_dict
+
+            self.fpn.load_state_dict(fpn_state_dict,strict=False)
+            print("================加载FPN权重成功！===============")
+            print(fpn_state_dict.keys())
+            # --------------
+
+
+        self.encoder_fpn_out_channels = [self.fpn_out_channels for i in range(len(fpn_in_channels_list))]
+
+
+        self.decoder = Light_Decoder(
+            encoder_channels=self.encoder_fpn_out_channels,
+            decoder_channels=self.encoder_fpn_out_channels[1:],
+            n_blocks=encoder_depth,
+            use_batchnorm=decoder_use_batchnorm,
+            attention_type=decoder_attention_type,
+        )
+
+
+        self.segmentation_head = SegmentationHead(
+            in_channels=128,
+            out_channels=classes,
+            activation=activation,
+            kernel_size=3,
+        )
+
+        self.upsample4x_op = nn.UpsamplingBilinear2d(scale_factor=4)
+
+        if aux_params is not None:
+            self.classification_head = ClassificationHead(in_channels=self.encoder.out_channels[-1], **aux_params)
+        else:
+            self.classification_head = None
+
+        self.name = "u-{}".format(encoder_name)
+        self.initialize()
+
+    def forward(self, x):
+        self.check_input_shape(x)
+
+        features = self.encoder(x)
+
+
+        deep_features = features[-1]
+        b,c,h,w = deep_features.size()
+        seq_deep_features = deep_features.reshape(b,c,-1)
+        seq_deep_features = seq_deep_features.permute(0,2,1)
+        seq_deep_features = self.RTFM(seq_deep_features,seq_deep_features,seq_deep_features)
+        seq_deep_features = seq_deep_features.permute(0, 2, 1)
+        features[-1] = seq_deep_features.reshape(b,c,h,w)
+
+
+        fpn_features = self.fpn(features[-4:])
+
+        decoder_output = self.decoder(*fpn_features)
+
+        masks = self.segmentation_head(decoder_output)
+
+        masks = self.upsample4x_op(masks)
+        return masks
+
+
 class Unet_wFPN_wRTFM(SegmentationModel):
 
     def __init__(
@@ -564,7 +685,7 @@ if __name__ == '__main__':
     in_chns = 3
     class_num1 = 5
     #
-    model = Unet_wFPN_wlightDecoder(
+    model = Unet_wRTFM_wFPN_wlightDecoder(
         encoder_name=backbone,
         encoder_weights='imagenet',
         in_channels=in_chns,
