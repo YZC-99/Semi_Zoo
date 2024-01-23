@@ -185,19 +185,6 @@ if __name__ == '__main__':
     lr_ = args.base_lr
     model.train()
 
-    # ce_loss = BCEWithLogitsLoss()
-    # class_weights = [0.001,1.0,0.1,0.01,0.1]
-    class_weights = args.ce_weight
-    if args.ohem > 0:
-        # online hard example mining
-        ce_loss = OhemCrossEntropy(thres=args.ohem,weight=torch.tensor(class_weights,device=device))
-    else:
-        ce_loss = CrossEntropyLoss(ignore_index=255,weight=torch.tensor(class_weights,device=device))
-
-    dice_loss = smp.losses.DiceLoss(mode='multiclass',from_logits=True)
-    # mse_loss = MSELoss()
-
-
 
 
     print("=================共计训练epoch: {}====================".format(max_epoch))

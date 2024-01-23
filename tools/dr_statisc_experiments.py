@@ -11,10 +11,8 @@ def logs2csv(ex_path=''):
         # 写入列头
         w.writerow([
             'experiment',
-            'OD_DICE',
-            'OD_DICE_iter',
-            'OC_DICE',
-            'OC_DICE_iter',
+            'EX_AUC-PR',
+            'EX_AUC-PR_iter',
             'model',
             'backbone',
             'with_ce',
@@ -37,16 +35,12 @@ def logs2csv(ex_path=''):
                 experiment = root.split(path)[-1]
                 OD_DICE = 0
                 OD_DICE_iter = 0
-                OC_DICE = 0
-                OC_DICE_iter = 0
                 conf = {}
                 for pth in files:
-                    if 'OD' in pth:
-                        OD_DICE = pth.split('OD_DICE')[-1].split('_')[0]
-                        OD_DICE_iter = pth.split('.pth')[0].split('_')[-1]
-                    elif 'OC' in pth:
-                        OC_DICE = pth.split('OC_DICE')[-1].split('_')[0]
-                        OC_DICE_iter = pth.split('.pth')[0].split('_')[-1]
+                    if 'EX' in pth:
+                        EX_pr = pth.split('EX')[-1].split('_')[0]
+                        EX_pr_iter = pth.split('.pth')[0].split('_')[-1]
+
                     elif 'log.txt' in pth:
                         with open(os.path.join(root,pth),'r') as f:
                             conf_str = f.readlines(1)[0].split('Namespace')[-1]
@@ -62,10 +56,8 @@ def logs2csv(ex_path=''):
 
                 w.writerow([
                     experiment,
-                    OD_DICE,
-                    OD_DICE_iter,
-                    OC_DICE,
-                    OC_DICE_iter,
+                    EX_pr,
+                    EX_pr_iter,
                     conf.get('model', 'N/A'),
                     conf.get('backbone', 'N/A'),
                     conf.get('with_ce', 'True'),  # 如果 'ohem' 不存在，返回 'N/A'
