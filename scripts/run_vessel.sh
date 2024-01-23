@@ -1,15 +1,15 @@
 python train_supervised_2d_odoc_vessel.py \
     --num_works 4        \
     --device 0         \
-    --exp REFUGE/Dual_Decoder_SR_Unet_woSR_wRTFM/ \
+    --exp REFUGE/Dual_Decoder_SR_Unet_woSR/resnet50-bs16-SGD-lr1e-2 \
     --dataset_name REFUGE        \
     --image_size 256         \
-    --model Dual_Decoder_SR_Unet_woSR_wRTFM        \
-    --optim Adam         \
-    --batch_size 8         \
+    --model Dual_Decoder_SR_Unet_woSR        \
+    --optim SGD         \
+    --batch_size 16         \
     --warmup 0.0         \
-    --base_lr 0.0003         \
-    --max_iterations 5000         \
+    --base_lr 0.01         \
+    --max_iterations 2500         \
     --backbone resnet50 \
     --vessel_type oc-rim50 \
     --KinkLoss 1.0 \
@@ -26,14 +26,14 @@ center-detach
 python train_odoc_supervised_2d_smp.py \
     --num_works 4        \
     --device 0         \
-    --exp REFUGE/Two_Encoder_Unet_wRTFM/resnet50 \
+    --exp REFUGE/Two_Encoder_Unet_wRTFM/resnet50-ce-bs16 \
     --dataset_name REFUGE        \
     --image_size 256         \
     --model Two_Encoder_Unet_wRTFM        \
     --optim Adam         \
-    --batch_size 8         \
+    --batch_size 16         \
     --warmup 0.0         \
-    --base_lr 0.0003         \
+    --base_lr 0.0008         \
     --max_iterations 5000         \
     --backbone resnet50 \
     --main_criteria ce \

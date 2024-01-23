@@ -1,25 +1,20 @@
 import random
 from tqdm import tqdm
 from dataloader.fundus import SemiDataset,IDRIDDataset
-from dataloader.samplers import TwoStreamBatchSampler, LabeledBatchSampler,UnlabeledBatchSampler
 import torch
 import glob
 import argparse
-from torch.utils.data import DataLoader
-from torch.optim.lr_scheduler import StepLR,LambdaLR
 from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss,MSELoss
 from torch.utils.data import DataLoader, WeightedRandomSampler
-import torch.nn.functional as F
-# from torch.utils.tensorboard import SummaryWriter
 from tensorboardX import SummaryWriter
 import segmentation_models_pytorch as smp
 from utils.losses import OhemCrossEntropy,annealing_softmax_focalloss,softmax_focalloss,weight_softmax_focalloss
 from utils.test_utils import DR_metrics,Sklearn_DR_metrics
 from utils.util import color_map,gray_to_color
-from utils.scheduler.poly_lr import PolyLRScheduler
 import random
 from utils.util import get_optimizer,PolyLRwithWarmup, compute_sdf,compute_sdf_luoxd,compute_sdf_multi_class
 from utils.bulid_model import build_model
+from utils.training_utils import criteria
 import time
 import logging
 import os
@@ -45,6 +40,7 @@ parser.add_argument('--ckpt_weight',type=str,default=None)
 # ==============model===================
 
 # ==============loss===================
+parser.add_argument('--main_criteria', type=str, default='ce',choices=['ce','dice','ce-dice','softmax_focal','annealing_softmax_focal'])
 parser.add_argument('--ce_weight', type=float, nargs='+', default=[0.001,1.0,0.1,0.1,0.1], help='List of floating-point values')
 parser.add_argument('--ohem',type=float,default=-1.0)
 parser.add_argument('--annealing_softmax_focalloss',action='store_true')
@@ -162,14 +158,7 @@ if __name__ == '__main__':
                                     pin_memory=True,
                                     shuffle=True
                                     )
-    # 使用WeightedRandomSampler
-    # sampler = WeightedRandomSampler(weights, num_samples=len(weights), replacement=True)
-    # labeledtrainloader = DataLoader(labeled_dataset,
-    #                                 batch_size=args.batch_size,
-    #                                 num_workers=args.num_works,
-    #                                 pin_memory=True,
-    #                                 sampler=sampler,
-    #                                 )
+
     # 验证集
     # init dataset
     val_dataset = IDRIDDataset(name='./dataset/{}'.format(args.dataset_name),
@@ -189,14 +178,6 @@ if __name__ == '__main__':
 
     # scheduler = StepLR(optimizer,step_size=100,gamma=0.999)
     scheduler = PolyLRwithWarmup(optimizer,total_steps=args.max_iterations,warmup_steps=args.max_iterations * args.warmup)
-    # scheduler = PolyLRScheduler(optimizer,
-    #                             t_initial=args.max_iterations,
-    #                             power = 0.9,
-    #                             warmup_t = args.max_iterations * args.warmup,
-    #                             t_in_epochs = False,
-    #                             cycle_mul = 1
-    #                             )
-    # init summarywriter
     writer = SummaryWriter(snapshot_path + '/log')
 
     iter_num = 0
@@ -239,25 +220,10 @@ if __name__ == '__main__':
 
             outputs = model(all_batch)
 
-            loss_seg_dice = torch.zeros(1,device=device)
-            # calculate the loss
-            outputs_soft = torch.argmax(outputs,dim=1)
-            all_label_batch[all_label_batch > 4] = 4
-            if args.annealing_softmax_focalloss:
-                loss_seg_ce = annealing_softmax_focalloss(outputs,all_label_batch,
-                                                         t=iter_num,t_max=args.max_iterations * 0.6)
-            elif args.softmax_focalloss:
-                loss_seg_ce = softmax_focalloss(outputs,all_label_batch)
-            elif args.weight_softmax_focalloss:
-                loss_seg_ce = weight_softmax_focalloss(outputs,all_label_batch,weight=torch.tensor(class_weights,device=device))
-            else:
-                loss_seg_ce = ce_loss(outputs,all_label_batch)
 
-            if args.with_dice:
-                loss_seg_dice = dice_loss(outputs,all_label_batch)
-                loss = loss_seg_ce + loss_seg_dice
-            else:
-                loss = loss_seg_ce
+            loss_seg_main = criteria(args, outputs, all_label_batch, iter_num)
+            loss = loss_seg_main
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -272,17 +238,9 @@ if __name__ == '__main__':
             iter_num = iter_num + 1
             writer.add_scalar('lr', optimizer.param_groups[0]['lr'], iter_num)
             writer.add_scalar('loss/loss', loss, iter_num)
-            writer.add_scalar('loss/loss_seg', loss_seg_ce, iter_num)
-            writer.add_scalar('loss/loss_dice', loss_seg_dice, iter_num)
-            writer.add_scalar('loss/loss', loss, iter_num)
+            writer.add_scalar('loss/loss_seg', loss_seg_main, iter_num)
 
 
-            # logging.info(
-            #     'iteration %d : loss : %f' %
-            #     (iter_num, loss.item()))
-            # logging.info('iteration %d : loss : %f' % (iter_num, loss.item()))
-            # logging.info('iteration %d : loss_seg : %f' % (iter_num, loss_seg_ce.item()))
-            # logging.info('iteration %d : loss_dice : %f' % (iter_num, loss_seg_dice.item()))
 
             with torch.no_grad():
                 if iter_num % 50 == 0:
