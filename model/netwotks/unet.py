@@ -1,5 +1,6 @@
 from typing import Optional, Union, List
 import torch
+import torch.nn as nn
 from model.module import fpn
 from segmentation_models_pytorch.encoders import get_encoder
 from segmentation_models_pytorch.base import (
@@ -377,6 +378,8 @@ class Unet_wFPN_wlightDecoder(SegmentationModel):
             kernel_size=3,
         )
 
+        self.upsample4x_op = nn.UpsamplingBilinear2d(scale_factor=4)
+
         if aux_params is not None:
             self.classification_head = ClassificationHead(in_channels=self.encoder.out_channels[-1], **aux_params)
         else:
@@ -396,10 +399,7 @@ class Unet_wFPN_wlightDecoder(SegmentationModel):
 
         masks = self.segmentation_head(decoder_output)
 
-        if self.classification_head is not None:
-            labels = self.classification_head(features[-1])
-            return masks, labels
-
+        masks = self.upsample4x_op(masks)
         return masks
 
 
