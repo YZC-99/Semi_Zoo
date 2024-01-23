@@ -891,20 +891,24 @@ if __name__ == '__main__':
     ssl._create_default_https_context = ssl._create_unverified_context
 
     data = torch.randn(4, 3, 256, 256)
-    backbone = 'resnet50'
+    # backbone = 'resnet50'
     # backbone='mit_b0'
     # backbone='mit_b2'
-    # backbone='efficientnet-b0'
+    backbone='efficientnet-b0'
+    # backbone='tu-efficientnet_b0_g16_evos'
     # backbone='densenet161'
     in_chns = 3
     class_num1 = 5
     #
+    # decoder_channels = (256, 128, 64,32,16)
+    decoder_channels = (256, 128, 64)
     model = Unet(
         encoder_name=backbone,
         encoder_weights='imagenet',
         in_channels=in_chns,
         classes=class_num1,
         encoder_depth = 3,
+        decoder_channels = decoder_channels
     )
     out = model(data)
     print(out.shape)

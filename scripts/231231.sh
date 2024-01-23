@@ -21,3 +21,4 @@ Unet_wFPN_wDAB
 Unet_wRTFM_wFPN_wlightDecoder
 Unet_wFPN_wlightDecoder
   mobileone_s3
+  efficientnet-b0

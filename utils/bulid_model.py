@@ -30,7 +30,9 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             encoder_weights='imagenet',
             in_channels=in_chns,
             classes=class_num1,
-            decoder_attention_type=args.decoder_attention_type
+            decoder_attention_type=args.decoder_attention_type,
+            encoder_depth=args.encoder_deepth,
+            decoder_channels=decoder_channels
         )
     elif model == "Unet_wFPN_wDAB":
         net = Unet_wFPN_wDAB(
@@ -38,7 +40,9 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             encoder_weights='imagenet',
             in_channels=in_chns,
             classes=class_num1,
-            decoder_attention_type=args.decoder_attention_type
+            decoder_attention_type=args.decoder_attention_type,
+            encoder_depth=args.encoder_deepth,
+            decoder_channels=decoder_channels
         )
 
 
@@ -48,7 +52,9 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             encoder_weights='imagenet',
             in_channels=in_chns,
             classes=class_num1,
-            decoder_attention_type=args.decoder_attention_type
+            decoder_attention_type=args.decoder_attention_type,
+            encoder_depth=args.encoder_deepth,
+            decoder_channels=decoder_channels
         )
     elif model == "Unet_wRTFM_wFPN":
         net = Unet_wRTFM_wFPN(
@@ -56,7 +62,9 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             encoder_weights='imagenet',
             in_channels=in_chns,
             classes=class_num1,
-            decoder_attention_type=args.decoder_attention_type
+            decoder_attention_type=args.decoder_attention_type,
+            encoder_depth=args.encoder_deepth,
+            decoder_channels=decoder_channels
         )
 
 

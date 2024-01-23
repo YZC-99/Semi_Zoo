@@ -1,197 +1,195 @@
+"""Each encoder should have following attributes and methods and be inherited from `_base.EncoderMixin`
+
+Attributes:
+
+    _out_channels (list of int): specify number of channels for each encoder feature tensor
+    _depth (int): specify number of stages in decoder (in other words number of downsampling operations)
+    _in_channels (int): default number of input channels in first Conv2d layer for encoder (usually 3)
+
+Methods:
+
+    forward(self, x: torch.Tensor)
+        produce list of features of different spatial resolutions, each feature is a 4D torch.tensor of
+        shape NCHW (features should be sorted in descending order according to spatial resolution, starting
+        with resolution same as input `x` tensor).
+
+        Input: `x` with shape (1, 3, 64, 64)
+        Output: [f0, f1, f2, f3, f4, f5] - features with corresponding shapes
+                [(1, 3, 64, 64), (1, 64, 32, 32), (1, 128, 16, 16), (1, 256, 8, 8),
+                (1, 512, 4, 4), (1, 1024, 2, 2)] (C - dim may differ)
+
+        also should support number of features according to specified depth, e.g. if depth = 5,
+        number of feature tensors = 6 (one with same resolution as input and 5 downsampled),
+        depth = 3 -> number of feature tensors = 4 (one with same resolution as input and 3 downsampled).
+"""
 import torch
-from torch.hub import load_state_dict_from_url
-from model.backbone.efficient.efficient_utils import *
 import torch.nn as nn
+from efficientnet_pytorch import EfficientNet
+from efficientnet_pytorch.utils import url_map, url_map_advprop, get_model_params
 
-class EfficientNet(nn.Module):
+from segmentation_models_pytorch.encoders._base import EncoderMixin
 
-    def __init__(self, block_args_list, global_params):
-        super().__init__()
+import torchvision.models.efficientnet as torch_efficient
 
-        self.block_args_list = block_args_list
-        self.global_params = global_params
 
-        # Batch norm parameters
-        batch_norm_momentum = 1 - self.global_params.batch_norm_momentum
-        batch_norm_epsilon = self.global_params.batch_norm_epsilon
+class EfficientNetEncoder(EfficientNet, EncoderMixin):
+    def __init__(self, stage_idxs, out_channels, model_name, depth=5):
 
-        # Stem
-        in_channels = 3
-        out_channels = round_filters(32, self.global_params)
-        self._conv_stem = Conv2dSamePadding(in_channels,
-                                            out_channels,
-                                            kernel_size=3,
-                                            stride=2,
-                                            bias=False,
-                                            name='stem_conv')
-        self._bn0 = BatchNorm2d(num_features=out_channels,
-                                momentum=batch_norm_momentum,
-                                eps=batch_norm_epsilon,
-                                name='stem_batch_norm')
+        blocks_args, global_params = get_model_params(model_name, override_params=None)
+        super().__init__(blocks_args, global_params)
 
-        self._swish = Swish(name='swish')
+        self._stage_idxs = stage_idxs
+        self._out_channels = out_channels
+        self._depth = depth
+        self._in_channels = 3
 
-        # Build _blocks
-        idx = 0
-        self._blocks = nn.ModuleList([])
-        for block_args in self.block_args_list:
+        del self._fc
 
-            # Update block input and output filters based on depth multiplier.
-            block_args = block_args._replace(
-                input_filters=round_filters(block_args.input_filters, self.global_params),
-                output_filters=round_filters(block_args.output_filters, self.global_params),
-                num_repeat=round_repeats(block_args.num_repeat, self.global_params)
-            )
-
-            # The first block needs to take care of stride and filter size increase.
-            self._blocks.append(MBConvBlock(block_args, self.global_params, idx=idx))
-            idx += 1
-
-            if block_args.num_repeat > 1:
-                block_args = block_args._replace(input_filters=block_args.output_filters, strides=1)
-
-            # The rest of the _blocks
-            for _ in range(block_args.num_repeat - 1):
-                self._blocks.append(MBConvBlock(block_args, self.global_params, idx=idx))
-                idx += 1
-
-        # Head
-        in_channels = block_args.output_filters  # output of final block
-        out_channels = round_filters(1280, self.global_params)
-        self._conv_head = Conv2dSamePadding(in_channels,
-                                            out_channels,
-                                            kernel_size=1,
-                                            bias=False,
-                                            name='head_conv')
-        self._bn1 = BatchNorm2d(num_features=out_channels,
-                                momentum=batch_norm_momentum,
-                                eps=batch_norm_epsilon,
-                                name='head_batch_norm')
-
-        # Final linear layer
-        self.dropout_rate = self.global_params.dropout_rate
-        self._fc = nn.Linear(out_channels, self.global_params.num_classes)
+    def get_stages(self):
+        return [
+            nn.Identity(),
+            nn.Sequential(self._conv_stem, self._bn0, self._swish),
+            self._blocks[: self._stage_idxs[0]],
+            self._blocks[self._stage_idxs[0] : self._stage_idxs[1]],
+            self._blocks[self._stage_idxs[1] : self._stage_idxs[2]],
+            self._blocks[self._stage_idxs[2] :],
+        ]
 
     def forward(self, x):
-        # Stem
-        x = self._conv_stem(x)
-        x = self._bn0(x)
-        x = self._swish(x)
+        stages = self.get_stages()
 
-        # Blocks
-        for idx, block in enumerate(self._blocks):
-            drop_connect_rate = self.global_params.drop_connect_rate
-            if drop_connect_rate:
-                drop_connect_rate *= idx / len(self._blocks)
-            x = block(x, drop_connect_rate)
+        block_number = 0.0
+        drop_connect_rate = self._global_params.drop_connect_rate
 
-        # Head
-        x = self._conv_head(x)
-        x = self._bn1(x)
-        x = self._swish(x)
+        features = []
+        for i in range(self._depth + 1):
 
-        # Pooling and Dropout
-        x = F.adaptive_avg_pool2d(x, 1).squeeze(-1).squeeze(-1)
-        if self.dropout_rate > 0:
-            x = F.dropout(x, p=self.dropout_rate, training=self.training)
+            # Identity and Sequential stages
+            if i < 2:
+                x = stages[i](x)
 
-        # Fully-connected layer
-        x = self._fc(x)
-        return x
+            # Block stages need drop_connect rate
+            else:
+                for module in stages[i]:
+                    drop_connect = drop_connect_rate * block_number / len(self._blocks)
+                    block_number += 1.0
+                    x = module(x, drop_connect)
 
-    @classmethod
-    def from_name(cls, model_name, *, n_classes=1000, pretrained=False):
-        return _get_model_by_name(model_name, classes=n_classes, pretrained=pretrained)
+            features.append(x)
 
-    @classmethod
-    def encoder(cls, model_name, *, pretrained=False):
-        model = cls.from_name(model_name, pretrained=pretrained)
+        return features
 
-        class Encoder(nn.Module):
-            def __init__(self):
-                super().__init__()
-
-                self.name = model_name
-
-                self.global_params = model.global_params
-
-                self.stem_conv = model._conv_stem
-                self.stem_batch_norm = model._bn0
-                self.stem_swish = Swish(name='stem_swish')
-                self.blocks = model._blocks
-                self.head_conv = model._conv_head
-                self.head_batch_norm = model._bn1
-                self.head_swish = Swish(name='head_swish')
-
-            def forward(self, x):
-                # Stem
-                x = self.stem_conv(x)
-                x = self.stem_batch_norm(x)
-                x = self.stem_swish(x)
-
-                # Blocks
-                for idx, block in enumerate(self.blocks):
-                    drop_connect_rate = self.global_params.drop_connect_rate
-                    if drop_connect_rate:
-                        drop_connect_rate *= idx / len(self.blocks)
-                    x = block(x, drop_connect_rate)
-
-                # Head
-                x = self.head_conv(x)
-                x = self.head_batch_norm(x)
-                x = self.head_swish(x)
-                return x
-
-        return Encoder()
-
-    @classmethod
-    def custom_head(cls, model_name, *, n_classes=1000, pretrained=False):
-        if n_classes == 1000:
-            return cls.from_name(model_name, n_classes=n_classes, pretrained=pretrained)
-        else:
-            class CustomHead(nn.Module):
-                def __init__(self, out_channels):
-                    super().__init__()
-                    self.encoder = cls.encoder(model_name, pretrained=pretrained)
-                    self.custom_head = custom_head(self.n_channels * 2, out_channels)
-
-                @property
-                def n_channels(self):
-                    n_channels_dict = {'efficientnet-b0': 1280, 'efficientnet-b1': 1280, 'efficientnet-b2': 1408,
-                                       'efficientnet-b3': 1536, 'efficientnet-b4': 1792, 'efficientnet-b5': 2048,
-                                       'efficientnet-b6': 2304, 'efficientnet-b7': 2560}
-                    return n_channels_dict[self.encoder.name]
-
-                def forward(self, x):
-                    x = self.encoder(x)
-                    mp = nn.AdaptiveMaxPool2d(output_size=(1, 1))(x)
-                    ap = nn.AdaptiveAvgPool2d(output_size=(1, 1))(x)
-                    x = torch.cat([mp, ap], dim=1)
-                    x = x.view(x.size(0), -1)
-                    x = self.custom_head(x)
-
-                    return x
-
-            return CustomHead(n_classes)
+    def load_state_dict(self, state_dict, **kwargs):
+        state_dict.pop("_fc.bias", None)
+        state_dict.pop("_fc.weight", None)
+        super().load_state_dict(state_dict, **kwargs)
 
 
-def _get_model_by_name(model_name, classes=1000, pretrained=False):
-    block_args_list, global_params = get_efficientnet_params(model_name, override_params={'num_classes': classes})
-    model = EfficientNet(block_args_list, global_params)
-    try:
-        if pretrained:
-            # pretrained_state_dict = load_state_dict_from_url(IMAGENET_WEIGHTS[model_name])
-            pretrained_state_dict = torch.load(IMAGENET_WEIGHTS[model_name],map_location='cpu')
+def _get_pretrained_settings(encoder):
+    pretrained_settings = {
+        "imagenet": {
+            "mean": [0.485, 0.456, 0.406],
+            "std": [0.229, 0.224, 0.225],
+            "url": url_map[encoder],
+            "input_space": "RGB",
+            "input_range": [0, 1],
+        },
+        "advprop": {
+            "mean": [0.5, 0.5, 0.5],
+            "std": [0.5, 0.5, 0.5],
+            "url": url_map_advprop[encoder],
+            "input_space": "RGB",
+            "input_range": [0, 1],
+        },
+    }
+    return pretrained_settings
 
-            if classes != 1000:
-                random_state_dict = model.state_dict()
-                pretrained_state_dict['_fc.weight'] = random_state_dict['_fc.weight']
-                pretrained_state_dict['_fc.bias'] = random_state_dict['_fc.bias']
 
-            model.load_state_dict(pretrained_state_dict)
+efficient_net_encoders = {
+    "efficientnet-b0": {
+        "encoder": EfficientNetEncoder,
+        "pretrained_settings": _get_pretrained_settings("efficientnet-b0"),
+        "params": {
+            "out_channels": (3, 32, 24, 40, 112, 320),
+            "stage_idxs": (3, 5, 9, 16),
+            "model_name": "efficientnet-b0",
+        },
+    },
+    "efficientnet-b1": {
+        "encoder": EfficientNetEncoder,
+        "pretrained_settings": _get_pretrained_settings("efficientnet-b1"),
+        "params": {
+            "out_channels": (3, 32, 24, 40, 112, 320),
+            "stage_idxs": (5, 8, 16, 23),
+            "model_name": "efficientnet-b1",
+        },
+    },
+    "efficientnet-b2": {
+        "encoder": EfficientNetEncoder,
+        "pretrained_settings": _get_pretrained_settings("efficientnet-b2"),
+        "params": {
+            "out_channels": (3, 32, 24, 48, 120, 352),
+            "stage_idxs": (5, 8, 16, 23),
+            "model_name": "efficientnet-b2",
+        },
+    },
+    "efficientnet-b3": {
+        "encoder": EfficientNetEncoder,
+        "pretrained_settings": _get_pretrained_settings("efficientnet-b3"),
+        "params": {
+            "out_channels": (3, 40, 32, 48, 136, 384),
+            "stage_idxs": (5, 8, 18, 26),
+            "model_name": "efficientnet-b3",
+        },
+    },
+    "efficientnet-b4": {
+        "encoder": EfficientNetEncoder,
+        "pretrained_settings": _get_pretrained_settings("efficientnet-b4"),
+        "params": {
+            "out_channels": (3, 48, 32, 56, 160, 448),
+            "stage_idxs": (6, 10, 22, 32),
+            "model_name": "efficientnet-b4",
+        },
+    },
+    "efficientnet-b5": {
+        "encoder": EfficientNetEncoder,
+        "pretrained_settings": _get_pretrained_settings("efficientnet-b5"),
+        "params": {
+            "out_channels": (3, 48, 40, 64, 176, 512),
+            "stage_idxs": (8, 13, 27, 39),
+            "model_name": "efficientnet-b5",
+        },
+    },
+    "efficientnet-b6": {
+        "encoder": EfficientNetEncoder,
+        "pretrained_settings": _get_pretrained_settings("efficientnet-b6"),
+        "params": {
+            "out_channels": (3, 56, 40, 72, 200, 576),
+            "stage_idxs": (9, 15, 31, 45),
+            "model_name": "efficientnet-b6",
+        },
+    },
+    "efficientnet-b7": {
+        "encoder": EfficientNetEncoder,
+        "pretrained_settings": _get_pretrained_settings("efficientnet-b7"),
+        "params": {
+            "out_channels": (3, 64, 48, 80, 224, 640),
+            "stage_idxs": (11, 18, 38, 55),
+            "model_name": "efficientnet-b7",
+        },
+    },
+}
+if __name__ == '__main__':
+    # input = torch.randn(2,3,256,256)
+    # depth = 5
+    # Encoder = efficient_net_encoders['efficientnet-b0']["encoder"]
+    # params = efficient_net_encoders['efficientnet-b0']["params"]
+    # params.update(depth=depth)
+    # encoder = Encoder(**params)
+    # out = encoder(input)
+    # print(out)
 
-    except KeyError as e:
-        print(f"NOTE: Currently model {e} doesn't have pretrained weights, therefore a model with randomly initialized"
-              " weights is returned.")
-
-    return model
+    input = torch.randn(2, 3, 256, 256)
+    encoder = torch_efficient.efficientnet_b0()
+    out = encoder(input)
+    print(out)
