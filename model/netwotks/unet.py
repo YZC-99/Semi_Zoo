@@ -29,7 +29,6 @@ class Unet(SegmentationModel):
         aux_params: Optional[dict] = None,
     ):
         super().__init__()
-
         self.encoder = get_encoder(
             encoder_name,
             in_channels=in_channels,
@@ -900,11 +899,12 @@ if __name__ == '__main__':
     in_chns = 3
     class_num1 = 5
     #
-    model = Unet_wFPN_wDAB(
+    model = Unet(
         encoder_name=backbone,
         encoder_weights='imagenet',
         in_channels=in_chns,
         classes=class_num1,
+        encoder_depth = 3,
     )
     out = model(data)
     print(out.shape)

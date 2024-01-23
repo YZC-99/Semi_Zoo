@@ -11,14 +11,18 @@ ssl._create_default_https_context = ssl._create_unverified_context
 
 
 def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt_weight=None):
+    decoder_channels = [256, 128, 64, 32, 16]
+    decoder_channels = decoder_channels[:args.encoder_deepth]
     # scse
     if model == "UNet":
         net =  Unet(
             encoder_name = backbone,
             encoder_weights = 'imagenet',
+            encoder_depth=args.encoder_deepth,
             in_channels = in_chns,
             classes= class_num1,
-            decoder_attention_type = args.decoder_attention_type
+            decoder_attention_type = args.decoder_attention_type,
+            decoder_channels = decoder_channels
         )
     elif model == "Unet_wFPN":
         net = Unet_wFPN(
