@@ -319,6 +319,7 @@ if __name__ == '__main__':
                         previous_files = glob.glob(os.path.join(snapshot_path, '*best_AUC_PR_EX*.pth'))
                         for file_path in previous_files:
                             os.remove(file_path)
+                            os.remove(file_path.replace('.pth','.txt'))
 
                         torch.save(model.state_dict(), save_mode_path)
                         with open(save_mode_path.replace('.pth','.txt'),'w') as f:
