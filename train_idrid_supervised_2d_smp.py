@@ -340,6 +340,8 @@ if __name__ == '__main__':
                         save_mode_path = os.path.join(
                             snapshot_path, name)
                         previous_files = glob.glob(os.path.join(snapshot_path, '*best_AUC_PR_MA*.txt'))
+                        for file_path in previous_files:
+                            os.remove(file_path)
                         with open(save_mode_path,'w') as f:
                             f.write(name + '\n')
 
@@ -349,6 +351,8 @@ if __name__ == '__main__':
                         save_mode_path = os.path.join(
                             snapshot_path, name)
                         previous_files = glob.glob(os.path.join(snapshot_path, '*best_AUC_PR_SE*.txt'))
+                        for file_path in previous_files:
+                            os.remove(file_path)
                         with open(save_mode_path,'w') as f:
                             f.write(name + '\n')
 
