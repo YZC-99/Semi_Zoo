@@ -13,13 +13,13 @@ def logs2csv(ex_path=''):
         w.writerow([
             'date',
             'experiment',
-            'EX_AUC-PR',
-            'EX_AUC-PR_iter',
+            'EX_pr',
             'MA_pr',
-            'MA_pr_iter',
             'SE_pr',
-            'SE_pr_iter',
             'HE_pr',
+            'EX_pr_iter',
+            'MA_pr_iter',
+            'SE_pr_iter',
             'HE_pr_iter',
             'model',
             'backbone',
@@ -66,7 +66,7 @@ def logs2csv(ex_path=''):
                             HE_pr = pth.split('HE')[-1].split('_')[0]
                             HE_pr_iter = pth.split('.txt')[0].split('_')[-1]
 
-                    elif 'log.txt' in pth:
+                    if 'log.txt' in pth:
                         log_file_path = os.path.join(root, pth)
                         with open(log_file_path, 'r') as f:
                             conf_str = f.readlines(1)[0].split('Namespace')[-1]
@@ -83,17 +83,17 @@ def logs2csv(ex_path=''):
                         date = os.path.getctime(log_file_path)
                         date = datetime.datetime.fromtimestamp(date).strftime('%m-%d-%H-%M-%S')
 
-
+                print(SE_pr)
                 w.writerow([
                     date,
                     experiment,
                     EX_pr,
-                    EX_pr_iter,
                     MA_pr,
-                    MA_pr_iter,
                     SE_pr,
-                    SE_pr_iter,
                     HE_pr,
+                    EX_pr_iter,
+                    MA_pr_iter,
+                    SE_pr_iter,
                     HE_pr_iter,
                     conf.get('model', 'N/A'),
                     conf.get('backbone', 'N/A'),
