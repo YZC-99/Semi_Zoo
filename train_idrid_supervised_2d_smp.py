@@ -195,6 +195,9 @@ if __name__ == '__main__':
     DR_val_metrics = DR_metrics(device)
     # DR_val_metrics = Sklearn_DR_metrics()
     best_AUC_PR_EX = 0
+    best_AUC_PR_HE = 0
+    best_AUC_PR_MA = 0
+    best_AUC_PR_SE = 0
     for epoch_num in iterator:
         torch.cuda.empty_cache()
         time1 = time.time()
@@ -318,8 +321,36 @@ if __name__ == '__main__':
                             os.remove(file_path)
 
                         torch.save(model.state_dict(), save_mode_path)
+                        with open(save_mode_path.replace('.pth','.txt'),'w') as f:
+                            f.write(name + '\n')
                         logging.info("save model to {}".format(save_mode_path))
+                    if HE_AUC_PR > best_AUC_PR_HE:
+                        best_AUC_PR_HE = HE_AUC_PR
+                        name = "best_AUC_PR_HE" + str(round(best_AUC_PR_HE.item(), 4)) +'_iter_' + str(iter_num)  + '.txt'
+                        save_mode_path = os.path.join(
+                            snapshot_path, name)
+                        previous_files = glob.glob(os.path.join(snapshot_path, '*best_AUC_PR_HE*.txt'))
+                        for file_path in previous_files:
+                            os.remove(file_path)
+                        with open(save_mode_path,'w') as f:
+                            f.write(name + '\n')
+                    if MA_AUC_PR > best_AUC_PR_MA:
+                        best_AUC_PR_MA = MA_AUC_PR
+                        name = "best_AUC_PR_MA" + str(round(best_AUC_PR_MA.item(), 4)) +'_iter_' + str(iter_num)  + '.txt'
+                        save_mode_path = os.path.join(
+                            snapshot_path, name)
+                        previous_files = glob.glob(os.path.join(snapshot_path, '*best_AUC_PR_MA*.txt'))
+                        with open(save_mode_path,'w') as f:
+                            f.write(name + '\n')
 
+                    if SE_AUC_PR > best_AUC_PR_SE:
+                        best_AUC_PR_SE = SE_AUC_PR
+                        name = "best_AUC_PR_SE" + str(round(best_AUC_PR_SE.item(), 4)) +'_iter_' + str(iter_num)  + '.txt'
+                        save_mode_path = os.path.join(
+                            snapshot_path, name)
+                        previous_files = glob.glob(os.path.join(snapshot_path, '*best_AUC_PR_SE*.txt'))
+                        with open(save_mode_path,'w') as f:
+                            f.write(name + '\n')
 
                 if iter_num % args.save_period == 0:
                     save_mode_path = os.path.join(
