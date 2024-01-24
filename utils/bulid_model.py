@@ -249,6 +249,15 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             sr_pretrained=args.sr_pretrained
         )
 
+    elif model == 'DeepLabv3p':
+        net = smp.DeepLabV3Plus(
+            encoder_name=backbone,
+            encoder_weights='imagenet',
+            in_channels=in_chns,
+            classes=class_num1,
+        )
+
+
 
     if ckpt_weight is not None:
         if args.exclude_keys is not None:
