@@ -56,8 +56,6 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
         )
 
 
-
-
     elif model == "Unet_wRTFM":
         net = Unet_wRTFM(
             encoder_name=backbone,

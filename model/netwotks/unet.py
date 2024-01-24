@@ -118,7 +118,7 @@ class Unet_wRTFM(SegmentationModel):
             weights=encoder_weights,
         )
 
-        self.RTFM = RTFM(self.encoder.out_channels[-1],192,192)
+        self.RTFM = RTFM(self.encoder.out_channels[-1],self.encoder.out_channels[-1],self.encoder.out_channels[-1])
 
         self.decoder = UnetDecoder(
             encoder_channels=self.encoder.out_channels,
