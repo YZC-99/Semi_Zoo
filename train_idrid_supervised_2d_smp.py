@@ -268,7 +268,10 @@ if __name__ == '__main__':
                     show_id = random.randint(0,len(val_iteriter))
                     for id,data in enumerate(val_iteriter):
                         img,label = data['image'].to(device),data['label'].to(device)
-                        outputs = model(img)
+                        if args.obj_loss > 0:
+                            outputs,_ = model(img)
+                        else:
+                            outputs = model(img)
 
                         DR_val_metrics.add(outputs.detach(),label)
 
