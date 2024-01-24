@@ -83,7 +83,6 @@ def logs2csv(ex_path=''):
                         date = os.path.getctime(log_file_path)
                         date = datetime.datetime.fromtimestamp(date).strftime('%m-%d-%H-%M-%S')
 
-                print(SE_pr)
                 w.writerow([
                     date,
                     experiment,

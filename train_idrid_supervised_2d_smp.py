@@ -42,6 +42,7 @@ parser.add_argument('--ckpt_weight',type=str,default=None)
 
 # ==============loss===================
 parser.add_argument('--main_criteria', type=str, default='ce',choices=['ce','dice','ce-dice','softmax_focal','annealing_softmax_focal'])
+parser.add_argument('--obj_loss', type=float, default=-1.0)
 parser.add_argument('--ce_weight', type=float, nargs='+', default=[1,1,1,1,1], help='List of floating-point values')
 parser.add_argument('--ohem',type=float,default=-1.0)
 parser.add_argument('--annealing_softmax_focalloss',action='store_true')
@@ -186,7 +187,7 @@ if __name__ == '__main__':
     lr_ = args.base_lr
     model.train()
 
-
+    obj_loss = BCEWithLogitsLoss()
 
     print("=================共计训练epoch: {}====================".format(max_epoch))
 
@@ -209,11 +210,20 @@ if __name__ == '__main__':
             all_batch = labeled_batch
             all_label_batch = label_label_batch
 
-            outputs = model(all_batch)
+            loss_seg_obj = 0
 
+            if args.obj_loss > 0:
+                assert 'Dual' in args.model , 'model必须是双输出'
+                outputs,obj_outputs = model(all_batch)
+                obj_label_batch = torch.zeros_like(label_label_batch)
+                obj_label_batch[label_label_batch > 0] = 1
+                onehot_obj_label_batch = torch.nn.functional.one_hot(obj_label_batch.to(torch.int64), num_classes=2).permute(0,3,1,2).float()
+                loss_seg_obj = obj_loss(obj_outputs,onehot_obj_label_batch)
+            else:
+                outputs = model(all_batch)
 
             loss_seg_main = criteria(args, outputs, all_label_batch, iter_num)
-            loss = loss_seg_main
+            loss = loss_seg_main + args.obj_loss * loss_seg_obj
 
             optimizer.zero_grad()
             loss.backward()
@@ -230,6 +240,7 @@ if __name__ == '__main__':
             writer.add_scalar('lr', optimizer.param_groups[0]['lr'], iter_num)
             writer.add_scalar('loss/loss', loss, iter_num)
             writer.add_scalar('loss/loss_seg', loss_seg_main, iter_num)
+            writer.add_scalar('loss/loss_seg_obj', loss_seg_obj, iter_num)
 
 
 
@@ -281,19 +292,6 @@ if __name__ == '__main__':
                     MA_AUC_PR, HE_AUC_PR, EX_AUC_PR, SE_AUC_PR = AUC_PR['MA_AUC_PR'],AUC_PR['HE_AUC_PR'],AUC_PR['EX_AUC_PR'],AUC_PR['SE_AUC_PR']
                     MA_AUC_ROC, HE_AUC_ROC, EX_AUC_ROC, SE_AUC_ROC = AUC_ROC['MA_AUC_ROC'],AUC_ROC['HE_AUC_ROC'],AUC_ROC['EX_AUC_ROC'],AUC_ROC['SE_AUC_ROC']
 
-                    #
-                    # logging.info("MA_AUC_PR:{}--HE_AUC_PR:{}--EX_AUC_PR:{}--SE_AUC_PR:{}".format(
-                    #                                                                         MA_AUC_PR,
-                    #                                                                         HE_AUC_PR,
-                    #                                                                         EX_AUC_PR,
-                    #                                                                        SE_AUC_PR,
-                    #                                                                        ))
-                    # logging.info("MA_AUC_ROC:{}--HE_AUC_ROC:{}--EX_AUC_ROC:{}--SE_AUC_ROC:{}".format(
-                    #                                                                         MA_AUC_ROC,
-                    #                                                                         HE_AUC_ROC,
-                    #                                                                         EX_AUC_ROC,
-                    #                                                                        SE_AUC_ROC,
-                    #                                                                        ))
 
                     writer.add_scalar('val_AUC_PR/MA',MA_AUC_PR, iter_num)
                     writer.add_scalar('val_AUC_PR/HE',HE_AUC_PR, iter_num)
