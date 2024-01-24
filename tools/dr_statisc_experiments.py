@@ -15,6 +15,12 @@ def logs2csv(ex_path=''):
             'experiment',
             'EX_AUC-PR',
             'EX_AUC-PR_iter',
+            'MA_pr',
+            'MA_pr_iter',
+            'SE_pr',
+            'SE_pr_iter',
+            'HE_pr',
+            'HE_pr_iter',
             'model',
             'backbone',
             'with_ce',
@@ -38,11 +44,27 @@ def logs2csv(ex_path=''):
                 conf = {}
                 EX_pr = 0
                 EX_pr_iter = 0
+                MA_pr = 0
+                MA_pr_iter = 0
+                SE_pr = 0
+                SE_pr_iter = 0
+                HE_pr = 0
+                HE_pr_iter = 0
                 date = None
                 for pth in files:
-                    if 'EX' in pth:
-                        EX_pr = pth.split('EX')[-1].split('_')[0]
-                        EX_pr_iter = pth.split('.pth')[0].split('_')[-1]
+                    if '.txt' in pth:
+                        if 'EX' in pth:
+                            EX_pr = pth.split('EX')[-1].split('_')[0]
+                            EX_pr_iter = pth.split('.txt')[0].split('_')[-1]
+                        if 'MA' in pth:
+                            MA_pr = pth.split('MA')[-1].split('_')[0]
+                            MA_pr_iter = pth.split('.txt')[0].split('_')[-1]
+                        if 'SE' in pth:
+                            SE_pr = pth.split('SE')[-1].split('_')[0]
+                            SE_pr_iter = pth.split('.txt')[0].split('_')[-1]
+                        if 'HE' in pth:
+                            HE_pr = pth.split('HE')[-1].split('_')[0]
+                            HE_pr_iter = pth.split('.txt')[0].split('_')[-1]
 
                     elif 'log.txt' in pth:
                         log_file_path = os.path.join(root, pth)
@@ -67,6 +89,12 @@ def logs2csv(ex_path=''):
                     experiment,
                     EX_pr,
                     EX_pr_iter,
+                    MA_pr,
+                    MA_pr_iter,
+                    SE_pr,
+                    SE_pr_iter,
+                    HE_pr,
+                    HE_pr_iter,
                     conf.get('model', 'N/A'),
                     conf.get('backbone', 'N/A'),
                     conf.get('with_ce', 'True'),  # 如果 'ohem' 不存在，返回 'N/A'
