@@ -1,11 +1,10 @@
 python train_idrid_supervised_2d_smp.py \
         --num_works 4 \
         --device 0 \
-        --exp crop_IDRID/UNet/resnet50-deepth3/imgz1024_bs2_CLAHE2_lr2e-4_3k \
+        --exp crop_IDRID/UNetpp/resnet50/imgz1024_bs2_CLAHE2_lr2e-4_3k \
         --dataset_name crop_IDRID \
         --image_size 1024 \
-        --model UNet \
-        --encoder_deepth 3 \
+        --model UNetpp \
         --optim Adam \
         --batch_size 2 \
         --base_lr 0.0002 \
@@ -14,6 +13,8 @@ python train_idrid_supervised_2d_smp.py \
         --max_iterations 3000 \
         --backbone resnet50
 
+DeepLabv3p
+UNetpp
 Unet_wRTFM
 Unet_wRTFM_wFPN
 Unet_wFPN
