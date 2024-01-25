@@ -2,8 +2,6 @@ import torch
 import torch.nn as nn
 from torch.nn import Softmax
 from torch.nn import init
-from fightingcv_attention.attention.PSA import PSA
-from fightingcv_attention.attention.SGE import SpatialGroupEnhance
 
 class SCSEModule(nn.Module):
     def __init__(self, in_channels, reduction=16):
