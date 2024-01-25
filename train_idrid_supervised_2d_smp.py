@@ -56,7 +56,7 @@ parser.add_argument('--with_dice',action='store_true')
 parser.add_argument('--base_lr',type=float,default=0.00025)
 parser.add_argument('--lr_decouple',action='store_true')
 parser.add_argument('--warmup',type=float,default=0.01)
-parser.add_argument('--scheduler',type=str,default='poly-v2',choices=['poly-v2','poly','no'])
+parser.add_argument('--scheduler',type=str,default='poly-v2',choices=['poly-v2','poly','no','my_decay_v1'])
 # ==============lr===================
 
 # ==============training params===================

@@ -10,6 +10,7 @@ python train_idrid_supervised_2d_smp.py \
         --base_lr 0.0003 \
         --CLAHE 0 \
         --autodl \
+        --scheduler \
         --max_iterations 5000 \
         --backbone resnet50
 
