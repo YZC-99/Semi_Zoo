@@ -457,8 +457,6 @@ class IDRIDDataset(Dataset):
                 img, mask = hflip(img, mask)
             if random.random() < 0.5:
                 img, mask = vflip(img, mask)
-            if random.random() < 0.5:
-                img, mask = random_rotate(img, mask,max_rotation_angle=30)
             if self.size == 1440:
                 img, mask = resize1440(img, mask)
                 if random.random() < 0.5:
@@ -467,18 +465,18 @@ class IDRIDDataset(Dataset):
                 img, mask = resize(img, mask, self.size,self.size)
                 if random.random() < 0.5:
                     img, mask = random_scale_and_crop(img, mask, target_size=(self.size, self.size))
+            if random.random() < 0.5:
+                img, mask = random_rotate(img, mask,max_rotation_angle=30)
+            if random.random() < 0.5:
+                img, mask = random_translate(img, mask)
+
         else:
             if self.size == 1440:
                 img, mask = resize1440(img, mask)
             else:
                 img, mask = resize(img, mask, self.size,self.size)
 
-        if self.CLAHE:
-            # img, mask = normalize(img, mask, mean=(0.0,), std=(1.0,))
-            img, mask = normalize(img, mask, mean=MEAN_RGB, std=STDDEV_RGB)
-        else:
-            # img, mask = normalize(img, mask,mean=(116.51,56,437,16.31),std=(81.60,41.72,7.36))
-            img, mask = normalize(img, mask, mean=MEAN_RGB, std=STDDEV_RGB)
+        img, mask = normalize(img, mask, mean=MEAN_RGB, std=STDDEV_RGB)
 
         return {'image': img, 'label': mask}
 

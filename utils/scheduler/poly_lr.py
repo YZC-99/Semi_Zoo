@@ -109,3 +109,10 @@ class PolyLRScheduler(Scheduler):
             return self.t_initial * cycles
         else:
             return int(math.floor(-self.t_initial * (self.cycle_mul ** cycles - 1) / (1 - self.cycle_mul)))
+
+
+def poly_step_decay(current_epoch,total_epochs=60,base_lr=0.0001):
+    initial_lrate = base_lr
+    epochs_drop = total_epochs
+    lrate = initial_lrate * math.pow(1-(1+current_epoch)/epochs_drop,0.9)
+    return lrate

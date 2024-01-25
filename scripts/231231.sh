@@ -1,18 +1,19 @@
 python train_idrid_supervised_2d_smp.py \
         --num_works 4 \
         --device 0 \
-        --exp crop_IDRID/Unet_wRTFM/resnet50_qkv/imgz1024_bs2_CLAHE2_lr2e-4_3k \
+        --exp crop_IDRID/Unet_wFPN_wSR/resnet50/nolrdecay/imgz1024_bs2_Adam_CLAHE0_lr3e-4_5k\
         --dataset_name crop_IDRID \
         --image_size 1024 \
-        --model Unet_wRTFM \
+        --model Unet_wFPN_wSR \
         --optim Adam \
         --batch_size 2 \
-        --base_lr 0.0002 \
-        --CLAHE 2 \
+        --base_lr 0.0003 \
+        --CLAHE 0 \
         --autodl \
-        --max_iterations 3000 \
+        --max_iterations 5000 \
         --backbone resnet50
 
+        --main_criteria softmax_focal \
 
         --obj_loss 1.0 \
 

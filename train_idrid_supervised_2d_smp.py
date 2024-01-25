@@ -13,6 +13,7 @@ from utils.test_utils import DR_metrics,Sklearn_DR_metrics
 from utils.util import color_map,gray_to_color
 import random
 from utils.util import get_optimizer,PolyLRwithWarmup, compute_sdf,compute_sdf_luoxd,compute_sdf_multi_class
+from utils.scheduler.my_scheduler import my_decay_v1
 from utils.bulid_model import build_model
 from utils.training_utils import criteria
 import time
@@ -24,7 +25,7 @@ import math
 import sys
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
-
+from utils.scheduler.poly_lr import poly_step_decay
 
 parser = argparse.ArgumentParser()
 
@@ -55,7 +56,7 @@ parser.add_argument('--with_dice',action='store_true')
 parser.add_argument('--base_lr',type=float,default=0.00025)
 parser.add_argument('--lr_decouple',action='store_true')
 parser.add_argument('--warmup',type=float,default=0.01)
-parser.add_argument('--scheduler',type=str,default='poly-v2')
+parser.add_argument('--scheduler',type=str,default='poly-v2',choices=['poly-v2','poly','no'])
 # ==============lr===================
 
 # ==============training params===================
@@ -77,11 +78,7 @@ parser.add_argument('--autodl',action='store_true')
 
 
 
-def step_decay(current_epoch,total_epochs=60,base_lr=0.0001):
-    initial_lrate = base_lr
-    epochs_drop = total_epochs
-    lrate = initial_lrate * math.pow(1-(1+current_epoch)/epochs_drop,0.9)
-    return lrate
+
 
 
 
@@ -232,9 +229,16 @@ if __name__ == '__main__':
             if args.scheduler == 'poly':
                 scheduler.step()
             elif args.scheduler == 'poly-v2':
-                current_lr = step_decay(epoch_num,max_epoch,args.base_lr)
+                current_lr = poly_step_decay(epoch_num,max_epoch,args.base_lr)
                 for param_group in optimizer.param_groups:
                     param_group['lr'] = current_lr
+            elif args.scheduler == 'no':
+                for param_group in optimizer.param_groups:
+                    param_group['lr'] = lr_
+            elif args.scheduler == 'my_decay_v1':
+                    if iter_num == 0:
+                        param_group['lr'] = args.base_lr
+                    param_group['lr'] = my_decay_v1(epoch_num,param_group['lr'])
 
             iter_num = iter_num + 1
             writer.add_scalar('lr', optimizer.param_groups[0]['lr'], iter_num)
