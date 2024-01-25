@@ -236,10 +236,12 @@ if __name__ == '__main__':
                 for param_group in optimizer.param_groups:
                     param_group['lr'] = lr_
             elif args.scheduler == 'my_decay_v1':
+                for param_group in optimizer.param_groups:
                     if iter_num == 0:
                         param_group['lr'] = args.base_lr
-                    for param_group in optimizer.param_groups:
+                    else:
                         param_group['lr'] = my_decay_v1(epoch_num,param_group['lr'])
+
 
             iter_num = iter_num + 1
             writer.add_scalar('lr', optimizer.param_groups[0]['lr'], iter_num)
