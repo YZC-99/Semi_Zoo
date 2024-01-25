@@ -2,7 +2,7 @@ import torch
 import segmentation_models_pytorch as smp
 from model.netwotks.unet import Unet,Unet_wRTFM,Unet_wFPN_wlightDecoder,Unet_wRTFM_wFPN_wlightDecoder,Two_Encoder_Unet_wRTFM
 from model.netwotks.unet import Unet_wFPN,Unet_wRTFM_wFPN,Unet_wFPN_wDAB,Unet_wFPN_wSR,Unet_wDAB,Unet_wFPN_wDAB_wSR
-from model.netwotks.unet import Unet_wSR
+from model.netwotks.unet import Unet_wSR,Unet_wFPN_wDAB_wSR_wRTFM
 from model.netwotks.sr_unet import SR_Unet,SR_Unet_woFPN,SR_Unet_SR_FPN,SR_Unet_woSR
 from model.netwotks.sr_light_net import LightNet_wFPN,LightNet_wSR,LightNet_wFPN_wSR
 from model.netwotks.dual_decoer_unet import Dual_Decoder_Unet,Dual_Seg_Head_Unet,Dual_Decoder_SR_Unet,Dual_Decoder_SR_Unet_woSR,Dual_Decoder_SR_Unet_woFPN
@@ -77,7 +77,16 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             encoder_depth=args.encoder_deepth,
             decoder_channels=decoder_channels
         )
-
+    elif model == "Unet_wFPN_wDAB_wSR_wRTFM":
+        net = Unet_wFPN_wDAB_wSR_wRTFM(
+            encoder_name=backbone,
+            encoder_weights='imagenet',
+            in_channels=in_chns,
+            classes=class_num1,
+            decoder_attention_type=args.decoder_attention_type,
+            encoder_depth=args.encoder_deepth,
+            decoder_channels=decoder_channels
+        )
 
 
     elif model == "Unet_wFPN_wSR":
