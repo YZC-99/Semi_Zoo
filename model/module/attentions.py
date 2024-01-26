@@ -122,11 +122,11 @@ class PSAModule(nn.Module):
         super().__init__()
         self.S = S
 
-        self.convs = []
+        self.convs = nn.ModuleList()
         for i in range(S):
             self.convs.append(nn.Conv2d(in_channels // S, in_channels // S, kernel_size=2 * (i + 1) + 1, padding=i + 1))
 
-        self.se_blocks = []
+        self.se_blocks = nn.ModuleList()
         for i in range(S):
             self.se_blocks.append(nn.Sequential(
                 nn.AdaptiveAvgPool2d(1),
@@ -158,11 +158,13 @@ class PSAModule(nn.Module):
         # Step1:SPC module
         SPC_out = x.view(b, self.S, c // self.S, h, w)  # bs,s,ci,h,w
         for idx, conv in enumerate(self.convs):
+            # conv = conv.to('cuda')
             SPC_out[:, idx, :, :, :] = conv(SPC_out[:, idx, :, :, :])
 
         # Step2:SE weight
         se_out = []
         for idx, se in enumerate(self.se_blocks):
+            # se = se.to('cuda')
             se_out.append(se(SPC_out[:, idx, :, :, :]))
         SE_out = torch.stack(se_out, dim=1)
         SE_out = SE_out.expand_as(SPC_out)
@@ -325,7 +327,7 @@ class Attention(nn.Module):
         return self.attention(x)
 
 if __name__ == '__main__':
-    input = torch.randn(4,512,32,32)
-    attention = PSAModule(512)
+    input = torch.randn(4,512,32,32,device='cuda')
+    attention = PSAModule(512).cuda()
     out = attention(input)
     print(out.shape)
