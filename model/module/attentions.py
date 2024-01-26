@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 from torch.nn import Softmax
 from torch.nn import init
-from fightingcv_attention.attention.BAM import BAMBlock
 
 
 class Flatten(nn.Module):
