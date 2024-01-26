@@ -2,87 +2,10 @@ import torch
 import torch.nn as nn
 from torch.nn import Softmax
 from torch.nn import init
+from model.module.external_attentions.bam import BAMBlock
+from model.module.external_attentions.cbam import CBAMBlock
 
 
-class Flatten(nn.Module):
-    def forward(self, x):
-        return x.view(x.shape[0], -1)
-
-
-class ChannelAttention(nn.Module):
-    def __init__(self, channel, reduction=16, num_layers=3):
-        super().__init__()
-        self.avgpool = nn.AdaptiveAvgPool2d(1)
-        gate_channels = [channel]
-        gate_channels += [channel // reduction] * num_layers
-        gate_channels += [channel]
-
-        self.ca = nn.Sequential()
-        self.ca.add_module('flatten', Flatten())
-        for i in range(len(gate_channels) - 2):
-            self.ca.add_module('fc%d' % i, nn.Linear(gate_channels[i], gate_channels[i + 1]))
-            self.ca.add_module('bn%d' % i, nn.BatchNorm1d(gate_channels[i + 1]))
-            self.ca.add_module('relu%d' % i, nn.ReLU())
-        self.ca.add_module('last_fc', nn.Linear(gate_channels[-2], gate_channels[-1]))
-
-    def forward(self, x):
-        res = self.avgpool(x)
-        res = self.ca(res)
-        res = res.unsqueeze(-1).unsqueeze(-1).expand_as(x)
-        return res
-
-
-class SpatialAttention(nn.Module):
-    def __init__(self, channel, reduction=16, num_layers=3, dia_val=2):
-        super().__init__()
-        self.sa = nn.Sequential()
-        self.sa.add_module('conv_reduce1',
-                           nn.Conv2d(kernel_size=1, in_channels=channel, out_channels=channel // reduction))
-        self.sa.add_module('bn_reduce1', nn.BatchNorm2d(channel // reduction))
-        self.sa.add_module('relu_reduce1', nn.ReLU())
-        for i in range(num_layers):
-            self.sa.add_module('conv_%d' % i, nn.Conv2d(kernel_size=3, in_channels=channel // reduction,
-                                                        out_channels=channel // reduction, padding=2,stride=1, dilation=dia_val))
-            self.sa.add_module('bn_%d' % i, nn.BatchNorm2d(channel // reduction))
-            self.sa.add_module('relu_%d' % i, nn.ReLU())
-        self.sa.add_module('last_conv', nn.Conv2d(channel // reduction, 1, kernel_size=1))
-
-    def forward(self, x):
-        res = self.sa(x)
-        res = res.expand_as(x)
-        return res
-
-
-class BAMBlock(nn.Module):
-
-    def __init__(self, channel=512,reduction=16,dia_val=2):
-        super().__init__()
-        self.ca=ChannelAttention(channel=channel,reduction=reduction)
-        self.sa=SpatialAttention(channel=channel,reduction=reduction,dia_val=dia_val)
-        self.sigmoid=nn.Sigmoid()
-
-
-    def init_weights(self):
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                init.kaiming_normal_(m.weight, mode='fan_out')
-                if m.bias is not None:
-                    init.constant_(m.bias, 0)
-            elif isinstance(m, nn.BatchNorm2d):
-                init.constant_(m.weight, 1)
-                init.constant_(m.bias, 0)
-            elif isinstance(m, nn.Linear):
-                init.normal_(m.weight, std=0.001)
-                if m.bias is not None:
-                    init.constant_(m.bias, 0)
-
-    def forward(self, x):
-        b, c, _, _ = x.size()
-        sa_out=self.sa(x)
-        ca_out=self.ca(x)
-        weight=self.sigmoid(sa_out+ca_out)
-        out=(1+weight)*x
-        return out
 
 
 class SCSEModule(nn.Module):
@@ -99,6 +22,38 @@ class SCSEModule(nn.Module):
 
     def forward(self, x):
         return x * self.cSE(x) + x * self.sSE(x)
+
+class SCCBAMMModule(nn.Module):
+    def __init__(self, in_channels, reduction=16):
+        super().__init__()
+        self.cSE = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Conv2d(in_channels, in_channels // reduction, 1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels // reduction, in_channels, 1),
+            nn.Sigmoid(),
+        )
+        self.sSE = nn.Sequential(nn.Conv2d(in_channels, 1, 1), nn.Sigmoid())
+        self.cbam = CBAMBlock(in_channels)
+
+    def forward(self, x):
+        return x * self.cSE(x) + x * self.sSE(x) + x * self.cbam(x)
+class SC2CBAMMModule(nn.Module):
+    def __init__(self, in_channels, reduction=16):
+        super().__init__()
+        self.cSE = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Conv2d(in_channels, in_channels // reduction, 1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels // reduction, in_channels, 1),
+            nn.Sigmoid(),
+        )
+        self.sSE = nn.Sequential(nn.Conv2d(in_channels, 1, 1), nn.Sigmoid())
+        self.cbam = CBAMBlock(in_channels)
+
+    def forward(self, x):
+        scse_out = x * self.cSE(x) + x * self.sSE(x)
+        return  scse_out * self.cbam(scse_out)
 
 
 class SCBAMMModule(nn.Module):
@@ -324,36 +279,6 @@ class CrissCrossAttention(nn.Module):
         return self.gamma * (out_H + out_W) + x
 
 
-    # def forward(self, x):
-    #     m_batchsize, _, height, width = x.size()
-    #     proj_query = self.query_conv(x)
-    #     proj_query_H = proj_query.permute(0, 3, 1, 2).contiguous().view(m_batchsize * width, -1, height).permute(0, 2,
-    #                                                                                                              1)
-    #     proj_query_W = proj_query.permute(0, 2, 1, 3).contiguous().view(m_batchsize * height, -1, width).permute(0, 2,
-    #                                                                                                              1)
-    #     proj_key = self.key_conv(x)
-    #     proj_key_H = proj_key.permute(0, 3, 1, 2).contiguous().view(m_batchsize * width, -1, height)
-    #     proj_key_W = proj_key.permute(0, 2, 1, 3).contiguous().view(m_batchsize * height, -1, width)
-    #     proj_value = self.value_conv(x)
-    #     proj_value_H = proj_value.permute(0, 3, 1, 2).contiguous().view(m_batchsize * width, -1, height)
-    #     proj_value_W = proj_value.permute(0, 2, 1, 3).contiguous().view(m_batchsize * height, -1, width)
-    #     energy_H = (torch.bmm(proj_query_H, proj_key_H) + self.INF(m_batchsize, height, width)).view(m_batchsize, width,
-    #                                                                                                  height,
-    #                                                                                                  height).permute(0,
-    #                                                                                                                  2,
-    #                                                                                                                  1,
-    #                                                                                                                  3)
-    #     energy_W = torch.bmm(proj_query_W, proj_key_W).view(m_batchsize, height, width, width)
-    #     concate = self.softmax(torch.cat([energy_H, energy_W], 3))
-    #
-    #     att_H = concate[:, :, :, 0:height].permute(0, 2, 1, 3).contiguous().view(m_batchsize * width, height, height)
-    #     # print(concate)
-    #     # print(att_H)
-    #     att_W = concate[:, :, :, height:height + width].contiguous().view(m_batchsize * height, width, width)
-    #     out_H = torch.bmm(proj_value_H, att_H.permute(0, 2, 1)).view(m_batchsize, width, -1, height).permute(0, 2, 3, 1)
-    #     out_W = torch.bmm(proj_value_W, att_W.permute(0, 2, 1)).view(m_batchsize, height, -1, width).permute(0, 2, 1, 3)
-    #     # print(out_H.size(),out_W.size())
-    #     return self.gamma * (out_H + out_W) + x
 
 
 class Attention(nn.Module):
@@ -364,6 +289,10 @@ class Attention(nn.Module):
             self.attention = nn.Identity(**params)
         elif name == "scse":
             self.attention = SCSEModule(**params)
+        elif name == "sccbam":
+            self.attention = SCCBAMMModule(**params)
+        elif name == "sc2cbam":
+            self.attention = SC2CBAMMModule(**params)
         elif name == "scbam":
             self.attention = SCBAMMModule(**params)
         elif name == "sc2bam":
