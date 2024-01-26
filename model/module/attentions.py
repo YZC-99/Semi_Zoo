@@ -35,7 +35,6 @@ class SCPSAMModule(nn.Module):
         self.psa = PSAModule(in_channels,reduction=reduction)
 
     def forward(self, x):
-        self.psa.to(x.device)
         return x * self.cSE(x) + x * self.sSE(x) + x * self.psa(x)
 
 class SC2PSAMModule(nn.Module):
@@ -94,17 +93,17 @@ class PSAModule(nn.Module):
 
     def forward(self, x):
         b, c, h, w = x.size()
+        if b == 0:
+            return x
 
         # Step1:SPC module
         SPC_out = x.view(b, self.S, c // self.S, h, w)  # bs,s,ci,h,w
         for idx, conv in enumerate(self.convs):
-            # conv = conv.to('cuda')
             SPC_out[:, idx, :, :, :] = conv(SPC_out[:, idx, :, :, :])
 
         # Step2:SE weight
         se_out = []
         for idx, se in enumerate(self.se_blocks):
-            # se = se.to('cuda')
             se_out.append(se(SPC_out[:, idx, :, :, :]))
         SE_out = torch.stack(se_out, dim=1)
         SE_out = SE_out.expand_as(SPC_out)
