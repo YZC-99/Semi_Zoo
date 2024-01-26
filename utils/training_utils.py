@@ -12,7 +12,7 @@ def ce_dice_criteria(outputs,all_label_batch):
     return loss_ce + loss_dice
 
 def criteria(args,outputs,all_label_batch,iter_num):
-    dice_criteria = smp.losses.DiceLoss(mode='multiclass', from_logits=True,log_loss=True)
+    dice_criteria = smp.losses.DiceLoss(mode='multiclass', from_logits=True)
     ce_criteria = CrossEntropyLoss(ignore_index=255)
     weight_ce_criteria = CrossEntropyLoss(ignore_index=255,weight=torch.tensor([1.0,2.0,2.0,2.0,2.0],device=outputs.device))
 

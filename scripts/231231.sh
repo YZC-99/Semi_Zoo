@@ -18,19 +18,19 @@ python train_idrid_supervised_2d_smp.py \
 python train_idrid_supervised_2d_smp.py \
         --num_works 4 \
         --device 0 \
-        --exp crop_IDRID/Unet_wFPN_wDAB_wSR/resnet50_weight-ce/imgz1024_bs2_Adam_CLAHE0_lr3e-4-5k\
-        --dataset_name crop_IDRID \
+        --exp cnn_preprocess_IDRID/Unet_wFPN-wDecoder-sece/resnext50_32x4d/imgz1024_bs2_Adam_CLAHE0_lr3e-4-5k\
+        --dataset_name cnn_preprocess_IDRID \
         --image_size 1024 \
-        --model Unet_wFPN_wDAB_wSR \
+        --model Unet_wFPN \
         --optim Adam \
         --batch_size 2 \
         --base_lr 0.0003 \
         --CLAHE 0 \
         --autodl \
-        --main_criteria weight-ce \
+        --decoder_attention_type scse \
         --scheduler no \
         --max_iterations 5000 \
-        --backbone resnet50
+        --backbone resnext50_32x4d
 
 python train_idrid_supervised_2d_smp.py \
         --num_works 4 \
