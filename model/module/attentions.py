@@ -92,7 +92,7 @@ class SCPSAMModule(nn.Module):
             nn.Sigmoid(),
         )
         self.sSE = nn.Sequential(nn.Conv2d(in_channels, 1, 1), nn.Sigmoid())
-        self.psa = PSA(in_channels,reduction=reduction)
+        self.psa = PSA(in_channels,reduction=reduction).cuda()
 
     def forward(self, x):
         return x * self.cSE(x) + x * self.sSE(x) + x * self.psa(x)
