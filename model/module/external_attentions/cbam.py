@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import torch.nn.functional as F
 from torch import nn
 from torch.nn import init
 
@@ -65,7 +66,10 @@ class CBAMBlock(nn.Module):
         b, c, _, _ = x.size()
         residual = x
         out = x * self.ca(x)
-        out = out * self.sa(out)
+        sa_out = self.sa(out)
+        if sa_out.size()[-1] != out.size()[-1]:
+            sa_out = F.interpolate(sa_out,size=out.size()[-2:])
+        out = out * sa_out
         return out + residual
 
 
