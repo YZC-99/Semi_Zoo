@@ -14,9 +14,11 @@ def ce_dice_criteria(outputs,all_label_batch):
 def criteria(args,outputs,all_label_batch,iter_num):
     dice_criteria = smp.losses.DiceLoss(mode='multiclass', from_logits=True,log_loss=True)
     ce_criteria = CrossEntropyLoss(ignore_index=255)
+    weight_ce_criteria = CrossEntropyLoss(ignore_index=255,weight=torch.tensor([1.0,2.0,2.0,2.0,2.0],device=outputs.device))
 
 
     seg_criteria = {'ce':ce_criteria,
+                    'weight-ce':weight_ce_criteria,
                     'dice':dice_criteria,
                     'ce-dice': ce_dice_criteria,
                     'softmax_focal':softmax_focalloss}
