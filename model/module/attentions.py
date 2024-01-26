@@ -95,7 +95,7 @@ class SCPSAMModule(nn.Module):
         self.psa = PSA(in_channels,reduction=reduction)
 
     def forward(self, x):
-        self.psa.to(self.cSE.device)
+        self.psa.to(x.device)
         return x * self.cSE(x) + x * self.sSE(x) + x * self.psa(x)
 
 class SC2PSAMModule(nn.Module):
