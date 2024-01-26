@@ -37,8 +37,7 @@ class SCCBAMMModule(nn.Module):
         self.cbam = CBAMBlock(in_channels)
 
     def forward(self, x):
-        cbam_out = self.cbam(x)
-        return x * self.cSE(x) + x * self.sSE(x) + x *
+        return x * self.cSE(x) + x * self.sSE(x) + x * self.cbam(x)
 class SC2CBAMMModule(nn.Module):
     def __init__(self, in_channels, reduction=16):
         super().__init__()
