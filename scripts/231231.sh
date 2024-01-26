@@ -1,25 +1,25 @@
+#python train_idrid_supervised_2d_smp.py \
+#        --num_works 4 \
+#        --device 0 \
+#        --exp crop_IDRID/Unet_wFPN-wDecoder-scpsa/resnet50/imgz800_bs4_Adam_CLAHE0_lr6e-4-5k\
+#        --dataset_name crop_IDRID \
+#        --image_size 800 \
+#        --model Unet_wFPN \
+#        --optim Adam \
+#        --batch_size 4 \
+#        --base_lr 0.0006 \
+#        --CLAHE 0 \
+#        --autodl \
+#        --scheduler no \
+#        --max_iterations 5000 \
+#        --backbone resnet50
+
+
 python train_idrid_supervised_2d_smp.py \
         --num_works 4 \
         --device 0 \
-        --exp crop_IDRID/Unet_wFPN_wDAB_wSR/resnet50/imgz800_bs4_Adam_CLAHE0_lr6e-4-5k\
+        --exp crop_IDRID/Unet_wFPN-wDecoder-scpsa/resnet50/imgz1024_bs2_Adam_CLAHE0_lr3e-4-5k\
         --dataset_name crop_IDRID \
-        --image_size 800 \
-        --model Unet_wFPN_wDAB_wSR \
-        --optim Adam \
-        --batch_size 4 \
-        --base_lr 0.0006 \
-        --CLAHE 0 \
-        --autodl \
-        --scheduler no \
-        --max_iterations 5000 \
-        --backbone resnet50
-
-
-python train_idrid_supervised_2d_smp.py \
-        --num_works 4 \
-        --device 0 \
-        --exp cnn_preprocess_IDRID/Unet_wFPN-wDecoder-sece/resnext50_32x4d/imgz1024_bs2_Adam_CLAHE0_lr3e-4-5k\
-        --dataset_name cnn_preprocess_IDRID \
         --image_size 1024 \
         --model Unet_wFPN \
         --optim Adam \
@@ -27,10 +27,10 @@ python train_idrid_supervised_2d_smp.py \
         --base_lr 0.0003 \
         --CLAHE 0 \
         --autodl \
-        --decoder_attention_type scse \
         --scheduler no \
         --max_iterations 5000 \
-        --backbone resnext50_32x4d
+        --decoder_attention_type scpsa \
+        --backbone resnet50
 
 python train_idrid_supervised_2d_smp.py \
         --num_works 4 \
