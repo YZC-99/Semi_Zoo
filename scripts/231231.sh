@@ -18,7 +18,7 @@
 python train_idrid_supervised_2d_smp.py \
         --num_works 4 \
         --device 0 \
-        --exp crop_IDRID/Unet_wFPN_wSCBAM/se_resnet50/imgz1024_bs2_Adam_CLAHE0_lr3e-4-5k\
+        --exp crop_IDRID/Unet_wFPN_wSCBAM-true/se_resnet50/imgz1024_bs2_Adam_CLAHE0_lr3e-4-5k\
         --dataset_name crop_IDRID \
         --image_size 1024 \
         --model Unet_wFPN_wSCBAM \
