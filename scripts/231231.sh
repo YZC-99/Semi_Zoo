@@ -18,10 +18,10 @@
 python train_idrid_supervised_2d_smp.py \
         --num_works 4 \
         --device 0 \
-        --exp crop_IDRID/Unet_wFPN-wDecoder-sccbam/resnet50/imgz1024_bs2_Adam_CLAHE0_lr3e-4-5k\
+        --exp crop_IDRID/Unet_wFPN_wSKA/se_resnet50/imgz1024_bs2_Adam_CLAHE0_lr3e-4-5k\
         --dataset_name crop_IDRID \
         --image_size 1024 \
-        --model Unet_wFPN \
+        --model Unet_wFPN_wSKA \
         --optim Adam \
         --batch_size 2 \
         --base_lr 0.0003 \
@@ -29,16 +29,16 @@ python train_idrid_supervised_2d_smp.py \
         --autodl \
         --scheduler no \
         --max_iterations 5000 \
-        --decoder_attention_type sccbam \
-        --backbone resnet50
+        --backbone se_resnet50
 
+        --decoder_attention_type scse \
 
         --main_criteria weight-ce \
 
 python train_idrid_supervised_2d_smp.py \
         --num_works 4 \
         --device 0 \
-        --exp crop_IDRID/Dual_Decoder_Unet_wFPN_wDecoder-scse/resnet50/imgz1024_bs2_Adam_CLAHE0_lr3e4-5k\
+        --exp crop_IDRID/Dual_Decoder_Unet_wFPN_wDecoder-scse/se_resnet50/imgz1024_bs2_Adam_CLAHE0_lr3e4-5k\
         --dataset_name crop_IDRID \
         --image_size 1024 \
         --model Dual_Decoder_Unet_wFPN \
@@ -51,7 +51,7 @@ python train_idrid_supervised_2d_smp.py \
         --max_iterations 5000 \
         --decoder_attention_type scse \
         --obj_loss 1.0 \
-        --backbone resnet50
+        --backbone se_resnet50
 
 
 
