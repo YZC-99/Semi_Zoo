@@ -250,7 +250,7 @@ class Dual_Decoder_Unet_wFPN_wSKA(SegmentationModel):
         decoder_output2 = self.decoder2(*features)
 
         masks = self.segmentation_head(decoder_output)
-        masks2 = self.segmentation_head(decoder_output2)
+        masks2 = self.segmentation_head2(decoder_output2)
 
         return masks,masks2
 
