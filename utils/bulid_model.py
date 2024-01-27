@@ -7,7 +7,7 @@ from model.netwotks.sr_unet import SR_Unet,SR_Unet_woFPN,SR_Unet_SR_FPN,SR_Unet_
 from model.netwotks.sr_light_net import LightNet_wFPN,LightNet_wSR,LightNet_wFPN_wSR
 from model.netwotks.dual_decoer_unet import Dual_Decoder_Unet,Dual_Seg_Head_Unet,Dual_Decoder_SR_Unet,Dual_Decoder_SR_Unet_woSR,Dual_Decoder_SR_Unet_woFPN
 from model.netwotks.dual_decoer_unet import Dual_Decoder_Unet_DualFPN_CrossAttention,Dual_Decoder_SR_Unet_woSR_wRTFM
-from model.netwotks.dual_decoer_unet import Dual_Decoder_Unet_wFPN_wDAB,Dual_Decoder_Unet_wFPN
+from model.netwotks.dual_decoer_unet import Dual_Decoder_Unet_wFPN_wDAB,Dual_Decoder_Unet_wFPN,Dual_Decoder_Unet_wFPN_wSKA
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -171,6 +171,17 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             classes=class_num1,
             decoder_attention_type=args.decoder_attention_type
         )
+
+    elif model == "Dual_Decoder_Unet_wFPN_wSKA":
+        net = Dual_Decoder_Unet_wFPN_wSKA(
+            encoder_name=backbone,
+            encoder_weights='imagenet',
+            in_channels=in_chns,
+            classes=class_num1,
+            decoder_attention_type=args.decoder_attention_type
+        )
+
+
     elif model == "Dual_Decoder_Unet_wFPN_wDAB":
         net = Dual_Decoder_Unet_wFPN_wDAB(
             encoder_name=backbone,
