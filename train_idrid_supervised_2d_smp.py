@@ -279,8 +279,9 @@ if __name__ == '__main__':
                             outputs,_ = model(img)
                         else:
                             outputs = model(img)
+                            outputs = outputs[:,:5,...]
 
-                        DR_val_metrics.add(outputs[:,:5,...].detach(),label)
+                        DR_val_metrics.add(outputs.detach(),label)
 
                         if id == show_id:
                             image = img[0]
