@@ -280,7 +280,7 @@ if __name__ == '__main__':
                         else:
                             outputs = model(img)
 
-                        DR_val_metrics.add(outputs.detach(),label)
+                        DR_val_metrics.add(outputs[:,:5,...].detach(),label)
 
                         if id == show_id:
                             image = img[0]
