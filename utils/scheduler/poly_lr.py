@@ -123,6 +123,8 @@ def poly_epoch_decay_v2(current_epoch,current_lr, total_epochs=60, base_lr=0.000
         epochs_drop = total_epochs
         lrate = initial_lrate * math.pow(1 - (1 + current_epoch) / epochs_drop, 0.9)
         return lrate
+    elif current_epoch == 0:
+        return initial_lrate
     else:
         return current_lr
 
