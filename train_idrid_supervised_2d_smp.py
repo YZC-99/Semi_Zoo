@@ -208,7 +208,7 @@ if __name__ == '__main__':
             labeled_batch, label_label_batch = labeled_sampled_batch['image'].to(device), labeled_sampled_batch['label'].to(device)
             r = np.random.rand(1)
 
-            if r < args.cutmix_prob:
+            if r < float(args.cutmix_prob):
                 all_batch,all_label_batch = cutmix(all_batch,all_label_batch)
             else:
                 all_batch = labeled_batch
