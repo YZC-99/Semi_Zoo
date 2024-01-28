@@ -112,3 +112,42 @@ class BlvLoss(nn.Module):
 
         return loss
 
+
+class Softmaxfocal_BlvLoss(nn.Module):
+#cls_nufrequency_list
+    def __init__(self, cls_num_list, sigma=4, loss_name='BlvLoss'):
+        super(BlvLoss, self).__init__()
+        cls_list = torch.cuda.FloatTensor(cls_num_list)
+        frequency_list = torch.log(cls_list)
+        self.frequency_list = torch.log(sum(cls_list)) - frequency_list
+        self.reduction = 'mean'
+        self.sampler = normal.Normal(0, sigma)
+        self._loss_name = loss_name
+
+    def softmaxfocal(self,losses,y_pred, y_true,ignore_index=255,gamma=2.0,normalize=True):
+        with torch.no_grad():
+            p = y_pred.softmax(dim=1)
+            modulating_factor = (1 - p).pow(gamma)
+            valid_mask = ~ y_true.eq(ignore_index)
+            masked_y_true = torch.where(valid_mask, y_true, torch.zeros_like(y_true))
+            modulating_factor = torch.gather(modulating_factor, dim=1, index=masked_y_true.unsqueeze(dim=1)).squeeze_(dim=1)
+            scale = 1.
+            if normalize:
+                scale = losses.sum() / (losses * modulating_factor).sum()
+        return scale * (losses * modulating_factor).sum() / (valid_mask.sum() + p.size(0))
+
+    def forward(self, pred, target, weight=None, ignore_index=255, avg_factor=None, reduction_override=None):
+
+        assert reduction_override in (None, 'none', 'mean', 'sum')
+        reduction = (
+            reduction_override if reduction_override else self.reduction)
+
+        viariation = self.sampler.sample(pred.shape).clamp(-1, 1).to(pred.device)
+
+        pred = pred + (viariation.abs().permute(0, 2, 3, 1) / self.frequency_list.max() * self.frequency_list).permute(0, 3, 1, 2)
+
+        loss = F.cross_entropy(pred, target, reduction='none',  ignore_index=ignore_index)
+
+        loss = self.softmaxfocal(loss,pred, target)
+        return loss
+
