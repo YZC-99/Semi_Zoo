@@ -92,7 +92,7 @@ class BlvLoss(nn.Module):
 
 
 
-    def forward(self, pred, target, weight=None, ignore_index=None, avg_factor=None, reduction_override=None):
+    def forward(self, pred, target, weight=None, ignore_index=255, avg_factor=None, reduction_override=None):
 
         assert reduction_override in (None, 'none', 'mean', 'sum')
         reduction = (
