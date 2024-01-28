@@ -116,7 +116,7 @@ class BlvLoss(nn.Module):
 class Softmaxfocal_BlvLoss(nn.Module):
 #cls_nufrequency_list
     def __init__(self, cls_num_list, sigma=4, loss_name='BlvLoss'):
-        super(BlvLoss, self).__init__()
+        super(Softmaxfocal_BlvLoss, self).__init__()
         cls_list = torch.cuda.FloatTensor(cls_num_list)
         frequency_list = torch.log(cls_list)
         self.frequency_list = torch.log(sum(cls_list)) - frequency_list
