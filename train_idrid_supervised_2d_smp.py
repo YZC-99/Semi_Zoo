@@ -240,7 +240,7 @@ if __name__ == '__main__':
                 for param_group in optimizer.param_groups:
                     param_group['lr'] = current_lr
             elif args.scheduler == 'poly-v2':
-                current_lr = poly_epoch_decay_v2(epoch_num,param_group['lr'],max_epoch,args.base_lr)
+                current_lr = poly_epoch_decay_v2(epoch_num,optimizer.param_groups[0]['lr'],max_epoch,args.base_lr)
                 for param_group in optimizer.param_groups:
                     param_group['lr'] = current_lr
             elif args.scheduler == 'no':
