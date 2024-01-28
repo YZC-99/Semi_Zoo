@@ -15,6 +15,13 @@ Class 3: 0.154
 Class 4: 0.037
 
 
+class_counts 0: 645688315.000
+class_counts 1: 704963.000
+class_counts 2: 6498614.000
+class_counts 3: 5319349.000
+class_counts 4: 1248855.000
+
+
 class_weights = [0.001,1.0,0.1,0.1,0.1]
 
 class_weights = [0.001,1.0,0.1,0.01,0.1]

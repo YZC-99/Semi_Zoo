@@ -18,7 +18,7 @@
 python train_idrid_supervised_2d_smp.py \
         --num_works 8 \
         --device 0 \
-        --exp crop_IDRID/Unet_wFPN_wSKA/poly-v2/imgz1024_se_resnet50/bs2_Adam_CLAHE0_lr3e-4-5k\
+        --exp crop_IDRID/Unet_wFPN_wSKA/blv_loss/imgz1024_se_resnet50/bs2_Adam_CLAHE0_lr3e-4-5k\
         --dataset_name crop_IDRID \
         --image_size 1024 \
         --model Unet_wFPN_wSKA \
@@ -27,7 +27,8 @@ python train_idrid_supervised_2d_smp.py \
         --base_lr 0.0003 \
         --CLAHE 0 \
         --autodl \
-        --scheduler poly-v2 \
+        --scheduler no \
+        --main_criteria blv \
         --max_iterations 5000 \
         --backbone se_resnet50
 
