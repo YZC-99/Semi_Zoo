@@ -16,6 +16,7 @@ from utils.util import get_optimizer,PolyLRwithWarmup, compute_sdf,compute_sdf_l
 from utils.scheduler.my_scheduler import my_decay_v1
 from utils.bulid_model import build_model
 from utils.training_utils import criteria
+from dataloader.transform import cutmix
 import time
 import logging
 import os
@@ -74,6 +75,7 @@ parser.add_argument('--batch_size',type=int,default=4)
 parser.add_argument('--image_size',type=int,default=512)
 parser.add_argument('--max_iterations',type=int,default=10000)
 parser.add_argument('--autodl',action='store_true')
+parser.add_argument('--cutmix',action='store_true')
 
 
 
@@ -203,9 +205,11 @@ if __name__ == '__main__':
             time2 = time.time()
 
             labeled_batch, label_label_batch = labeled_sampled_batch['image'].to(device), labeled_sampled_batch['label'].to(device)
-
-            all_batch = labeled_batch
-            all_label_batch = label_label_batch
+            if args.cutmix:
+                all_batch,all_label_batch = cutmix(all_batch,all_label_batch)
+            else:
+                all_batch = labeled_batch
+                all_label_batch = label_label_batch
 
             loss_seg_obj = 0
 
