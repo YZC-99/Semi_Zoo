@@ -27,7 +27,7 @@ import math
 import sys
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
-from utils.scheduler.poly_lr import poly_step_decay
+from utils.scheduler.poly_lr import poly_epoch_decay,poly_epoch_decay_v2
 
 parser = argparse.ArgumentParser()
 
@@ -58,7 +58,7 @@ parser.add_argument('--with_dice',action='store_true')
 parser.add_argument('--base_lr',type=float,default=0.00025)
 parser.add_argument('--lr_decouple',action='store_true')
 parser.add_argument('--warmup',type=float,default=0.01)
-parser.add_argument('--scheduler',type=str,default='poly-v2',choices=['poly-v2','poly','no','my_decay_v1'])
+parser.add_argument('--scheduler',type=str,default='poly-v1',choices=['poly-v1','poly-v2','poly','no','my_decay_v1'])
 # ==============lr===================
 
 # ==============training params===================
@@ -235,8 +235,12 @@ if __name__ == '__main__':
 
             if args.scheduler == 'poly':
                 scheduler.step()
+            elif args.scheduler == 'poly-v1':
+                current_lr = poly_epoch_decay(epoch_num,max_epoch,args.base_lr)
+                for param_group in optimizer.param_groups:
+                    param_group['lr'] = current_lr
             elif args.scheduler == 'poly-v2':
-                current_lr = poly_step_decay(epoch_num,max_epoch,args.base_lr)
+                current_lr = poly_epoch_decay_v2(epoch_num,param_group['lr'],max_epoch,args.base_lr)
                 for param_group in optimizer.param_groups:
                     param_group['lr'] = current_lr
             elif args.scheduler == 'no':
