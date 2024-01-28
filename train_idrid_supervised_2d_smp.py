@@ -19,6 +19,7 @@ from utils.training_utils import criteria
 from dataloader.transform import cutmix
 import time
 import logging
+import numpy as np
 import os
 import shutil
 import logging
@@ -75,7 +76,7 @@ parser.add_argument('--batch_size',type=int,default=4)
 parser.add_argument('--image_size',type=int,default=512)
 parser.add_argument('--max_iterations',type=int,default=10000)
 parser.add_argument('--autodl',action='store_true')
-parser.add_argument('--cutmix',action='store_true')
+parser.add_argument('--cutmix_prob',default=-1.0)
 
 
 
@@ -205,7 +206,9 @@ if __name__ == '__main__':
             time2 = time.time()
 
             labeled_batch, label_label_batch = labeled_sampled_batch['image'].to(device), labeled_sampled_batch['label'].to(device)
-            if args.cutmix:
+            r = np.random.rand(1)
+
+            if r < args.cutmix_prob:
                 all_batch,all_label_batch = cutmix(all_batch,all_label_batch)
             else:
                 all_batch = labeled_batch
