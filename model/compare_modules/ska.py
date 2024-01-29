@@ -137,7 +137,7 @@ class SKA_Module(nn.Module):
 class SKA_Spatial_Module(nn.Module):
 
     def __init__(self, in_channels_list):
-        super(SKA_Module, self).__init__()
+        super(SKA_Spatial_Module, self).__init__()
 
         self.sa_layers = []
         for idx,in_channels in enumerate(in_channels_list,1):
