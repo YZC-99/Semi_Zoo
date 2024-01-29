@@ -128,3 +128,13 @@ def poly_epoch_decay_v2(current_epoch,current_lr, total_epochs=60, base_lr=0.000
     else:
         return current_lr
 
+def poly_epoch_decay_v3(current_epoch,current_lr, total_epochs=60, base_lr=0.0001,decay_interval=30):
+    initial_lrate = base_lr
+    if (current_epoch+1) % decay_interval == 0:
+        epochs_drop = total_epochs
+        lrate = initial_lrate * math.pow(1 - (1 + current_epoch) / epochs_drop, 1.0)
+        return lrate
+    elif current_epoch == 0:
+        return initial_lrate
+    else:
+        return current_lr
