@@ -6,6 +6,7 @@ import torch
 from torch import nn
 from torch.nn import init
 from collections import OrderedDict
+from model.module.external_attentions.cbam import CBAMBlock,SpatialAttention
 
 
 
@@ -75,8 +76,7 @@ class SK_Spatial_Attention(nn.Module):
 
         self.fss=nn.ModuleList([])
         for i in range(len(kernels)):
-            self.fss.append(nn.Conv2d(channel,1,1))
-        self.sigmoid=nn.Sigmoid()
+            self.fss.append(SpatialAttention())
 
 
     def forward(self, x):
@@ -97,9 +97,8 @@ class SK_Spatial_Attention(nn.Module):
             weight=fs(U)
             weights.append(weight) #bs,1,h,w
         attention_weights=torch.stack(weights,0)#k,bs,1,h,w
-        attention_weights=self.sigmoid(attention_weights)#k,bs,1,h,w
         ### fuse
-        V=(attention_weights*feats).sum(0)
+        V=(attention_weights).sum(0)
         return V
 
 
@@ -113,6 +112,15 @@ class SK_add_Spatial_Attention(nn.Module):
     def forward(self, x):
         return self.org_sk(x) + self.spatial(x)
 
+class SK_2_CBAM_Attention(nn.Module):
+
+    def __init__(self, channel=512,kernels=[1,3,5],reduction=16,group=1,L=32):
+        super().__init__()
+        self.org_sk = SKAttention(channel)
+        self.cbam = SK_Spatial_Attention(channel)
+
+    def forward(self, x):
+        return self.org_sk(x) + self.spatial(x)
 
 
 class SKA_Module(nn.Module):
