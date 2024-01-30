@@ -112,15 +112,16 @@ class SK_add_Spatial_Attention(nn.Module):
     def forward(self, x):
         return self.org_sk(x) + self.spatial(x)
 
-class SK_2_CBAM_Attention(nn.Module):
+class SK_add_CBAM_Attention(nn.Module):
 
     def __init__(self, channel=512,kernels=[1,3,5],reduction=16,group=1,L=32):
         super().__init__()
         self.org_sk = SKAttention(channel)
-        self.cbam = SK_Spatial_Attention(channel)
+        self.cbam = CBAMBlock(channel)
 
     def forward(self, x):
-        return self.org_sk(x) + self.spatial(x)
+        return self.org_sk(x) + self.cbam()
+
 
 
 class SKA_Module(nn.Module):
@@ -160,9 +161,27 @@ class SKA_Spatial_Module(nn.Module):
             fpn_features[idx] = feature_out
         return fpn_features
 
+class SKA_CBAM_Module(nn.Module):
+
+    def __init__(self, in_channels_list):
+        super(SKA_CBAM_Module, self).__init__()
+
+        self.sa_layers = []
+        for idx,in_channels in enumerate(in_channels_list,1):
+            sa_layer = 'ska_layer{}'.format(idx)
+            sa_layer_module = SK_add_CBAM_Attention(in_channels)
+            self.add_module(sa_layer,sa_layer_module)
+            self.sa_layers.append(sa_layer)
+
+    def forward(self, fpn_features):
+        for idx,(feature,sa) in enumerate(zip(fpn_features,self.sa_layers)):
+            feature_out = getattr(self,sa)(feature)
+            fpn_features[idx] = feature_out
+        return fpn_features
+
 
 if __name__ == '__main__':
     input = torch.randn(4,256,32,32)
-    attention = SK_add_Spatial_Attention(256)
+    attention = SK_2_CBAM_Attention(256)
     out = attention(input)
     print(out.shape)
