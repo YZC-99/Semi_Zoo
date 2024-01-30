@@ -1,5 +1,6 @@
 import torch
 import segmentation_models_pytorch as smp
+from model.netwotks.unet import Unet_wMamba_Bot
 from model.netwotks.unet import Unet,Unet_wRTFM,Unet_wFPN_wlightDecoder,Unet_wRTFM_wFPN_wlightDecoder,Two_Encoder_Unet_wRTFM
 from model.netwotks.unet import Unet_wFPN,Unet_wRTFM_wFPN,Unet_wFPN_wDAB,Unet_wFPN_wSR,Unet_wDAB,Unet_wFPN_wDAB_wSR
 from model.netwotks.unet import Unet_wSR,Unet_wFPN_wDAB_wSR_wRTFM,Unet_wFPN_wSKA,Unet_wFPN_wSCBAM,Unet_wFPN_wSCCBAM,Unet_wFPN_wSKA_add_Spatial
@@ -26,6 +27,19 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             decoder_attention_type = args.decoder_attention_type,
             decoder_channels = decoder_channels
         )
+    elif model == "Unet_wMamba_Bot":
+        net = Unet_wMamba_Bot(
+            encoder_name=backbone,
+            encoder_weights='imagenet',
+            encoder_depth=args.encoder_deepth,
+            in_channels=in_chns,
+            classes=class_num1,
+            decoder_attention_type=args.decoder_attention_type,
+            decoder_channels=decoder_channels
+        )
+
+
+
     elif model == "Unet_wFPN":
         net = Unet_wFPN(
             encoder_name=backbone,
