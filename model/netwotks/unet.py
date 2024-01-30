@@ -174,6 +174,18 @@ class Unet_wMamba_Bot(SegmentationModel):
         self.check_input_shape(x)
 
         features = self.encoder(x)
+
+        middle_feature = features[-1]
+        B, C = middle_feature.shape[:2]
+        n_tokens = middle_feature.shape[2:].numel()
+        img_dims = middle_feature.shape[2:]
+        middle_feature_flat = middle_feature.view(B, C, n_tokens).transpose(-1, -2)
+        middle_feature_flat = self.ln(middle_feature_flat)
+        out = self.mamba(middle_feature_flat)
+        out = out.transpose(-1, -2).view(B, C, *img_dims)
+        features[-1] = out
+
+
         decoder_output = self.decoder(*features)
 
         masks = self.segmentation_head(decoder_output)
