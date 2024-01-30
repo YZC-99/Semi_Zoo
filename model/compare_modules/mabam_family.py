@@ -9,9 +9,9 @@ class Mamba_block(nn.Module):
     def __init__(self, in_channels):
         super(Mamba_block, self).__init__()
         from mamba_ssm import Mamba
-        self.ln = nn.LayerNorm(self.encoder.out_channels[-1])
+        self.ln = nn.LayerNorm(in_channels)
         self.mamba = Mamba(
-            d_model=self.encoder.out_channels[-1],
+            d_model=in_channels,
             d_state=16,
             d_conv=4,
             expand=2,
