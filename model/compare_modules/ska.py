@@ -120,7 +120,7 @@ class SK_add_CBAM_Attention(nn.Module):
         self.cbam = CBAMBlock(channel)
 
     def forward(self, x):
-        return self.org_sk(x) + self.cbam()
+        return self.org_sk(x) + self.cbam(x)
 
 
 
