@@ -490,14 +490,13 @@ class IDRIDDataset(Dataset):
     def __len__(self):
         return len(self.ids)
 
-
 class DDRDataset(Dataset):
     def __init__(self,name, root, mode, size,
-                 id_path=None,CLAHE = False):
+                 id_path=None,CLAHE = 2):
         self.name = name
         self.root = root
         self.mode = mode
-        self.size = size
+        self.size = int(size)
         self.CLAHE = CLAHE
 
         if mode == 'semi_train':
@@ -513,8 +512,8 @@ class DDRDataset(Dataset):
     def get_item_nor(self,item):
         id = self.ids[item]
         img_path = os.path.join(self.root, id.split(' ')[0])
-        if self.CLAHE:
-            img_path = img_path.replace('/images','/images_clahe')
+        if self.CLAHE > 0:
+            img_path = img_path.replace('/images','/images_clahe_{}'.format(self.CLAHE))
             img = Image.open(img_path)
         else:
             img = Image.open(img_path)
@@ -523,23 +522,44 @@ class DDRDataset(Dataset):
         mask = Image.open(mask_path)
 
         if self.mode == 'semi_train':
-            img, mask = hflip(img, mask, p=0.5)
-            img, mask = vflip(img, mask, p=0.5)
-            img, mask = random_rotate(img, mask,p=0.5,max_rotation_angle=30)
+            if random.random() < 0.5:
+                img, mask = hflip(img, mask)
+            if random.random() < 0.5:
+                img, mask = vflip(img, mask)
+            if self.size == 1440:
+                img, mask = resize1440(img, mask)
+                if random.random() < 0.5:
+                    img, mask = random_scale_and_crop(img,mask,target_size=(1440,960))
+            else:
+                img, mask = resize(img, mask, self.size,self.size)
+                if random.random() < 0.5:
+                    img, mask = random_scale_and_crop(img, mask, target_size=(self.size, self.size))
+            if random.random() < 0.5:
+                img, mask = random_rotate(img, mask,max_rotation_angle=30)
+            if random.random() < 0.5:
+                img, mask = random_translate(img, mask)
 
+        else:
+            if self.size == 1440:
+                img, mask = resize1440(img, mask)
+            else:
+                img, mask = resize(img, mask, self.size,self.size)
 
-        img, mask = resize(img, mask, self.size)
-        img, mask = normalize(img, mask,mean=(91.78,56.94,25.83),std=(124.97,83.84,36.79))
+        img, mask = normalize(img, mask, mean=MEAN_RGB, std=STDDEV_RGB)
 
         return {'image': img, 'label': mask}
 
     def __getitem__(self, item):
+        import cv2
+        cv2.setNumThreads(0)
         sample = self.get_item_nor(item)
 
         return sample
 
     def __len__(self):
         return len(self.ids)
+
+
 
 
 
