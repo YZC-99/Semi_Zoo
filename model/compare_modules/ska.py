@@ -105,7 +105,7 @@ class SK_Dali_Attention(nn.Module):
         self.convs.append(DAM(channel))
         self.fc=nn.Linear(channel,self.d)
         self.fcs=nn.ModuleList([])
-        for i in range(len(kernels)):
+        for i in range(len(kernels)+1):
             self.fcs.append(nn.Linear(self.d,channel))
         self.softmax=nn.Softmax(dim=0)
 
