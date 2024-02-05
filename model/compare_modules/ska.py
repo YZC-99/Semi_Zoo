@@ -90,7 +90,7 @@ class SKAttention(nn.Module):
 
 class SK_Dali_Attention(nn.Module):
 
-    def __init__(self, channel=512,kernels=[1,3,5],reduction=16,group=1,L=32):
+    def __init__(self, channel=512,kernels=[1,3,5,7],reduction=16,group=1,L=32):
         super().__init__()
         self.d=max(L,channel//reduction)
         self.convs=nn.ModuleList([])
@@ -232,7 +232,7 @@ class SKA_Dali_Module(nn.Module):
         self.sa_layers = []
         for idx,in_channels in enumerate(in_channels_list,1):
             sa_layer = 'ska_layer{}'.format(idx)
-            sa_layer_module = SKA_Dali_Module( in_channels)
+            sa_layer_module = SK_Dali_Attention(in_channels)
             self.add_module(sa_layer,sa_layer_module)
             self.sa_layers.append(sa_layer)
 
