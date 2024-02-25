@@ -126,6 +126,8 @@ if __name__ == '__main__':
         os.makedirs(snapshot_path)
 
     results_path = snapshot_path + "/" + 'results' + "/"
+    if not os.path.exists(results_path):
+        os.makedirs(results_path)
     results_logs_path = snapshot_path + "/" + 'results-log.txt'
 
     device = "cuda:{}".format(args.device)
