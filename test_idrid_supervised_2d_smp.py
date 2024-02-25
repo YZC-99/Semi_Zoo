@@ -177,16 +177,24 @@ if __name__ == '__main__':
         Dice,IoU = val_metrics[2]['Dice'],val_metrics[2]['IoU']
         MA_AUC_PR, HE_AUC_PR, EX_AUC_PR, SE_AUC_PR = AUC_PR['MA_AUC_PR'],AUC_PR['HE_AUC_PR'],AUC_PR['EX_AUC_PR'],AUC_PR['SE_AUC_PR']
         MA_AUC_ROC, HE_AUC_ROC, EX_AUC_ROC, SE_AUC_ROC = AUC_ROC['MA_AUC_ROC'],AUC_ROC['HE_AUC_ROC'],AUC_ROC['EX_AUC_ROC'],AUC_ROC['SE_AUC_ROC']
-        f.write('MA_AUC_PR:{}\n'.format(MA_AUC_PR))
-        f.write('HE_AUC_PR:{}\n'.format(HE_AUC_PR))
-        f.write('EX_AUC_PR:{}\n'.format(EX_AUC_PR))
-        f.write('SE_AUC_PR:{}\n'.format(SE_AUC_PR))
 
-        f.write('MA_AUC_ROC:{}\n'.format(MA_AUC_ROC))
-        f.write('HE_AUC_ROC:{}\n'.format(HE_AUC_ROC))
-        f.write('EX_AUC_ROC:{}\n'.format(EX_AUC_ROC))
-        f.write('SE_AUC_ROC:{}\n'.format(SE_AUC_ROC))
+        lines = [
+            f'MA_AUC_PR:{MA_AUC_PR}\n',
+            f'HE_AUC_PR:{HE_AUC_PR}\n',
+            f'EX_AUC_PR:{EX_AUC_PR}\n',
+            f'SE_AUC_PR:{SE_AUC_PR}\n',
+            f'MA_AUC_ROC:{MA_AUC_ROC}\n',
+            f'HE_AUC_ROC:{HE_AUC_ROC}\n',
+            f'EX_AUC_ROC:{EX_AUC_ROC}\n',
+            f'SE_AUC_ROC:{SE_AUC_ROC}\n',
+            f'Dice:{Dice}\n',
+            f'IoU:{IoU}\n'
+        ]
+        # 写入并打印每行
+        for line in lines:
+            f.write(line)
+            print(line.strip())  # 使用 strip() 移除尾随的换行符
 
-        f.write('Dice:{}\n'.format(Dice))
-        f.write('IoU:{}\n'.format(IoU))
+
+
 
