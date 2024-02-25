@@ -362,8 +362,8 @@ if __name__ == '__main__':
                                 best_model_paths[1] = best_model_paths[0]
                                 best_AUC_PR_EX[1] = best_AUC_PR_EX[0]
 
-                            best_AUC_PR_EX[i] = EX_AUC_PR
-                            name = f"best_AUC_PR_EX_{round(EX_AUC_PR, 4)}_iter_{iter_num}.pth"
+                            best_AUC_PR_EX[i] = EX_AUC_PR.item()
+                            name = f"best_AUC_PR_EX_{round(EX_AUC_PR.item(), 4)}_iter_{iter_num}.pth"
                             save_mode_path = os.path.join(snapshot_path, name)
 
                             # 如果是更新第一名模型，删除旧的第一名模型文件

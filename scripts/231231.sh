@@ -23,6 +23,7 @@ python train_idrid_supervised_2d_smp.py \
         --image_size 1440 \
         --model Unet_wFPN_wSKA \
         --optim Adam \
+        --seed 3407 \
         --batch_size 2 \
         --base_lr 0.0006 \
         --CLAHE 0 \
