@@ -478,7 +478,7 @@ class IDRIDDataset(Dataset):
 
         img, mask = normalize(img, mask, mean=MEAN_RGB, std=STDDEV_RGB)
 
-        return {'image': img, 'label': mask}
+        return {'image': img, 'label': mask,'id':id.split(' ')[1]}
 
     def __getitem__(self, item):
         import cv2
