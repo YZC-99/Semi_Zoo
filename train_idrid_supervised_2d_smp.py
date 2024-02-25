@@ -295,6 +295,7 @@ if __name__ == '__main__':
             with torch.no_grad():
                 if iter_num % (54 / args.batch_size) == 0:
                     if args.ema > 0 and (iter_num > args.ema * args.max_iterations):
+                        print('---ema---')
                         ema.apply_shadow()
                     model.eval()
                     show_id = random.randint(0,len(val_iteriter))
