@@ -115,7 +115,7 @@ def create_version_folder(snapshot_path):
 
 
 args = parser.parse_args()
-snapshot_path = "./test_2d_dr/" + args.exp + "/"
+snapshot_path = "./exp_refer_2d_dr/" + args.exp + "/"
 max_iterations = args.max_iterations
 base_lr = args.base_lr
 

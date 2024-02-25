@@ -2,14 +2,16 @@
 python test_idrid_supervised_2d_smp.py \
         --num_works 8 \
         --device 0 \
-        --exp crop_IDRID/Unet_wFPN-se_resnet50 \
+        --exp crop_IDRID/Unet_wFPN-decoder_attention_type-scse-se_resnet50 \
         --dataset_name crop_IDRID \
         --image_size 1440 \
         --model Unet_wFPN \
         --CLAHE 0 \
         --autodl \
-        --ckpt_weight /root/autodl-tmp/Semi_Zoo/exp_2d_dr/crop_IDRID/Unet_wFPN/ema-lr6e-4_poly-v2-interval-30/imgz1440_se_resnet50/bs2_Adam_CLAHE0-5k/version0/best_AUC_PR_EX0.8106_iter_4698.pth \
+        --decoder_attention_type scse \
+        --ckpt_weight /root/autodl-tmp/Semi_Zoo/exp_2d_dr/crop_IDRID/Unet_wFPN-decoder_attention_type-scse/ema-lr6e-4_poly-v2-interval-30/imgz1440_se_resnet50/bs2_Adam_CLAHE0-5k/version0/best_AUC_PR_EX0.8126_iter_3888.pth \
         --backbone se_resnet50
+
 
 Unet_wFPN_wSKA
 Unet_wFPN

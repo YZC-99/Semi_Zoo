@@ -28,7 +28,6 @@ python train_idrid_supervised_2d_smp.py \
         --CLAHE 0 \
         --autodl \
         --ema 0.75 \
-        --decoder_attention_type scse \
         --scheduler poly-v2 \
         --max_iterations 5000 \
         --backbone se_resnet50
@@ -37,6 +36,7 @@ python train_idrid_supervised_2d_smp.py \
         --cutmix_prob 0.5 \
 
 crop_IDRID
+        --decoder_attention_type scse \
 
         --main_criteria softmax_focal_blv \
 Unet_wFPN_wASPP_Bottle
