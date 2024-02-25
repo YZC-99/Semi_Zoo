@@ -29,6 +29,7 @@ import sys
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 from utils.scheduler.poly_lr import poly_epoch_decay,poly_epoch_decay_v2,poly_epoch_decay_v3
+import ttach as tta
 
 parser = argparse.ArgumentParser()
 
@@ -81,6 +82,8 @@ parser.add_argument('--max_iterations',type=int,default=10000)
 parser.add_argument('--autodl',action='store_true')
 parser.add_argument('--cutmix_prob',default=-1.0)
 
+# ==============test params===================
+parser.add_argument('--tta',action='store_true')
 
 
 def color_map_fn():
@@ -136,6 +139,8 @@ if __name__ == '__main__':
     model = build_model(args,model=args.model,backbone=args.backbone,in_chns=3,class_num1=args.num_classes,class_num2=2,fuse_type=None,ckpt_weight=args.ckpt_weight)
     model.to(device)
 
+    if args.tta:
+        model = tta.SegmentationTTAWrapper(model,tta.aliases.d4_transform(),merge_mode='mean')
     # init dataset
     root_base = '/home/gu721/yzc/data/dr/'
     if args.autodl:
