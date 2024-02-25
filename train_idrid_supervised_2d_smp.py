@@ -291,9 +291,15 @@ if __name__ == '__main__':
 
 
             # eval
-            if args.ema > 0 and (iter_num > args.ema * args.max_iterations):
-                ema.apply_shadow()
             with torch.no_grad():
+                if args.ema > 0 and (iter_num > args.ema * args.max_iterations):
+                    ema.apply_shadow()
+                    name = 'ema.pth'
+                    save_mode_path = os.path.join(
+                        snapshot_path, name)
+                    torch.save(model.state_dict(), save_mode_path)
+                    ema.restore()
+
                 if iter_num % (54 / args.batch_size) == 0:
                     model.eval()
                     show_id = random.randint(0,len(val_iteriter))
@@ -403,8 +409,7 @@ if __name__ == '__main__':
                 if iter_num >= max_iterations:
                     break
                 time1 = time.time()
-            if args.ema > 0 and (iter_num > args.ema * args.max_iterations):
-                ema.restore()
+
         if iter_num >= max_iterations:
             iterator.close()
             break
