@@ -293,6 +293,7 @@ if __name__ == '__main__':
 
             # eval
             if args.ema > 0 & iter_num > args.ema * args.max_iterations:
+                print('----ema----')
                 ema.apply_shadow()
             with torch.no_grad():
                 if iter_num % (54 / args.batch_size) == 0:
