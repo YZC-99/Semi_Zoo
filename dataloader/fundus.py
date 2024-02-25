@@ -477,7 +477,7 @@ class IDRIDDataset(Dataset):
                 img, mask = resize(img, mask, self.size,self.size)
 
         img, mask = normalize(img, mask, mean=MEAN_RGB, std=STDDEV_RGB)
-
+        mask[ mask > 4] = 4
         return {'image': img, 'label': mask,'id':id.split(' ')[1]}
 
     def __getitem__(self, item):

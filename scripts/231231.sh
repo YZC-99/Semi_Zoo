@@ -17,10 +17,10 @@ Unet_wFPN_wSKA_add_Spatial
 
 python train_idrid_supervised_2d_smp.py \
         --num_works 8 \
-        --device 0 \
-        --exp crop_IDRID/Unet_wFPN_wSKA/ema-lr6e-4_poly-v2-interval-30/imgz1440_se_resnet50/bs2_Adam_CLAHE0-5k\
-        --dataset_name crop_IDRID \
-        --image_size 1440 \
+        --device 1 \
+        --exp DDR/Unet_wFPN_wSKA/ema-lr6e-4_poly-v2-interval-30/imgz1024_se_resnet50/bs2_Adam_CLAHE0-5k\
+        --dataset_name DDR \
+        --image_size 1024 \
         --model Unet_wFPN_wSKA \
         --optim Adam \
         --batch_size 2 \
@@ -35,7 +35,7 @@ python train_idrid_supervised_2d_smp.py \
 
         --cutmix_prob 0.5 \
 
-
+crop_IDRID
 
         --main_criteria softmax_focal_blv \
 
