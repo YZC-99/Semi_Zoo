@@ -15,7 +15,7 @@ import random
 from utils.util import get_optimizer,PolyLRwithWarmup, compute_sdf,compute_sdf_luoxd,compute_sdf_multi_class
 from utils.scheduler.my_scheduler import my_decay_v1
 from utils.bulid_model import build_model
-from utils.training_utils import criteria
+from utils.training_utils import criteria,EMA
 from dataloader.transform import cutmix
 import time
 import logging
@@ -77,6 +77,7 @@ parser.add_argument('--batch_size',type=int,default=4)
 parser.add_argument('--image_size',type=int,default=512)
 parser.add_argument('--max_iterations',type=int,default=10000)
 parser.add_argument('--autodl',action='store_true')
+parser.add_argument('--ema',type=float,default=-0.1)
 parser.add_argument('--cutmix_prob',default=-1.0)
 
 
@@ -200,6 +201,10 @@ if __name__ == '__main__':
     best_AUC_PR_HE = 0
     best_AUC_PR_MA = 0
     best_AUC_PR_SE = 0
+
+    ema = EMA(model,0.999)
+    ema.register()
+
     for epoch_num in iterator:
         torch.cuda.empty_cache()
         time1 = time.time()
@@ -233,6 +238,8 @@ if __name__ == '__main__':
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            if args.ema > 0 & iter_num > args.ema * args.max_iterations:
+                ema.update()
 
             if args.scheduler == 'poly':
                 scheduler.step()
@@ -285,6 +292,8 @@ if __name__ == '__main__':
 
 
             # eval
+            if args.ema > 0 & iter_num > args.ema * args.max_iterations:
+                ema.apply_shadow()
             with torch.no_grad():
                 if iter_num % (54 / args.batch_size) == 0:
                     model.eval()
@@ -297,6 +306,8 @@ if __name__ == '__main__':
                             outputs = model(img)
                             outputs = outputs[:,:5,...]
 
+                        if args.ema > 0 & iter_num > args.ema * args.max_iterations:
+                            ema.restore()
                         DR_val_metrics.add(outputs.detach(),label)
 
                         if id == show_id:
