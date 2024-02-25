@@ -238,8 +238,7 @@ if __name__ == '__main__':
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            if args.ema > 0 and (iter_num > args.ema * args.max_iterations):
-                ema.update()
+            ema.update()
 
             if args.scheduler == 'poly':
                 scheduler.step()
