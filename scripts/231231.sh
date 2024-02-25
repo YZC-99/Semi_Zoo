@@ -18,10 +18,10 @@ Unet_wFPN_wSKA_add_Spatial
 python train_idrid_supervised_2d_smp.py \
         --num_works 8 \
         --device 1 \
-        --exp crop_IDRID/Unet_wRTFM_wFPN/lr8e-4_poly-v2-interval-30/imgz1024_se_resnet50/bs2_Adam_CLAHE0-5k\
+        --exp crop_IDRID/Unet_wMHSA_wFPN/lr8e-4_poly-v2-interval-30/imgz1024_se_resnet50/bs2_Adam_CLAHE0-5k\
         --dataset_name crop_IDRID \
         --image_size 1024 \
-        --model Unet_wRTFM_wFPN \
+        --model Unet_wMHSA_wFPN \
         --optim Adam \
         --batch_size 2 \
         --base_lr 0.0008 \
@@ -41,7 +41,7 @@ python train_idrid_supervised_2d_smp.py \
 annealing_softmax_focal_blv
 Unet_wRTFM_wFPN
 softmax_focal_blv
-
+Unet_wMHSA_wFPN
 Unet_wFPN
 Unet_wFPN_wSKA_Dali
 Unet_wFPN_wSKA
