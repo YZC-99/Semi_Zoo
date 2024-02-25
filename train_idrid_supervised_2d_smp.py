@@ -292,10 +292,11 @@ if __name__ == '__main__':
 
 
             # eval
-            if args.ema > 0 and (iter_num > args.ema * args.max_iterations):
-                ema.apply_shadow()
+
             with torch.no_grad():
                 if iter_num % (54 / args.batch_size) == 0:
+                    if args.ema > 0 and (iter_num > args.ema * args.max_iterations):
+                        ema.apply_shadow()
                     model.eval()
                     show_id = random.randint(0,len(val_iteriter))
                     for id,data in enumerate(val_iteriter):
