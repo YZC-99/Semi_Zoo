@@ -238,7 +238,7 @@ if __name__ == '__main__':
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            if args.ema > 0 & iter_num > args.ema * args.max_iterations:
+            if args.ema > 0 and (iter_num > args.ema * args.max_iterations):
                 ema.update()
 
             if args.scheduler == 'poly':
@@ -292,8 +292,7 @@ if __name__ == '__main__':
 
 
             # eval
-            if args.ema > 0 & iter_num > args.ema * args.max_iterations:
-                print('----ema----')
+            if args.ema > 0 and (iter_num > args.ema * args.max_iterations):
                 ema.apply_shadow()
             with torch.no_grad():
                 if iter_num % (54 / args.batch_size) == 0:
@@ -307,7 +306,7 @@ if __name__ == '__main__':
                             outputs = model(img)
                             outputs = outputs[:,:5,...]
 
-                        if args.ema > 0 & iter_num > args.ema * args.max_iterations:
+                        if args.ema > 0 and (iter_num > args.ema * args.max_iterations):
                             ema.restore()
                         DR_val_metrics.add(outputs.detach(),label)
 
