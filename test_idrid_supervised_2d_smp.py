@@ -193,7 +193,7 @@ if __name__ == '__main__':
         # 写入并打印每行
         for line in lines:
             f.write(line)
-            print(line.strip())  # 使用 strip() 移除尾随的换行符
+            print(line)  # 使用 strip() 移除尾随的换行符
 
 
 
