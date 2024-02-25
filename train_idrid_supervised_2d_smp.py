@@ -291,12 +291,10 @@ if __name__ == '__main__':
 
 
             # eval
-
+            if args.ema > 0 and (iter_num > args.ema * args.max_iterations):
+                ema.apply_shadow()
             with torch.no_grad():
                 if iter_num % (54 / args.batch_size) == 0:
-                    if args.ema > 0 and (iter_num > args.ema * args.max_iterations):
-                        ema.apply_shadow()
-
                     model.eval()
                     show_id = random.randint(0,len(val_iteriter))
                     for id,data in enumerate(val_iteriter):
@@ -362,8 +360,7 @@ if __name__ == '__main__':
                             f.write(name + '\n')
                         logging.info("save model to {}".format(save_mode_path))
 
-                    if args.ema > 0 and (iter_num > args.ema * args.max_iterations):
-                        ema.restore()
+
 
                     if HE_AUC_PR > best_AUC_PR_HE:
                         best_AUC_PR_HE = HE_AUC_PR
@@ -406,6 +403,8 @@ if __name__ == '__main__':
                 if iter_num >= max_iterations:
                     break
                 time1 = time.time()
+            if args.ema > 0 and (iter_num > args.ema * args.max_iterations):
+                ema.restore()
         if iter_num >= max_iterations:
             iterator.close()
             break
