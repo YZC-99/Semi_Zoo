@@ -160,7 +160,7 @@ if __name__ == '__main__':
     for i_batch,labeled_sampled_batch in enumerate(val_loader):
         time2 = time.time()
         labeled_batch, label_label_batch = labeled_sampled_batch['image'].to(device), labeled_sampled_batch['label'].to(device)
-        image_id = labeled_sampled_batch['id']
+        image_id = labeled_sampled_batch['id'][0].split('/')[-1]
 
         outputs = model(labeled_batch)
         out = torch.argmax(outputs,dim=1)
