@@ -197,7 +197,8 @@ if __name__ == '__main__':
     iterator = tqdm(range(max_epoch), ncols=70)
     DR_val_metrics = DR_metrics(device)
     # DR_val_metrics = Sklearn_DR_metrics()
-    best_AUC_PR_EX = 0
+    best_AUC_PR_EX = [0,0]
+    best_model_paths = ['', '']
     best_AUC_PR_HE = 0
     best_AUC_PR_MA = 0
     best_AUC_PR_SE = 0
@@ -351,21 +352,49 @@ if __name__ == '__main__':
 
                     model.train()
 
-                    if EX_AUC_PR > best_AUC_PR_EX:
-                        best_AUC_PR_EX = EX_AUC_PR
-                        name = "best_AUC_PR_EX" + str(round(best_AUC_PR_EX.item(), 4)) +'_iter_' + str(iter_num)  + '.pth'
-                        save_mode_path = os.path.join(
-                            snapshot_path, name)
+                    # 检查当前指标是否进入前两名
+                    for i in range(2):
+                        if EX_AUC_PR > best_AUC_PR_EX[i]:
+                            # 移动之前的模型，使得第一名变成第二名
+                            if i == 0 and best_model_paths[1] != '':
+                                os.remove(best_model_paths[1])
+                                os.remove(best_model_paths[1].replace('.pth', '.txt'))
+                                best_model_paths[1] = best_model_paths[0]
+                                best_AUC_PR_EX[1] = best_AUC_PR_EX[0]
 
-                        previous_files = glob.glob(os.path.join(snapshot_path, '*best_AUC_PR_EX*.pth'))
-                        for file_path in previous_files:
-                            os.remove(file_path)
-                            os.remove(file_path.replace('.pth','.txt'))
+                            best_AUC_PR_EX[i] = EX_AUC_PR
+                            name = f"best_AUC_PR_EX_{round(EX_AUC_PR, 4)}_iter_{iter_num}.pth"
+                            save_mode_path = os.path.join(snapshot_path, name)
 
-                        torch.save(model.state_dict(), save_mode_path)
-                        with open(save_mode_path.replace('.pth','.txt'),'w') as f:
-                            f.write(name + '\n')
-                        logging.info("save model to {}".format(save_mode_path))
+                            # 如果是更新第一名模型，删除旧的第一名模型文件
+                            if i == 0 and best_model_paths[i] != '':
+                                os.remove(best_model_paths[i])
+                                os.remove(best_model_paths[i].replace('.pth', '.txt'))
+
+                            best_model_paths[i] = save_mode_path
+
+                            torch.save(model.state_dict(), save_mode_path)
+                            with open(save_mode_path.replace('.pth', '.txt'), 'w') as f:
+                                f.write(name + '\n')
+
+                            print(f"Saved new top {i + 1} model to {save_mode_path}")
+                            break  # 退出循环，因为我们只更新比当前指标值低的第一个位置
+
+                    # if EX_AUC_PR > best_AUC_PR_EX:
+                    #     best_AUC_PR_EX = EX_AUC_PR
+                    #     name = "best_AUC_PR_EX" + str(round(best_AUC_PR_EX.item(), 4)) +'_iter_' + str(iter_num)  + '.pth'
+                    #     save_mode_path = os.path.join(
+                    #         snapshot_path, name)
+                    #
+                    #     previous_files = glob.glob(os.path.join(snapshot_path, '*best_AUC_PR_EX*.pth'))
+                    #     for file_path in previous_files:
+                    #         os.remove(file_path)
+                    #         os.remove(file_path.replace('.pth','.txt'))
+                    #
+                    #     torch.save(model.state_dict(), save_mode_path)
+                    #     with open(save_mode_path.replace('.pth','.txt'),'w') as f:
+                    #         f.write(name + '\n')
+                    #     logging.info("save model to {}".format(save_mode_path))
 
 
 
