@@ -295,8 +295,8 @@ if __name__ == '__main__':
             with torch.no_grad():
                 if iter_num % (54 / args.batch_size) == 0:
                     if args.ema > 0 and (iter_num > args.ema * args.max_iterations):
-                        print('---ema---')
                         ema.apply_shadow()
+
                     model.eval()
                     show_id = random.randint(0,len(val_iteriter))
                     for id,data in enumerate(val_iteriter):
@@ -307,8 +307,7 @@ if __name__ == '__main__':
                             outputs = model(img)
                             outputs = outputs[:,:5,...]
 
-                        if args.ema > 0 and (iter_num > args.ema * args.max_iterations):
-                            ema.restore()
+
                         DR_val_metrics.add(outputs.detach(),label)
 
                         if id == show_id:
@@ -362,6 +361,10 @@ if __name__ == '__main__':
                         with open(save_mode_path.replace('.pth','.txt'),'w') as f:
                             f.write(name + '\n')
                         logging.info("save model to {}".format(save_mode_path))
+
+                    if args.ema > 0 and (iter_num > args.ema * args.max_iterations):
+                        ema.restore()
+
                     if HE_AUC_PR > best_AUC_PR_HE:
                         best_AUC_PR_HE = HE_AUC_PR
                         name = "best_AUC_PR_HE" + str(round(best_AUC_PR_HE.item(), 4)) +'_iter_' + str(iter_num)  + '.txt'
