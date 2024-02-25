@@ -2,7 +2,7 @@ import torch
 import segmentation_models_pytorch as smp
 from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss,MSELoss
 from utils.losses import OhemCrossEntropy,annealing_softmax_focalloss,softmax_focalloss,weight_softmax_focalloss
-from utils.blv_loss import BlvLoss,Softmaxfocal_BlvLoss
+from utils.blv_loss import BlvLoss,Softmaxfocal_BlvLoss,Annealing_Softmaxfocal_BlvLoss
 
 def ce_dice_criteria(outputs,all_label_batch):
     dice_criteria = smp.losses.DiceLoss(mode='multiclass', from_logits=True,log_loss=True)
@@ -18,6 +18,7 @@ def criteria(args,outputs,all_label_batch,iter_num):
     weight_ce_criteria = CrossEntropyLoss(ignore_index=255,weight=torch.tensor([1.0,2.0,2.0,2.0,2.0],device=outputs.device))
     blv_criteria = BlvLoss(cls_num_list=args.cls_num_list)
     softmax_focal_blv_criteria = Softmaxfocal_BlvLoss(cls_num_list=args.cls_num_list)
+    annealing_softmax_focal_blv_criteria = Annealing_Softmaxfocal_BlvLoss(cls_num_list=args.cls_num_list)
 
 
     seg_criteria = {'ce':ce_criteria,
@@ -30,6 +31,9 @@ def criteria(args,outputs,all_label_batch,iter_num):
 
     if args.main_criteria == 'annealing_softmax_focal':
         loss_seg_main = annealing_softmax_focalloss(outputs,all_label_batch,
+                                                         t=iter_num,t_max=args.max_iterations * 0.6)
+    elif args.main_criteria == 'annealing_softmax_focal_blv':
+        loss_seg_main = annealing_softmax_focal_blv_criteria(outputs,all_label_batch,
                                                          t=iter_num,t_max=args.max_iterations * 0.6)
     else:
         loss_seg_main = seg_criteria[args.main_criteria](outputs,all_label_batch)

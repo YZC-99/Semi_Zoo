@@ -2,9 +2,16 @@ import torch
 import torch.nn as nn
 from torch.distributions import normal
 import torch.nn.functional as F
+import math
 import numpy as np
 # import mmcv
 #
+
+
+def cosine_annealing(lower_bound, upper_bound, _t, _t_max):
+    return upper_bound + 0.5 * (lower_bound - upper_bound) * (math.cos(math.pi * _t / _t_max) + 1)
+
+
 #
 #
 # def get_class_weight(class_weight):
@@ -149,5 +156,47 @@ class Softmaxfocal_BlvLoss(nn.Module):
         loss = F.cross_entropy(pred, target, reduction='none',  ignore_index=ignore_index)
 
         loss = self.softmaxfocal(loss,pred, target)
+        return loss
+
+
+class Annealing_Softmaxfocal_BlvLoss(nn.Module):
+    def __init__(self, cls_num_list, sigma=4, loss_name='BlvLoss'):
+        super(Annealing_Softmaxfocal_BlvLoss, self).__init__()
+        cls_list = torch.cuda.FloatTensor(cls_num_list)
+        frequency_list = torch.log(cls_list)
+        self.frequency_list = torch.log(sum(cls_list)) - frequency_list
+        self.reduction = 'mean'
+        self.sampler = normal.Normal(0, sigma)
+        self._loss_name = loss_name
+
+    def annealing_softmaxfocal(self,losses,y_pred, y_true,t, t_max,ignore_index=255,gamma=2.0,annealing_function=cosine_annealing):
+        with torch.no_grad():
+            p = y_pred.softmax(dim=1)
+            modulating_factor = (1 - p).pow(gamma)
+            valid_mask = ~ y_true.eq(ignore_index)
+            masked_y_true = torch.where(valid_mask, y_true, torch.zeros_like(y_true))
+            modulating_factor = torch.gather(modulating_factor, dim=1, index=masked_y_true.unsqueeze(dim=1)).squeeze_(dim=1)
+            normalizer = losses.sum() / (losses * modulating_factor).sum()
+            scales = modulating_factor * normalizer
+            if t > t_max:
+                scale = scales
+            else:
+                scale = annealing_function(1, scales, t, t_max)
+            losses = (losses * scale).sum() / (valid_mask.sum() + p.size(0))
+        return losses
+
+    def forward(self, pred, target, t, t_max, ignore_index=255, avg_factor=None, reduction_override=None):
+
+        assert reduction_override in (None, 'none', 'mean', 'sum')
+        reduction = (
+            reduction_override if reduction_override else self.reduction)
+
+        viariation = self.sampler.sample(pred.shape).clamp(-1, 1).to(pred.device)
+
+        pred = pred + (viariation.abs().permute(0, 2, 3, 1) / self.frequency_list.max() * self.frequency_list).permute(0, 3, 1, 2)
+
+        loss = F.cross_entropy(pred, target, reduction='none',  ignore_index=ignore_index)
+
+        loss = self.annealing_softmaxfocal(loss,pred, target,t, t_max)
         return loss
 
