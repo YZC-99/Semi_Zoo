@@ -25,6 +25,7 @@ import os
 import shutil
 import logging
 import math
+from torchvision import transforms
 import sys
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -96,7 +97,42 @@ def color_map_fn():
     return cmap
 
 
+tta_transforms = [transforms.Compose([
+                    transforms.ToPILImage(),
+                    transforms.HorizontalFlip(),
+                    transforms.ToTensor()]),
+                  transforms.Compose([
+                    transforms.ToPILImage(),
+                    transforms.RandomRotation(90),
+                    transforms.ToTensor()]),
+                  transforms.Compose([
+                    transforms.ToPILImage(),
+                    transforms.RandomRotation(180),
+                    transforms.ToTensor()]),
+                  transforms.Compose([
+                    transforms.ToPILImage(),
+                    transforms.RandomRotation(270),
+                    transforms.ToTensor()])
+                 ]
 
+
+def apply_tta_and_predict(model, image, tta_transforms, device):
+    # 存储TTA预测结果
+    tta_outputs = []
+
+    # 原始图像预测
+    original_pred = model(image.unsqueeze(0))
+    tta_outputs.append(original_pred.cpu().data.numpy())
+
+    # 应用TTA变换
+    for tta_transform in tta_transforms:
+        tta_image = tta_transform(image)
+        tta_pred = model(tta_image.unsqueeze(0))
+        tta_outputs.append(tta_pred.cpu().data.numpy())
+
+    # 计算所有TTA预测结果的平均值
+    mean_tta_output = np.mean(tta_outputs, axis=0)
+    return mean_tta_output
 
 
 def create_version_folder(snapshot_path):
@@ -139,8 +175,7 @@ if __name__ == '__main__':
     model = build_model(args,model=args.model,backbone=args.backbone,in_chns=3,class_num1=args.num_classes,class_num2=2,fuse_type=None,ckpt_weight=args.ckpt_weight)
     model.to(device)
 
-    if args.tta:
-        model = tta.SegmentationTTAWrapper(model,tta.aliases.d4_transform(),merge_mode='mean')
+
     # init dataset
     root_base = '/home/gu721/yzc/data/dr/'
     if args.autodl:
@@ -167,7 +202,10 @@ if __name__ == '__main__':
         labeled_batch, label_label_batch = labeled_sampled_batch['image'].to(device), labeled_sampled_batch['label'].to(device)
         image_id = labeled_sampled_batch['id'][0].split('/')[-1]
 
-        outputs = model(labeled_batch)
+        if args.tta:
+            outputs = apply_tta_and_predict(model, labeled_batch, tta_transforms, device)
+        else:
+            outputs = model(labeled_batch)
         out = torch.argmax(outputs,dim=1)
         out = out[0].detach().cpu().numpy().astype(np.int8)
         pred_mask = Image.fromarray(out,mode='P')

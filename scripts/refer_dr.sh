@@ -2,12 +2,13 @@
 python test_idrid_supervised_2d_smp.py \
         --num_works 8 \
         --device 0 \
-        --exp crop_IDRID/Unet_wFPN_wASPP_Bottle-se_resnet50 \
+        --exp crop_IDRID/Unet_wFPN_wASPP_Bottle-tta-se_resnet50 \
         --dataset_name crop_IDRID \
         --image_size 1440 \
         --model Unet_wFPN_wASPP_Bottle \
         --CLAHE 0 \
         --autodl \
+        --tta \
         --ckpt_weight /root/autodl-tmp/Semi_Zoo/exp_2d_dr/crop_IDRID/Unet_wFPN_wASPP_Bottle/ema-lr6e-4_poly-v2-interval-30/imgz1440_se_resnet50/bs2_Adam_CLAHE0-5k/version0/best_AUC_PR_EX0.809_iter_4455.pth \
         --backbone se_resnet50
 
