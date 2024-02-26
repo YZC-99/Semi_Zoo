@@ -355,23 +355,25 @@ if __name__ == '__main__':
                     # 检查当前指标是否进入前两名
                     for i in range(2):
                         if EX_AUC_PR > best_AUC_PR_EX[i]:
-                            # 移动之前的模型，使得第一名变成第二名
-                            if i == 0 and best_model_paths[1] != '':
-                                # 检查文件是否存在
-                                if os.path.exists(best_model_paths[1]):
-                                    os.remove(best_model_paths[1])
-                                if os.path.exists(best_model_paths[1].replace('.pth', '.txt')):
-                                    os.remove(best_model_paths[1].replace('.pth', '.txt'))
-                                best_model_paths[1] = best_model_paths[0]
+                            # 第一名更新，需要将当前第一名降为第二名，然后更新第一名信息
+                            if i == 0:
+                                # 更新前检查第二名是否存在，存在则删除
+                                if best_model_paths[1] != '':
+                                    if os.path.exists(best_model_paths[1]):
+                                        os.remove(best_model_paths[1])
+                                    if os.path.exists(best_model_paths[1].replace('.pth', '.txt')):
+                                        os.remove(best_model_paths[1].replace('.pth', '.txt'))
+                                # 将第一名降级为第二名
                                 best_AUC_PR_EX[1] = best_AUC_PR_EX[0]
+                                best_model_paths[1] = best_model_paths[0]
 
+                            # 更新当前名次的模型信息
                             best_AUC_PR_EX[i] = EX_AUC_PR.item()
                             name = f"best_AUC_PR_EX_{round(EX_AUC_PR.item(), 4)}_iter_{iter_num}.pth"
                             save_mode_path = os.path.join(snapshot_path, name)
 
-                            # 如果是更新第一名模型，删除旧的第一名模型文件
-                            if i == 0 and best_model_paths[i] != '':
-                                # 检查文件是否存在
+                            # 删除旧的当前名次模型文件（如果存在）
+                            if best_model_paths[i] != '':
                                 if os.path.exists(best_model_paths[i]):
                                     os.remove(best_model_paths[i])
                                 if os.path.exists(best_model_paths[i].replace('.pth', '.txt')):
@@ -384,7 +386,7 @@ if __name__ == '__main__':
                                 f.write(name + '\n')
 
                             print(f"Saved new top {i + 1} model to {save_mode_path}")
-                            break  # 退出循环，因为我们只更新比当前指标值低的第一个位置
+                            break  # 找到更好的模型后更新并退出循环
 
                     # if EX_AUC_PR > best_AUC_PR_EX:
                     #     best_AUC_PR_EX = EX_AUC_PR
