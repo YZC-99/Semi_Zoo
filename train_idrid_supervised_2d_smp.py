@@ -352,41 +352,64 @@ if __name__ == '__main__':
 
                     model.train()
 
-                    # 检查当前指标是否进入前两名
+                    # 生成当前模型的名称和保存路径
+                    # 当前模型的AUC值和迭代次数
+                    current_AUC_PR = EX_AUC_PR.item()
+                    current_iter = iter_num
+                    current_name = f"best_AUC_PR_EX_{round(current_AUC_PR, 4)}_iter_{current_iter}.pth"
+                    current_save_path = os.path.join(snapshot_path, current_name)
+
+                    # 更新逻辑
+                    updated = False
                     for i in range(2):
-                        if EX_AUC_PR > best_AUC_PR_EX[i]:
-                            # 第一名更新，需要将当前第一名降为第二名，然后更新第一名信息
+                        if current_AUC_PR > best_AUC_PR_EX[i]:
+                            # 删除旧的次佳模型
+                            if i == 0 and best_model_paths[1] != '':
+                                if os.path.exists(best_model_paths[1]):
+                                    os.remove(best_model_paths[1])
+                                txt_path = best_model_paths[1].replace('.pth', '.txt')
+                                if os.path.exists(txt_path):
+                                    os.remove(txt_path)
+
+                            # 将原最佳模型降级为次佳
                             if i == 0:
-                                # 更新前检查第二名是否存在，存在则删除
-                                if best_model_paths[1] != '':
-                                    if os.path.exists(best_model_paths[1]):
-                                        os.remove(best_model_paths[1])
-                                    if os.path.exists(best_model_paths[1].replace('.pth', '.txt')):
-                                        os.remove(best_model_paths[1].replace('.pth', '.txt'))
-                                # 将第一名降级为第二名
                                 best_AUC_PR_EX[1] = best_AUC_PR_EX[0]
                                 best_model_paths[1] = best_model_paths[0]
 
                             # 更新当前名次的模型信息
-                            best_AUC_PR_EX[i] = EX_AUC_PR.item()
-                            name = f"best_AUC_PR_EX_{round(EX_AUC_PR.item(), 4)}_iter_{iter_num}.pth"
-                            save_mode_path = os.path.join(snapshot_path, name)
+                            best_AUC_PR_EX[i] = current_AUC_PR
+                            best_model_paths[i] = current_save_path
 
-                            # 删除旧的当前名次模型文件（如果存在）
-                            if best_model_paths[i] != '':
-                                if os.path.exists(best_model_paths[i]):
-                                    os.remove(best_model_paths[i])
-                                if os.path.exists(best_model_paths[i].replace('.pth', '.txt')):
-                                    os.remove(best_model_paths[i].replace('.pth', '.txt'))
+                            # 保存新的最佳或次佳模型
+                            torch.save(model.state_dict(), current_save_path)
+                            with open(current_save_path.replace('.pth', '.txt'), 'w') as f:
+                                f.write(current_name + '\n')
 
-                            best_model_paths[i] = save_mode_path
+                            print(f"Saved new top {i + 1} model to {current_save_path}")
+                            updated = True
+                            break
 
-                            torch.save(model.state_dict(), save_mode_path)
-                            with open(save_mode_path.replace('.pth', '.txt'), 'w') as f:
-                                f.write(name + '\n')
+                    if not updated and len(set(best_AUC_PR_EX)) > 1:
+                        # 检查是否需要更新次佳模型
+                        if current_AUC_PR > min(best_AUC_PR_EX):
+                            # 找到次佳模型的索引并更新
+                            min_index = best_AUC_PR_EX.index(min(best_AUC_PR_EX))
+                            # 删除旧的次佳模型文件
+                            if os.path.exists(best_model_paths[min_index]):
+                                os.remove(best_model_paths[min_index])
+                            txt_path = best_model_paths[min_index].replace('.pth', '.txt')
+                            if os.path.exists(txt_path):
+                                os.remove(txt_path)
 
-                            print(f"Saved new top {i + 1} model to {save_mode_path}")
-                            break  # 找到更好的模型后更新并退出循环
+                            best_AUC_PR_EX[min_index] = current_AUC_PR
+                            best_model_paths[min_index] = current_save_path
+
+                            torch.save(model.state_dict(), current_save_path)
+                            with open(current_save_path.replace('.pth', '.txt'), 'w') as f:
+                                f.write(current_name + '\n')
+
+                            print(f"Saved new second-best model to {current_save_path}")
+
 
                     # if EX_AUC_PR > best_AUC_PR_EX:
                     #     best_AUC_PR_EX = EX_AUC_PR
