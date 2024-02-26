@@ -360,37 +360,37 @@ if __name__ == '__main__':
                     current_save_path = os.path.join(snapshot_path, current_name)
 
                     # 检查当前模型是否进入前两名
-                    rank_updated = False
+                    # 检查当前模型是否进入前两名
                     for i in range(2):
-                        if current_AUC_PR > best_AUC_PR_EX[i]:
-                            # 准备更新排名
-                            rank_updated = True
-                            # 将当前模型信息插入到排名中，然后排序
+                        # 检查是否有足够的模型进行比较，或者当前模型性能是否优于现有模型
+                        if len(best_AUC_PR_EX) < 2 or current_AUC_PR > best_AUC_PR_EX[i]:
+                            # 保存当前模型
+                            torch.save(model.state_dict(), current_save_path)
+                            with open(current_save_path.replace('.pth', '.txt'), 'w') as f:
+                                f.write(current_name + '\n')
+                            print(f"Saved new model to {current_save_path}")
+
+                            # 更新列表
                             best_AUC_PR_EX.insert(i, current_AUC_PR)
                             best_model_paths.insert(i, current_save_path)
 
-                            # 保留前两名，删除多余的模型
+                            # 如果列表长度超过2，移除多余的模型
                             if len(best_AUC_PR_EX) > 2:
-                                # 删除排名第三的模型文件
-                                removed_path = best_model_paths.pop(3)
+                                # 删除排名最低的模型文件（现在是列表的最后一个元素）
+                                removed_path = best_model_paths.pop()
                                 removed_txt_path = removed_path.replace('.pth', '.txt')
                                 if os.path.exists(removed_path):
                                     os.remove(removed_path)
                                 if os.path.exists(removed_txt_path):
                                     os.remove(removed_txt_path)
+                                # 同时移除对应的性能记录
+                                best_AUC_PR_EX.pop()
 
-                            # 保存当前模型
-                            torch.save(model.state_dict(), current_save_path)
-                            with open(current_save_path.replace('.pth', '.txt'), 'w') as f:
-                                f.write(current_name + '\n')
+                            break  # 更新后退出循环
 
-                            print(f"Saved new top {i + 1} model to {current_save_path}")
-                            break  # 更新排名后退出循环
-
-                    if rank_updated:
-                        # 保留列表中前两个元素，这是当前的最佳和次佳模型
-                        best_AUC_PR_EX = best_AUC_PR_EX[:2]
-                        best_model_paths = best_model_paths[:2]
+                    # 保证列表只保留前两名模型和性能指标
+                    best_AUC_PR_EX = best_AUC_PR_EX[:2]
+                    best_model_paths = best_model_paths[:2]
 
 
                     # if EX_AUC_PR > best_AUC_PR_EX:
