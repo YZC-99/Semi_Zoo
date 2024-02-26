@@ -17,11 +17,11 @@ Unet_wFPN_wSKA_add_Spatial
 
 python train_idrid_supervised_2d_smp.py \
         --num_works 8 \
-        --device 1 \
-        --exp crop_IDRID/UNetpp/ema-lr6e-4_poly-v2-interval-30/imgz1440_se_resnet50/bs2_Adam_CLAHE0-5k\
+        --device 0 \
+        --exp crop_IDRID/DeepLabV3P/ema-lr6e-4_poly-v2-interval-30/imgz1440_se_resnet50/bs2_Adam_CLAHE0-5k\
         --dataset_name crop_IDRID \
         --image_size 1440 \
-        --model UNetpp \
+        --model DeepLabV3P \
         --optim Adam \
         --batch_size 2 \
         --base_lr 0.0006 \
@@ -39,6 +39,7 @@ python train_idrid_supervised_2d_smp.py \
 crop_IDRID
 
         --main_criteria softmax_focal_blv \
+        DeepLabV3P
 Unet_wFPN_wASPP_Bottle
 annealing_softmax_focal_blv
 Unet_wRTFM_wFPN

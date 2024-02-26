@@ -466,6 +466,14 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             classes=class_num1,
             encoder_depth= args.encoder_deepth
         )
+    elif model == 'DeepLabV3P':
+        net = smp.DeepLabV3Plus(
+            encoder_name=backbone,
+            encoder_weights='imagenet',
+            in_channels=in_chns,
+            classes=class_num1,
+            encoder_depth= args.encoder_deepth
+        )
     elif model == 'AttU_Net':
         net = AttU_Net(
             in_channels=in_chns,
