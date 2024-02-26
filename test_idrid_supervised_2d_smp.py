@@ -26,6 +26,7 @@ import shutil
 import logging
 import math
 from torchvision import transforms
+import torchvision.transforms.functional as F
 import sys
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -96,44 +97,48 @@ def color_map_fn():
     cmap[4] = np.array([255, 255, 0])
     return cmap
 
+# 定义一个函数来执行旋转，接受图像和角度作为输入
+def rotate_image(image, angle):
+    return F.rotate(image, angle)
 
-tta_transforms = [transforms.Compose([
-                    transforms.ToPILImage(),
-                    transforms.HorizontalFlip(),
-                    transforms.ToTensor()]),
-                  transforms.Compose([
-                    transforms.ToPILImage(),
-                    transforms.RandomRotation(90),
-                    transforms.ToTensor()]),
-                  transforms.Compose([
-                    transforms.ToPILImage(),
-                    transforms.RandomRotation(180),
-                    transforms.ToTensor()]),
-                  transforms.Compose([
-                    transforms.ToPILImage(),
-                    transforms.RandomRotation(270),
-                    transforms.ToTensor()])
-                 ]
+tta.aliases.d4_transform()
 
 
-def apply_tta_and_predict(model, image, tta_transforms, device):
-    # 存储TTA预测结果
+def tta_transforms(image):
+    """生成图像的TTA变换版本及其对应的逆变换函数。"""
+    transforms = [
+        (lambda x: x, lambda x: x),  # 原图及其逆变换
+        (lambda x: F.hflip(x), lambda x: F.hflip(x)),  # 水平翻转及其逆变换
+        # 为每个旋转增加旋转及其逆旋转
+        (lambda x: F.rotate(x, 90), lambda x: F.rotate(x, -90)),
+    ]
+
+    # 应用增强变换
+    augmented_images = [t(image) for t, _ in transforms]
+    # 获取逆变换函数
+    inverse_transforms = [inv_t for _, inv_t in transforms]
+
+    return augmented_images, inverse_transforms
+
+def apply_tta_and_predict(model, image_tensor, device):
+    augmented_images, inverse_transforms = tta_transforms(image_tensor)
     tta_outputs = []
 
-    # 原始图像预测
-    original_pred = model(image.unsqueeze(0))
-    tta_outputs.append(original_pred.cpu().data.numpy())
-
-    # 应用TTA变换
-    for tta_transform in tta_transforms:
-        tta_image = tta_transform(image)
-        tta_pred = model(tta_image.unsqueeze(0))
-        tta_outputs.append(tta_pred.cpu().data.numpy())
+    for aug_image, inv_transform in zip(augmented_images, inverse_transforms):
+        # 转换为模型的输入格式
+        input_tensor = F.to_tensor(aug_image).unsqueeze(0).to(device)
+        # 预测
+        output = model(input_tensor)
+        # 将预测结果从tensor转换为PIL图像，应用逆变换，然后转回tensor
+        output_pil = F.to_pil_image(output.squeeze().cpu())
+        inv_output_pil = inv_transform(output_pil)
+        inv_output_tensor = F.to_tensor(inv_output_pil)
+        # 存储逆变换后的输出
+        tta_outputs.append(inv_output_tensor.unsqueeze(0))
 
     # 计算所有TTA预测结果的平均值
-    mean_tta_output = np.mean(tta_outputs, axis=0)
+    mean_tta_output = torch.mean(torch.cat(tta_outputs, dim=0), dim=0, keepdim=True)
     return mean_tta_output
-
 
 def create_version_folder(snapshot_path):
     # 检查是否存在版本号文件夹
@@ -203,7 +208,7 @@ if __name__ == '__main__':
         image_id = labeled_sampled_batch['id'][0].split('/')[-1]
 
         if args.tta:
-            outputs = apply_tta_and_predict(model, labeled_batch, tta_transforms, device)
+            outputs = apply_tta_and_predict(model, labeled_batch, device)
         else:
             outputs = model(labeled_batch)
         out = torch.argmax(outputs,dim=1)

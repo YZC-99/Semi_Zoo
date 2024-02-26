@@ -357,8 +357,11 @@ if __name__ == '__main__':
                         if EX_AUC_PR > best_AUC_PR_EX[i]:
                             # 移动之前的模型，使得第一名变成第二名
                             if i == 0 and best_model_paths[1] != '':
-                                os.remove(best_model_paths[1])
-                                os.remove(best_model_paths[1].replace('.pth', '.txt'))
+                                # 检查文件是否存在
+                                if os.path.exists(best_model_paths[1]):
+                                    os.remove(best_model_paths[1])
+                                if os.path.exists(best_model_paths[1].replace('.pth', '.txt')):
+                                    os.remove(best_model_paths[1].replace('.pth', '.txt'))
                                 best_model_paths[1] = best_model_paths[0]
                                 best_AUC_PR_EX[1] = best_AUC_PR_EX[0]
 
@@ -368,8 +371,11 @@ if __name__ == '__main__':
 
                             # 如果是更新第一名模型，删除旧的第一名模型文件
                             if i == 0 and best_model_paths[i] != '':
-                                os.remove(best_model_paths[i])
-                                os.remove(best_model_paths[i].replace('.pth', '.txt'))
+                                # 检查文件是否存在
+                                if os.path.exists(best_model_paths[i]):
+                                    os.remove(best_model_paths[i])
+                                if os.path.exists(best_model_paths[i].replace('.pth', '.txt')):
+                                    os.remove(best_model_paths[i].replace('.pth', '.txt'))
 
                             best_model_paths[i] = save_mode_path
 

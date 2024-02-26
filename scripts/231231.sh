@@ -17,13 +17,12 @@ Unet_wFPN_wSKA_add_Spatial
 
 python train_idrid_supervised_2d_smp.py \
         --num_works 8 \
-        --device 0 \
-        --exp crop_IDRID/Unet_wFPN_wSKA/ema-lr6e-4_poly-v2-interval-30/imgz1440_se_resnet50/bs2_Adam_CLAHE0-5k\
+        --device 1 \
+        --exp crop_IDRID/UNetpp/ema-lr6e-4_poly-v2-interval-30/imgz1440_se_resnet50/bs2_Adam_CLAHE0-5k\
         --dataset_name crop_IDRID \
         --image_size 1440 \
-        --model Unet_wFPN_wSKA \
+        --model UNetpp \
         --optim Adam \
-        --seed 3407 \
         --batch_size 2 \
         --base_lr 0.0006 \
         --CLAHE 0 \
@@ -33,11 +32,11 @@ python train_idrid_supervised_2d_smp.py \
         --max_iterations 5000 \
         --backbone se_resnet50
 
+        --decoder_attention_type scse \
 
         --cutmix_prob 0.5 \
 
 crop_IDRID
-        --decoder_attention_type scse \
 
         --main_criteria softmax_focal_blv \
 Unet_wFPN_wASPP_Bottle
