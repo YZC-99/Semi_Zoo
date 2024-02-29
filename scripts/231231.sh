@@ -18,10 +18,10 @@ Unet_wFPN_wSKA_add_Spatial
 python train_idrid_supervised_2d_smp.py \
         --num_works 8 \
         --device 0 \
-        --exp crop_IDRID/DeepLabV3P/ema-lr6e-4_poly-v2-interval-30/imgz1440_se_resnet50/bs2_Adam_CLAHE0-5k\
+        --exp crop_IDRID/UNet-softmax_focal_blv/ema-lr6e-4_poly-v2-interval-30/imgz1440_se_resnet50/bs2_Adam_CLAHE0-5k\
         --dataset_name crop_IDRID \
         --image_size 1440 \
-        --model DeepLabV3P \
+        --model UNet \
         --optim Adam \
         --batch_size 2 \
         --base_lr 0.0006 \
@@ -29,16 +29,16 @@ python train_idrid_supervised_2d_smp.py \
         --autodl \
         --ema 0.75 \
         --scheduler poly-v2 \
+        --decoder_attention_type scse \
+        --main_criteria softmax_focal_blv \
         --max_iterations 5000 \
         --backbone se_resnet50
 
-        --decoder_attention_type scse \
 
         --cutmix_prob 0.5 \
 
 crop_IDRID
 
-        --main_criteria softmax_focal_blv \
         DeepLabV3P
 Unet_wFPN_wASPP_Bottle
 annealing_softmax_focal_blv
@@ -55,21 +55,24 @@ Unet_wMamba_Bot
 
 python train_idrid_supervised_2d_smp.py \
         --num_works 8 \
-        --device 1 \
-        --exp DDR/Unet_wFPN_wSKA/ema-lr6e-4_poly-v2-interval-30/imgz1024_se_resnet50/bs2_Adam_CLAHE0-5k\
+        --device 0 \
+        --exp DDR/Unet_wFPN_wDeocderAttention/ema-lr6e-4_poly-v2-interval-30/imgz1024_se_resnet50/bs2_Adam_CLAHE0-5k\
         --dataset_name DDR \
         --image_size 1024 \
-        --model Unet_wFPN_wSKA \
+        --model Unet_wFPN_wDeocderAttention \
         --optim Adam \
         --batch_size 2 \
         --base_lr 0.0006 \
         --CLAHE 0 \
         --autodl \
         --ema 0.75 \
+        --decoder_attention_type scse \
         --scheduler poly-v2 \
         --max_iterations 15000 \
         --backbone se_resnet50
 
+
+        --main_criteria softmax_focal_blv \
 
 
 

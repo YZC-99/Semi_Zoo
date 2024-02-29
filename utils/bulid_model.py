@@ -4,7 +4,7 @@ from model.netwotks.unet import Unet_wMamba_Bot,Unet_wFPN_wMamba
 from model.netwotks.unet import Unet,Unet_wRTFM,Unet_wFPN_wlightDecoder,Unet_wRTFM_wFPN_wlightDecoder,Two_Encoder_Unet_wRTFM
 from model.netwotks.unet import Unet_wFPN,Unet_wRTFM_wFPN,Unet_wFPN_wDAB,Unet_wFPN_wSR,Unet_wDAB,Unet_wFPN_wDAB_wSR
 from model.netwotks.unet import Unet_wFPN_wSKA_add_CBAM,Unet_wFPN_wSKA_Dali,Unet_wMHSA_wFPN
-from model.netwotks.unet import Unet_wFPN_wASPP_Bottle,Unet_wFPN_wDeocderAttention
+from model.netwotks.unet import Unet_wFPN_wASPP_Bottle,Unet_wFPN_wDeocderAttention,Unet_wDeocderAttention
 from model.netwotks.unet import Unet_wSR,Unet_wFPN_wDAB_wSR_wRTFM,Unet_wFPN_wSKA,Unet_wFPN_wSCBAM,Unet_wFPN_wSCCBAM,Unet_wFPN_wSKA_add_Spatial
 from model.netwotks.att_unet import AttU_Net
 from model.netwotks.sr_unet import SR_Unet,SR_Unet_woFPN,SR_Unet_SR_FPN,SR_Unet_woSR
@@ -29,6 +29,18 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             classes= class_num1,
             decoder_attention_type = args.decoder_attention_type,
             decoder_channels = decoder_channels
+        )
+
+
+    elif model == "Unet_wDeocderAttention":
+        net = Unet_wDeocderAttention(
+            encoder_name=backbone,
+            encoder_weights='imagenet',
+            encoder_depth=args.encoder_deepth,
+            in_channels=in_chns,
+            classes=class_num1,
+            decoder_attention_type=args.decoder_attention_type,
+            decoder_channels=decoder_channels
         )
     elif model == "Unet_wMamba_Bot":
         net = Unet_wMamba_Bot(

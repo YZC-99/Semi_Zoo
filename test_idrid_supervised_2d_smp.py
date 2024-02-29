@@ -125,20 +125,24 @@ def apply_tta_and_predict(model, image_tensor, device):
     tta_outputs = []
 
     for aug_image, inv_transform in zip(augmented_images, inverse_transforms):
-        # 转换为模型的输入格式
-        input_tensor = F.to_tensor(aug_image).unsqueeze(0).to(device)
+        # 检查aug_image是否为Tensor，如果不是，则转换为Tensor
+        if not isinstance(aug_image, torch.Tensor):
+            input_tensor = F.to_tensor(aug_image).to(device)
+        else:
+            input_tensor = aug_image.to(device)
         # 预测
         output = model(input_tensor)
-        # 将预测结果从tensor转换为PIL图像，应用逆变换，然后转回tensor
-        output_pil = F.to_pil_image(output.squeeze().cpu())
-        inv_output_pil = inv_transform(output_pil)
-        inv_output_tensor = F.to_tensor(inv_output_pil)
+        # 假设输出需要逆变换并且逆变换适用于Tensor
+        # 注意：这里假设inv_transform可以直接应用于Tensor
+        # 如果inv_transform期望的输入是PIL图像，则需要先将output转换为PIL图像，逆变换后再转回Tensor
+        inv_output_tensor = inv_transform(output.squeeze(0)).unsqueeze(0)
         # 存储逆变换后的输出
-        tta_outputs.append(inv_output_tensor.unsqueeze(0))
+        tta_outputs.append(inv_output_tensor)
 
     # 计算所有TTA预测结果的平均值
     mean_tta_output = torch.mean(torch.cat(tta_outputs, dim=0), dim=0, keepdim=True)
     return mean_tta_output
+
 
 def create_version_folder(snapshot_path):
     # 检查是否存在版本号文件夹
