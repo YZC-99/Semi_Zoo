@@ -108,6 +108,7 @@ python train_idrid_supervised_2d_smp.py \
         --batch_size 2 \
         --base_lr 0.0006 \
         --CLAHE 0 \
+        --save_period 1200 \
         --autodl \
         --ema 0.75 \
         --scheduler poly-v2 \
