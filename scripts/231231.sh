@@ -29,10 +29,11 @@ python train_idrid_supervised_2d_smp.py \
         --autodl \
         --ema 0.75 \
         --scheduler poly-v2 \
-        --decoder_attention_type scse \
         --main_criteria softmax_focal_blv \
         --max_iterations 5000 \
         --backbone se_resnet50
+
+
 
 
         --cutmix_prob 0.5 \
@@ -93,3 +94,23 @@ Dual_Decoder_Unet_wFPN_wDAB
 Dual_Seg_Head_Unet
   mobileone_s3
   efficientnet-b0
+
+
+
+python train_idrid_supervised_2d_smp.py \
+        --num_works 8 \
+        --device 0 \
+        --exp E-ophtha/Unet_wFPN_wDeocderAttention/ema-lr6e-4_poly-v2-interval-30/imgz1024_se_resnet50/bs2_Adam_CLAHE0-5k\
+        --dataset_name E-ophtha \
+        --image_size 1024 \
+        --model Unet_wFPN_wDeocderAttention \
+        --optim Adam \
+        --batch_size 2 \
+        --base_lr 0.0006 \
+        --CLAHE 0 \
+        --autodl \
+        --ema 0.75 \
+        --decoder_attention_type scse \
+        --scheduler poly-v2 \
+        --max_iterations 2500 \
+        --backbone se_resnet50

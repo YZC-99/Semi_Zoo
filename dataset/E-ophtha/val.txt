@@ -1,0 +1,10 @@
+images/C0030692.jpg annotations/C0030692_merged.png
+images/C0032812.jpg annotations/C0032812_merged.png
+images/C0032814.jpg annotations/C0032814_merged.png
+images/DS00008G.JPG annotations/DS00008G_merged.png
+images/DS00008I.JPG annotations/DS00008I_merged.png
+images/DS000F4K.JPG annotations/DS000F4K_merged.png
+images/DS000FGD.JPG annotations/DS000FGD_merged.png
+images/DS000HVG.JPG annotations/DS000HVG_merged.png
+images/DS000HXJ.JPG annotations/DS000HXJ_merged.png
+images/DS000U30.JPG annotations/DS000U30_merged.png

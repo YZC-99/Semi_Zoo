@@ -1,0 +1,11 @@
+images/C0001273.jpg annotations/C0001273_merged.png
+images/C0003164.jpg annotations/C0003164_merged.png
+images/C0007155.jpg annotations/C0007155_merged.png
+images/C0007157.jpg annotations/C0007157_merged.png
+images/C0007158.jpg annotations/C0007158_merged.png
+images/C0007240.jpg annotations/C0007240_merged.png
+images/C0021833.jpg annotations/C0021833_merged.png
+images/C0021835.jpg annotations/C0021835_merged.png
+images/C0024407.jpg annotations/C0024407_merged.png
+images/C0024408.jpg annotations/C0024408_merged.png
+images/C0025307.jpg annotations/C0025307_merged.png
