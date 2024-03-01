@@ -475,7 +475,9 @@ class IDRIDDataset(Dataset):
                 img, mask = resize1440(img, mask)
             else:
                 img, mask = resize(img, mask, self.size,self.size)
-
+        if 'E-ophtha' in mask_path:
+            mask[mask == 1] = 3
+            mask[mask == 2] = 1
         img, mask = normalize(img, mask, mean=MEAN_RGB, std=STDDEV_RGB)
         mask[ mask > 4] = 4
         return {'image': img, 'label': mask,'id':id.split(' ')[1]}
