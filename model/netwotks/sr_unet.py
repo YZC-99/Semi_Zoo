@@ -234,9 +234,9 @@ class Unet_wTri(SegmentationModel):
         self.check_input_shape(x)
 
         features = self.encoder(x)
+        c_last = self.gap(features[-1])
 
         features[-4:] = self.fpn(features[-4:])
-        c_last = self.gap(features[-1])
 
         features[-4:] = self.sr(c_last, features[-4:])
 
