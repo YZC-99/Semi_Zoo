@@ -188,9 +188,13 @@ class Unet_wTri(SegmentationModel):
         new_encoder_channels[-len(self.encoder_fpn_out_channels):] = self.encoder_fpn_out_channels
 
         self.gap = GlobalAvgPool2D()
-        self.feature_latent2048 = nn.Conv2d(self.encoder.out_channels[-1],self.fpn_out_channels,1)
-        self.feature_latent1024 = nn.Conv2d(self.encoder.out_channels[-2],self.fpn_out_channels,1)
-        self.feature_latent512 = nn.Conv2d(self.encoder.out_channels[-3],self.fpn_out_channels,1)
+        # self.feature_latent2048 = nn.Conv2d(self.encoder.out_channels[-1],self.fpn_out_channels,1)
+        # self.feature_latent1024 = nn.Conv2d(self.encoder.out_channels[-2],self.fpn_out_channels,1)
+        # self.feature_latent512 = nn.Conv2d(self.encoder.out_channels[-3],self.fpn_out_channels,1)
+
+        self.feature_latent2048 = nn.Conv2d(self.fpn_out_channels, self.fpn_out_channels, 1)
+        self.feature_latent1024 = nn.Conv2d(self.fpn_out_channels, self.fpn_out_channels, 1)
+        self.feature_latent512 = nn.Conv2d(self.fpn_out_channels, self.fpn_out_channels, 1)
 
         self.spatial_attention = nn.Sequential(
             nn.Conv2d(self.fpn_out_channels * 4,1,1),
@@ -530,8 +534,8 @@ if __name__ == '__main__':
 
     data = torch.randn(4,3,256,256)
     # backbone='efficientnet-b0'
-    # backbone='mobileone_s0'
-    backbone='resnet50'
+    backbone='mobileone_s0'
+    # backbone='resnet50'
     # backbone='mit_b0'
     # backbone='mit_b2'
     # backbone='efficientnet-b0'
@@ -539,7 +543,7 @@ if __name__ == '__main__':
     in_chns = 3
     class_num1 = 5
 
-    model = Unet_wTri_wLightDecoder(
+    model = Unet_wTri(
         encoder_name=backbone,
         encoder_weights='imagenet',
         in_channels=in_chns,
