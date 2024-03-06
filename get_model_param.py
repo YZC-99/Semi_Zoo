@@ -41,7 +41,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--model', type=str, default='unet')
 parser.add_argument('--backbone', type=str, default='b2')
 parser.add_argument('--encoder_deepth', type=int, default=5)
-parser.add_argument('--fpn_out_c', type=int, default=-1, help='the out-channels of the FPN module')
+parser.add_argument('--fpn_out_c', type=int, default=48, help='the out-channels of the FPN module')
 parser.add_argument('--fpn_pretrained', action='store_true')
 parser.add_argument('--sr_out_c', type=int, default=128, help='the out-channels of the SR module')
 parser.add_argument('--sr_pretrained', action='store_true')
@@ -91,85 +91,9 @@ parser.add_argument('--max_iterations', type=int, default=10000)
 parser.add_argument('--autodl', action='store_true')
 parser.add_argument('--cutmix_prob', default=-1.0)
 
-# ==============test params===================
-parser.add_argument('--tta', action='store_true')
 
 
-def color_map_fn():
-    cmap = np.zeros((256, 3), dtype='uint8')
-    cmap[0] = np.array([0, 0, 0])
-    cmap[1] = np.array([255, 0, 0])
-    cmap[2] = np.array([0, 255, 0])
-    cmap[3] = np.array([0, 0, 255])
-    cmap[4] = np.array([255, 255, 0])
-    return cmap
 
-
-# 定义一个函数来执行旋转，接受图像和角度作为输入
-def rotate_image(image, angle):
-    return F.rotate(image, angle)
-
-
-tta.aliases.d4_transform()
-
-
-def tta_transforms(image):
-    """生成图像的TTA变换版本及其对应的逆变换函数。"""
-    transforms = [
-        (lambda x: x, lambda x: x),  # 原图及其逆变换
-        (lambda x: F.hflip(x), lambda x: F.hflip(x)),  # 水平翻转及其逆变换
-        # 为每个旋转增加旋转及其逆旋转
-        (lambda x: F.rotate(x, 90), lambda x: F.rotate(x, -90)),
-    ]
-
-    # 应用增强变换
-    augmented_images = [t(image) for t, _ in transforms]
-    # 获取逆变换函数
-    inverse_transforms = [inv_t for _, inv_t in transforms]
-
-    return augmented_images, inverse_transforms
-
-
-def apply_tta_and_predict(model, image_tensor, device):
-    augmented_images, inverse_transforms = tta_transforms(image_tensor)
-    tta_outputs = []
-
-    for aug_image, inv_transform in zip(augmented_images, inverse_transforms):
-        # 检查aug_image是否为Tensor，如果不是，则转换为Tensor
-        if not isinstance(aug_image, torch.Tensor):
-            input_tensor = F.to_tensor(aug_image).to(device)
-        else:
-            input_tensor = aug_image.to(device)
-        # 预测
-        output = model(input_tensor)
-        # 假设输出需要逆变换并且逆变换适用于Tensor
-        # 注意：这里假设inv_transform可以直接应用于Tensor
-        # 如果inv_transform期望的输入是PIL图像，则需要先将output转换为PIL图像，逆变换后再转回Tensor
-        inv_output_tensor = inv_transform(output.squeeze(0)).unsqueeze(0)
-        # 存储逆变换后的输出
-        tta_outputs.append(inv_output_tensor)
-
-    # 计算所有TTA预测结果的平均值
-    mean_tta_output = torch.mean(torch.cat(tta_outputs, dim=0), dim=0, keepdim=True)
-    return mean_tta_output
-
-
-def create_version_folder(snapshot_path):
-    # 检查是否存在版本号文件夹
-    version_folders = [name for name in os.listdir(snapshot_path) if name.startswith('version')]
-
-    if not version_folders:
-        # 如果不存在版本号文件夹，则创建version0
-        new_folder = os.path.join(snapshot_path, 'version0')
-    else:
-        # 如果存在版本号文件夹，则创建下一个版本号文件夹
-        last_version = max(version_folders)
-        last_version_number = int(last_version.replace('version', ''))
-        next_version = 'version{:02d}'.format(last_version_number + 1)
-        new_folder = os.path.join(snapshot_path, next_version)
-
-    os.makedirs(new_folder)
-    return new_folder
 
 
 args = parser.parse_args()
@@ -179,9 +103,10 @@ base_lr = args.base_lr
 
 if __name__ == '__main__':
 
-    model = 'Unet_wFPN_wlightDecoder'
+    model = 'Unet_wTri'
     # backbone = 'se_resnet50'
-    backbone = 'vgg11'
+    backbone = 'mobileone_s0'
+    # backbone = 'vgg11'
     # init model
     model = build_model(args, model=model, backbone=backbone, in_chns=3, class_num1=args.num_classes,
                         class_num2=2, fuse_type=None, ckpt_weight=args.ckpt_weight)
