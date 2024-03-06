@@ -179,120 +179,19 @@ base_lr = args.base_lr
 
 if __name__ == '__main__':
 
-    if not os.path.exists(snapshot_path):
-        os.makedirs(snapshot_path)
-
-    results_path = snapshot_path + "/" + 'results' + "/"
-    if not os.path.exists(results_path):
-        os.makedirs(results_path)
-    results_logs_path = snapshot_path + "/" + 'results-log.txt'
-
-    device = "cuda:{}".format(args.device)
-
+    model = 'Unet_wFPN_wlightDecoder'
+    # backbone = 'se_resnet50'
+    backbone = 'vgg11'
     # init model
-    model = build_model(args, model=args.model, backbone=args.backbone, in_chns=3, class_num1=args.num_classes,
+    model = build_model(args, model=model, backbone=backbone, in_chns=3, class_num1=args.num_classes,
                         class_num2=2, fuse_type=None, ckpt_weight=args.ckpt_weight)
-    model.to(device)
 
-    # init dataset
-    root_base = '/home/gu721/yzc/data/dr/'
-    if args.autodl:
-        root_base = '/root/autodl-tmp/'
+    # 计算模型大小
+    model_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    model_size = model_parameters * 4  # float32参数每个占用4字节
+    model_size_mb = model_size / (1024 * 1024)  # 转换为MB
 
-    # 验证集
-    # init dataset
-    val_dataset = IDRIDDataset(name='./dataset/{}'.format(args.dataset_name),
-                               # root="D:/1-Study/220803研究生阶段学习/221216论文写作专区/OD_OC/数据集/REFUGE",
-                               root="{}{}".format(root_base, args.dataset_name),
-                               mode='val',
-                               size=args.image_size,
-                               CLAHE=args.CLAHE)
-
-    val_loader = DataLoader(val_dataset, batch_size=1, num_workers=1)
-    val_iteriter = tqdm(val_loader)
-
-    model.eval()
-    DR_val_metrics = DR_metrics(device)
-
-    for i_batch, labeled_sampled_batch in enumerate(val_loader):
-        time2 = time.time()
-        labeled_batch, label_label_batch = labeled_sampled_batch['image'].to(device), labeled_sampled_batch['label'].to(
-            device)
-        image_id = labeled_sampled_batch['id'][0].split('/')[-1]
-
-        if args.tta:
-            outputs = apply_tta_and_predict(model, labeled_batch, device)
-        else:
-            outputs = model(labeled_batch)
-        out = torch.argmax(outputs, dim=1)
-        class_3_mask = (out == 3)
-        # 创建一个形状与outputs相同、但所有值都设为0的张量
-        class_3_output = torch.zeros_like(out, dtype=outputs.dtype)
-
-        # 注意outputs的形状为[1, 5, h, w]，我们需要在第二维度选取索引为3的通道
-        class_3_values = outputs[:, 3, :, :]
-
-        # 使用torch.where根据class_3_mask将满足条件的位置更新为class_3_values对应的值
-        class_3_output = torch.where(class_3_mask, class_3_values, class_3_output)
-
-        class_3_output_list = class_3_output.squeeze().tolist()  # 移除批次维度，并转换为列表
-
-        # 保存为文本文件
-        list_file_path = results_path + '/' + image_id.replace('.png','.txt')
-        with open(list_file_path, 'w') as list_file:
-            # 将列表转换为字符串表示形式，并写入文件
-            list_file.write(str(class_3_output_list))
-
-        # 确保数据在0到1之间，如果已经在这个范围内，这一步可以跳过
-        class_3_output_normalized = (class_3_output - class_3_output.min()) / (
-                    class_3_output.max() - class_3_output.min())
-
-        # 使用matplotlib绘制热力图
-        plt.imshow(class_3_output_normalized.detach().cpu().numpy().squeeze(), cmap='hot', interpolation='nearest')
-        plt.axis('off')  # 关闭坐标轴
-        plt.tight_layout(pad=0)  # 紧凑布局，不留额外边缘空间
-
-        # 保存图像
-        plt.savefig(results_path + '/hot_' + image_id, bbox_inches='tight', pad_inches=0)
-
-        # 关闭图形，释放资源
-        plt.close()
-        #         print(labeled_batch.shape)
-        #         print(class_3_output.shape)
-
-        out = out[0].detach().cpu().numpy().astype(np.int8)
-        pred_mask = Image.fromarray(out, mode='P')
-        pred_mask.putpalette(color_map_fn())
-        pred_mask.save(results_path + '/' + image_id)
-
-        DR_val_metrics.add(outputs.detach(), label_label_batch)
-    with open(results_logs_path, 'w') as f:
-        val_metrics = DR_val_metrics.get_metrics()
-        AUC_PR = val_metrics[0]
-        AUC_ROC = val_metrics[1]
-        Dice, IoU = val_metrics[2]['Dice'], val_metrics[2]['IoU']
-        MA_AUC_PR, HE_AUC_PR, EX_AUC_PR, SE_AUC_PR = AUC_PR['MA_AUC_PR'], AUC_PR['HE_AUC_PR'], AUC_PR['EX_AUC_PR'], \
-                                                     AUC_PR['SE_AUC_PR']
-        MA_AUC_ROC, HE_AUC_ROC, EX_AUC_ROC, SE_AUC_ROC = AUC_ROC['MA_AUC_ROC'], AUC_ROC['HE_AUC_ROC'], AUC_ROC[
-            'EX_AUC_ROC'], AUC_ROC['SE_AUC_ROC']
-
-        lines = [
-            f'MA_AUC_PR:{MA_AUC_PR}\n',
-            f'HE_AUC_PR:{HE_AUC_PR}\n',
-            f'EX_AUC_PR:{EX_AUC_PR}\n',
-            f'SE_AUC_PR:{SE_AUC_PR}\n',
-            f'MA_AUC_ROC:{MA_AUC_ROC}\n',
-            f'HE_AUC_ROC:{HE_AUC_ROC}\n',
-            f'EX_AUC_ROC:{EX_AUC_ROC}\n',
-            f'SE_AUC_ROC:{SE_AUC_ROC}\n',
-            f'Dice:{Dice}\n',
-            f'IoU:{IoU}\n'
-        ]
-        # 写入并打印每行
-        for line in lines:
-            f.write(line)
-            print(line)  # 使用 strip() 移除尾随的换行符
-
+    print(f'模型大小: {model_size_mb:.2f} MB')
 
 
 

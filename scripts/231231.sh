@@ -18,10 +18,10 @@ Unet_wFPN_wSKA_add_Spatial
 python train_idrid_supervised_2d_smp.py \
         --num_works 8 \
         --device 0 \
-        --exp crop_IDRID/UNet-softmax_focal_blv/ema-lr6e-4_poly-v2-interval-30/imgz1440_se_resnet50/bs2_Adam_CLAHE0-5k\
+        --exp crop_IDRID/Unet_wTri/ema-lr6e-4_poly-v2-interval-30/imgz1440_se_resnet50/bs2_Adam_CLAHE0-5k\
         --dataset_name crop_IDRID \
         --image_size 1440 \
-        --model UNet \
+        --model Unet_wTri \
         --optim Adam \
         --batch_size 2 \
         --base_lr 0.0006 \
@@ -29,11 +29,11 @@ python train_idrid_supervised_2d_smp.py \
         --autodl \
         --ema 0.75 \
         --scheduler poly-v2 \
-        --main_criteria softmax_focal_blv \
         --max_iterations 5000 \
         --backbone se_resnet50
 
 
+        --main_criteria softmax_focal_blv \
 
 
         --cutmix_prob 0.5 \
@@ -51,6 +51,7 @@ Unet_wFPN_wSKA_Dali
 Unet_wFPN_wSKA
 Unet_wFPN_wSCCBAM
 Unet_wMamba_Bot
+Unet_wDeocderAttention
         --decoder_attention_type scse \
 
 
@@ -100,10 +101,10 @@ Dual_Seg_Head_Unet
 python train_idrid_supervised_2d_smp.py \
         --num_works 8 \
         --device 0 \
-        --exp E-ophtha/UNet-softmax_focal_blv/ema-lr6e-4_poly-v2-interval-30/imgz1024_se_resnet50/bs2_Adam_CLAHE0-5k\
+        --exp E-ophtha/Unet_wFPN_wSR/ema-lr6e-4_poly-v2-interval-30/imgz1024_se_resnet50/bs2_Adam_CLAHE0-5k\
         --dataset_name E-ophtha \
         --image_size 1024 \
-        --model UNet \
+        --model Unet_wFPN_wSR \
         --optim Adam \
         --batch_size 2 \
         --base_lr 0.0006 \
@@ -112,13 +113,12 @@ python train_idrid_supervised_2d_smp.py \
         --autodl \
         --ema 0.75 \
         --scheduler poly-v2 \
-        --main_criteria softmax_focal_blv \
         --max_iterations 1200 \
         --backbone se_resnet50
 
-
         --decoder_attention_type scse \
 
+        --main_criteria softmax_focal_blv \
 
 Unet_wDeocderAttention
 Unet_wFPN_wDeocderAttention
