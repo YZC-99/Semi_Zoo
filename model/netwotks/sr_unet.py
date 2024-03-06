@@ -269,7 +269,7 @@ if __name__ == '__main__':
     ssl._create_default_https_context = ssl._create_unverified_context
 
     data = torch.randn(4,3,256,256)
-    backbone='resnet50'
+    backbone='efficientnet-b0'
     # backbone='mit_b0'
     # backbone='mit_b2'
     # backbone='efficientnet-b0'

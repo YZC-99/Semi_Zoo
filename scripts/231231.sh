@@ -18,7 +18,7 @@ Unet_wFPN_wSKA_add_Spatial
 python train_idrid_supervised_2d_smp.py \
         --num_works 8 \
         --device 0 \
-        --exp crop_IDRID/Unet_wTri/ema-lr6e-4_poly-v2-interval-30/imgz1440_se_resnet50/bs2_Adam_CLAHE0-5k\
+        --exp crop_IDRID/Unet_wTri/ema-lr6e-4_poly-v2-interval-30/imgz1440_efficientnet-b0/bs2_Adam_CLAHE0-5k\
         --dataset_name crop_IDRID \
         --image_size 1440 \
         --model Unet_wTri \
@@ -30,9 +30,13 @@ python train_idrid_supervised_2d_smp.py \
         --ema 0.75 \
         --scheduler poly-v2 \
         --max_iterations 5000 \
-        --backbone se_resnet50
+        --fpn_out_c 24 \
+        --backbone efficientnet-b0
+
+fpn_out_c
 
 
+efficientnet-b0
         --main_criteria softmax_focal_blv \
 
 
