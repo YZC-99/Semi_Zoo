@@ -18,23 +18,23 @@ Unet_wFPN_wSKA_add_Spatial
 python train_idrid_supervised_2d_smp.py \
         --num_works 8 \
         --device 0 \
-        --exp crop_IDRID/Unet_wFPN_wSR/ema-lr6e-4_poly-v2-interval-30/imgz1440_resnet50/bs2_Adam_CLAHE0-5k\
+        --exp crop_IDRID/Unet_wTri/256channels-lr6e-4_poly-v2-interval-30/imgz1440_mobileone_s0/bs2_Adam_CLAHE0-5k\
         --dataset_name crop_IDRID \
         --image_size 1440 \
-        --model Unet_wFPN_wSR \
+        --model Unet_wTri \
         --optim Adam \
         --batch_size 2 \
         --base_lr 0.0006 \
         --CLAHE 0 \
         --autodl \
         --ema 0.75 \
+        --fpn_out_c 256 \
         --scheduler poly-v2 \
         --max_iterations 5000 \
         --backbone mobileone_s0
 
 
-        --fpn_out_c 48 \
-
+Unet_wTri_wLightDecoder
 fpn_out_c
 mobileone_s0
 mobileone_s0
@@ -42,7 +42,7 @@ efficientnet-b0 24
 
         --main_criteria softmax_focal_blv \
 
-
+Unet_wTri
         --cutmix_prob 0.5 \
 
 crop_IDRID

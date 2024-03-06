@@ -245,6 +245,8 @@ class Unet_wTri(SegmentationModel):
 
         features[-4:] = self.fpn(features[-4:])
 
+        features[-4:] = self.sr(c_last, features[-4:])
+
         #学习空间上的场景关系
         feature2048_weight = F.interpolate(spatial_weight,features[-1].size()[-2:])
         feature1024_weight = F.interpolate(spatial_weight,features[-2].size()[-2:])
@@ -255,7 +257,6 @@ class Unet_wTri(SegmentationModel):
         features[-4] = features[-4] + features[-4] * spatial_weight
 
 
-        features[-4:] = self.sr(c_last, features[-4:])
 
         decoder_output = self.decoder(*features)
 
