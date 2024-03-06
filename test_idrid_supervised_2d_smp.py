@@ -277,16 +277,16 @@ if __name__ == '__main__':
             'EX_AUC_ROC'], AUC_ROC['SE_AUC_ROC']
 
         lines = [
-            f'MA_AUC_PR:{MA_AUC_PR}\n',
-            f'HE_AUC_PR:{HE_AUC_PR}\n',
-            f'EX_AUC_PR:{EX_AUC_PR}\n',
-            f'SE_AUC_PR:{SE_AUC_PR}\n',
-            f'MA_AUC_ROC:{MA_AUC_ROC}\n',
-            f'HE_AUC_ROC:{HE_AUC_ROC}\n',
-            f'EX_AUC_ROC:{EX_AUC_ROC}\n',
-            f'SE_AUC_ROC:{SE_AUC_ROC}\n',
-            f'Dice:{Dice}\n',
-            f'IoU:{IoU}\n'
+            f'MA_AUC_PR:{MA_AUC_PR * 100}\n',
+            f'HE_AUC_PR:{HE_AUC_PR * 100}\n',
+            f'EX_AUC_PR:{EX_AUC_PR * 100}\n',
+            f'SE_AUC_PR:{SE_AUC_PR * 100}\n',
+            f'MA_AUC_ROC:{MA_AUC_ROC * 100}\n',
+            f'HE_AUC_ROC:{HE_AUC_ROC * 100}\n',
+            f'EX_AUC_ROC:{EX_AUC_ROC * 100}\n',
+            f'SE_AUC_ROC:{SE_AUC_ROC * 100}\n',
+            f'Dice:{Dice * 100}\n',
+            f'IoU:{IoU * 100}\n'
         ]
         # 写入并打印每行
         for line in lines:
