@@ -60,7 +60,7 @@ class Light_Decoder(nn.Module):
     def __init__(
         self,
         encoder_channels,
-        decoder_channels,
+        decoder_channels=256,
         n_blocks=5,
         use_batchnorm=True,
         attention_type=None,
@@ -80,34 +80,35 @@ class Light_Decoder(nn.Module):
         # reverse channels to start from head of encoder
         encoder_channels = encoder_channels[::-1]
 
+        middle_channels = int(decoder_channels / 2)
         self.convc5 = nn.Sequential(
-            md.Conv2dReLU(256,128,3,1,1,use_batchnorm=use_batchnorm),
+            md.Conv2dReLU(decoder_channels,middle_channels,3,1,1,use_batchnorm=use_batchnorm),
             nn.UpsamplingBilinear2d(scale_factor=2),
-            md.Conv2dReLU(128, 128, 3, 1, 1, use_batchnorm=use_batchnorm),
+            md.Conv2dReLU(middle_channels, middle_channels, 3, 1, 1, use_batchnorm=use_batchnorm),
             nn.UpsamplingBilinear2d(scale_factor=2),
-            md.Conv2dReLU(128, 128, 3, 1, 1, use_batchnorm=use_batchnorm),
+            md.Conv2dReLU(middle_channels, middle_channels, 3, 1, 1, use_batchnorm=use_batchnorm),
             nn.UpsamplingBilinear2d(scale_factor=2),
         )
-        self.attention5 = md.Attention(attention_type, in_channels=128)
+        self.attention5 = md.Attention(attention_type, in_channels=middle_channels)
 
         self.convc4 = nn.Sequential(
-            md.Conv2dReLU(256,128,3,1,1,use_batchnorm=use_batchnorm),
+            md.Conv2dReLU(decoder_channels,middle_channels,3,1,1,use_batchnorm=use_batchnorm),
             nn.UpsamplingBilinear2d(scale_factor=2),
-            md.Conv2dReLU(128, 128, 3, 1, 1, use_batchnorm=use_batchnorm),
+            md.Conv2dReLU(middle_channels, middle_channels, 3, 1, 1, use_batchnorm=use_batchnorm),
             nn.UpsamplingBilinear2d(scale_factor=2),
         )
-        self.attention4 = md.Attention(attention_type, in_channels=128)
+        self.attention4 = md.Attention(attention_type, in_channels=middle_channels)
 
         self.convc3 = nn.Sequential(
-            md.Conv2dReLU(256,128,3,1,1,use_batchnorm=use_batchnorm),
+            md.Conv2dReLU(decoder_channels,middle_channels,3,1,1,use_batchnorm=use_batchnorm),
             nn.UpsamplingBilinear2d(scale_factor=2),
         )
-        self.attention3 = md.Attention(attention_type, in_channels=128)
+        self.attention3 = md.Attention(attention_type, in_channels=middle_channels)
 
         self.convc2 = nn.Sequential(
-            md.Conv2dReLU(256,128,3,1,1,use_batchnorm=use_batchnorm),
+            md.Conv2dReLU(decoder_channels,middle_channels,3,1,1,use_batchnorm=use_batchnorm),
         )
-        self.attention2 = md.Attention(attention_type, in_channels=128)
+        self.attention2 = md.Attention(attention_type, in_channels=middle_channels)
 
     def forward(self, *features):
 

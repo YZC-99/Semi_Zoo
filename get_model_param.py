@@ -41,9 +41,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--model', type=str, default='unet')
 parser.add_argument('--backbone', type=str, default='b2')
 parser.add_argument('--encoder_deepth', type=int, default=5)
-parser.add_argument('--fpn_out_c', type=int, default=48, help='the out-channels of the FPN module')
+parser.add_argument('--fpn_out_c', type=int, default=24, help='the out-channels of the FPN module')
 parser.add_argument('--fpn_pretrained', action='store_true')
-parser.add_argument('--sr_out_c', type=int, default=128, help='the out-channels of the SR module')
+parser.add_argument('--sr_out_c', type=int, default=48, help='the out-channels of the SR module')
 parser.add_argument('--sr_pretrained', action='store_true')
 parser.add_argument('--decoder_attention_type', type=str, default=None,
                     choices=['scse', 'sccbam', 'sc2cbam', 'scbam', 'sc2bam'])
@@ -103,9 +103,12 @@ base_lr = args.base_lr
 
 if __name__ == '__main__':
 
-    model = 'Unet_wTri'
+    # model = 'Unet_wTri_wLightDecoder'
+    model = 'UNet'
+    # model = 'Unet_wTri'
     # backbone = 'se_resnet50'
-    backbone = 'mobileone_s0'
+    # backbone = 'mobileone_s0'
+    backbone = 'efficientnet-b0'
     # backbone = 'vgg11'
     # init model
     model = build_model(args, model=model, backbone=backbone, in_chns=3, class_num1=args.num_classes,
