@@ -244,9 +244,14 @@ class Unet_wTri(SegmentationModel):
 
         features[-4:] = self.sr(c_last, features[-4:])
 
-        feature2048 = F.interpolate(self.feature_latent2048(features[-1]),features[-4].size()[-2:])
-        feature1024 = F.interpolate(self.feature_latent1024(features[-2]),features[-4].size()[-2:])
-        feature512 = F.interpolate(self.feature_latent512(features[-3]),features[-4].size()[-2:])
+        # feature2048 = F.interpolate(self.feature_latent2048(features[-1]),features[-4].size()[-2:])
+        # feature1024 = F.interpolate(self.feature_latent1024(features[-2]),features[-4].size()[-2:])
+        # feature512 = F.interpolate(self.feature_latent512(features[-3]),features[-4].size()[-2:])
+        #
+
+        feature2048 = F.interpolate(features[-1],features[-4].size()[-2:])
+        feature1024 = F.interpolate(features[-2],features[-4].size()[-2:])
+        feature512 = F.interpolate(features[-3],features[-4].size()[-2:])
 
         spatial_weight = self.spatial_attention(torch.cat([features[-4],feature2048,feature1024,feature512],dim=1))
 

@@ -2,26 +2,27 @@
 python test_idrid_supervised_2d_smp.py \
         --num_works 8 \
         --device 0 \
-        --exp crop_IDRID/Unet_wTri_wLightDecoder \
+        --exp crop_IDRID/Unet_wFPN_wSR \
         --dataset_name crop_IDRID \
         --image_size 1440 \
-        --model Unet_wTri_wLightDecoder \
+        --model Unet_wFPN_wSR \
         --CLAHE 0 \
         --autodl \
-        --fpn_out_c 48 \
-        --ckpt_weight /root/autodl-tmp/Semi_Zoo/exp_2d_dr/crop_IDRID/Unet_wTri_wLightDecoder/ema-lr6e-4_poly-v2-interval-30/imgz1440_mobileone_s0/bs2_Adam_CLAHE0-5k/version0/best_AUC_PR_EX_0.7825_iter_4428.pth \
+        --fpn_out_c 256 \
+        --ckpt_weight /root/autodl-tmp/Semi_Zoo/exp_2d_dr/crop_IDRID/Unet_wFPN_wSR/channels-lr6e-4_poly-v2-interval-30/imgz1440_mobileone_s0/bs2_Adam_CLAHE0-5k/version0/best_AUC_PR_EX_0.8102_iter_4887.pth \
         --backbone mobileone_s0
 
 
 
         --decoder_attention_type scse \
-
+DeepLabV3P
 efficientnet-b0
 Unet_wFPN_wSR
 Unet_wFPN_wSKA
 Unet_wFPN
 Unet_wFPN_wSpatial
-
+Unet_wTri_wLightDecoder
+Unet_wTri
 #
 ddr
 
