@@ -220,8 +220,8 @@ if __name__ == '__main__':
             device)
         image_id = labeled_sampled_batch['id'][0].split('/')[-1]
 
-        if args.tta:
-            outputs = apply_tta_and_predict(model, labeled_batch, device)
+        if 'Dual' in args.model:
+            outputs,_ = model(labeled_batch)
         else:
             outputs = model(labeled_batch)
         out = torch.argmax(outputs, dim=1)
