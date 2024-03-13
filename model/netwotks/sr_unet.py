@@ -968,7 +968,7 @@ if __name__ == '__main__':
     # encoder_depth = 4
     # decoder_channels = (256, 128, 64, 32)
 
-    model = Unet_wFPN_wPyramidMHSA_SR(
+    model = Unet_wFPN_wPyramidMHSA_SR_wLightDecoder(
         encoder_name=backbone,
         encoder_weights='imagenet',
         in_channels=in_chns,
