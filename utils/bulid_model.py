@@ -7,7 +7,7 @@ from model.netwotks.unet import Unet_wFPN_wSKA_add_CBAM,Unet_wFPN_wSKA_Dali,Unet
 from model.netwotks.unet import Unet_wFPN_wASPP_Bottle,Unet_wFPN_wDeocderAttention,Unet_wDeocderAttention
 from model.netwotks.unet import Unet_wSR,Unet_wFPN_wDAB_wSR_wRTFM,Unet_wFPN_wSKA,Unet_wFPN_wSCBAM,Unet_wFPN_wSCCBAM,Unet_wFPN_wSKA_add_Spatial
 from model.netwotks.att_unet import AttU_Net
-from model.netwotks.sr_unet import Unet_wTri,Unet_wFPN_wSpatial,Unet_wTri_wLightDecoder
+from model.netwotks.sr_unet import Unet_wTri,Dual_Decoder_Unet_wTri,Unet_wFPN_wSpatial,Unet_wTri_wLightDecoder
 from model.netwotks.sr_unet import Unet_wFPN_wPyramidMHSA_SR_wLightDecoder,Unet_wFPN_wPyramidMHSA_SR
 from model.netwotks.sr_light_net import LightNet_wFPN,LightNet_wSR,LightNet_wFPN_wSR
 from model.netwotks.dual_decoer_unet import Dual_Decoder_Unet,Dual_Seg_Head_Unet,Dual_Decoder_SR_Unet,Dual_Decoder_SR_Unet_woSR,Dual_Decoder_SR_Unet_woFPN
@@ -241,6 +241,19 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             encoder_depth=args.encoder_deepth,
             decoder_channels=decoder_channels
         )
+    elif model == "Dual_Decoder_Unet_wTri":
+        net = Dual_Decoder_Unet_wTri(
+            encoder_name=backbone,
+            encoder_weights='imagenet',
+            in_channels=in_chns,
+            classes=class_num1,
+            fpn_out_channels=args.fpn_out_c,
+            decoder_attention_type=args.decoder_attention_type,
+            encoder_depth=args.encoder_deepth,
+            decoder_channels=decoder_channels
+        )
+
+
     elif model == "Unet_wFPN_wPyramidMHSA_SR":
         net = Unet_wFPN_wPyramidMHSA_SR(
             encoder_name=backbone,
@@ -505,6 +518,9 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             in_channels=in_chns,
             classes=class_num1,
         )
+
+
+
     elif model == 'Dual_Seg_Head_Unet':
         net = Dual_Seg_Head_Unet(
             encoder_name=backbone,
