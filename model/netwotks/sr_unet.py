@@ -208,7 +208,7 @@ class Unet_wFPN_wPyramidMHSA_SR(SegmentationModel):
         new_encoder_channels = list(self.encoder.out_channels)
         new_encoder_channels[-len(self.encoder_fpn_out_channels):] = self.encoder_fpn_out_channels
 
-        self.MHSA = ScaledDotProductAttention(sum(self.encoder.out_channels[-4:]), 64, 64, 4)
+        self.MHSA = ScaledDotProductAttention(sum(self.encoder.out_channels[-4:]), 128, 128, 12)
         self.gap = GlobalAvgPool2D()
 
 
@@ -968,7 +968,7 @@ if __name__ == '__main__':
     # encoder_depth = 4
     # decoder_channels = (256, 128, 64, 32)
 
-    model = Unet_wFPN_wPyramidMHSA_SR_wLightDecoder(
+    model = Unet_wFPN_wScaleWare(
         encoder_name=backbone,
         encoder_weights='imagenet',
         in_channels=in_chns,
