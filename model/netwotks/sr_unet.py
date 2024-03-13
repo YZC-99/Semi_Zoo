@@ -398,9 +398,9 @@ class Unet_wFPN_wPyramidMHSA_SR_wLightDecoder(SegmentationModel):
 
 
         gap_features = torch.cat([features[-1],
-                                  F.interpolate(features[-3],size=features[-1].size()[-2:]),
                                   F.interpolate(features[-2],size=features[-1].size()[-2:]),
-                                  F.interpolate(features[-1],size=features[-1].size()[-2:])],
+                                  F.interpolate(features[-3],size=features[-1].size()[-2:]),
+                                  F.interpolate(features[-4],size=features[-1].size()[-2:])],
                                  dim=1
                                  )
 
