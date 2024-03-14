@@ -50,10 +50,10 @@ efficientnet-b0 24
 python train_idrid_supervised_2d_smp.py \
         --num_works 8 \
         --device 0 \
-        --exp crop_IDRID/Dual_Decoder_Unet_wFPN_wAuxInPyramidASPP/obj_loss1e-1_lr6e-4_poly-v2-interval-30/imgz1440_mobileone_s0/bs2_Adam_CLAHE0-5k\
+        --exp crop_IDRID/Dual_Decoder_Unet_wFPN_wAuxInPyramidASPP_wMain/fpn256-obj_loss1e-1_lr6e-4_poly-v2-interval-30/imgz1440_mobileone_s0/bs2_Adam_CLAHE0-5k\
         --dataset_name crop_IDRID \
         --image_size 1440 \
-        --model Dual_Decoder_Unet_wFPN_wAuxInPyramidASPP \
+        --model Dual_Decoder_Unet_wFPN_wAuxInPyramidASPP_wMain \
         --optim Adam \
         --batch_size 2 \
         --base_lr 0.0006 \
@@ -62,11 +62,14 @@ python train_idrid_supervised_2d_smp.py \
         --ema 0.75 \
         --scheduler poly-v2 \
         --max_iterations 5000 \
-        --fpn_out_c 48 \
+        --fpn_out_c 256 \
         --obj_loss 0.1 \
         --backbone mobileone_s0
 
         --main_criteria softmax_focal_blv \
+
+
+Dual_Decoder_Unet_wFPN_wAuxInPyramidASPP_wMain
 Unet_wFPN_wSR
 Unet_wTri
         --cutmix_prob 0.5 \
