@@ -50,10 +50,10 @@ efficientnet-b0 24
 python train_idrid_supervised_2d_smp.py \
         --num_works 8 \
         --device 0 \
-        --exp crop_IDRID/Dual_Decoder_Unet_wTri/obj_loss1e-1_lr6e-4_poly-v2-interval-30/imgz1440_mobileone_s0/bs2_Adam_CLAHE0-5k\
+        --exp crop_IDRID/Dual_Decoder_Unet_wFPN_wPyramidASPP/obj_loss1e-1_lr6e-4_poly-v2-interval-30/imgz1440_mobileone_s0/bs2_Adam_CLAHE0-5k\
         --dataset_name crop_IDRID \
         --image_size 1440 \
-        --model Dual_Decoder_Unet_wTri \
+        --model Dual_Decoder_Unet_wFPN_wPyramidASPP \
         --optim Adam \
         --batch_size 2 \
         --base_lr 0.0006 \
