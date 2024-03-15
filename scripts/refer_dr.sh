@@ -2,14 +2,14 @@
 python test_idrid_supervised_2d_smp.py \
         --num_works 8 \
         --device 0 \
-        --exp crop_IDRID/Unet_wFPN_wPyramidASPP \
+        --exp crop_IDRID/Dual_Decoder_Unet_wFPN_wAuxInPyramidASPP_wMain-obj_loss5e-1 \
         --dataset_name crop_IDRID \
         --image_size 1440 \
-        --model Unet_wFPN_wPyramidASPP \
+        --model Dual_Decoder_Unet_wFPN_wAuxInPyramidASPP_wMain \
         --CLAHE 0 \
         --autodl \
         --fpn_out_c 48 \
-        --ckpt_weight /root/autodl-tmp/Semi_Zoo/exp_2d_dr/crop_IDRID/Unet_wFPN_wPyramidASPP/fpn48-lr6e-4_poly-v2-interval-30/imgz1440_mobileone_s0/bs2_Adam_CLAHE0-5k/version0/best_AUC_PR_EX_0.8041_iter_4077.pth \
+        --ckpt_weight /root/autodl-tmp/Semi_Zoo/exp_2d_dr/crop_IDRID/Dual_Decoder_Unet_wFPN_wAuxInPyramidASPP_wMain/fpn48-obj_loss5e-1_lr6e-4_poly-v2-interval-30/imgz1440_mobileone_s0/bs2_Adam_CLAHE0-5k/version0/best_AUC_PR_EX_0.8107_iter_4401.pth \
         --backbone mobileone_s0
 
 Unet_wFPN_wPyramidMHSA_SR

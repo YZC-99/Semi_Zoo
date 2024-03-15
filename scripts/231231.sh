@@ -18,10 +18,10 @@ Unet_wFPN_wSKA_add_Spatial
 python train_idrid_supervised_2d_smp.py \
         --num_works 8 \
         --device 0 \
-        --exp crop_IDRID/Unet_wPyramidASPP_wMain/lr6e-4_poly-v2-interval-30/imgz1440_mobileone_s0/bs2_Adam_CLAHE0-5k\
+        --exp crop_IDRID/Unet_ASPPinBot/lr6e-4_poly-v2-interval-30/imgz1440_mobileone_s0/bs2_Adam_CLAHE0-5k\
         --dataset_name crop_IDRID \
         --image_size 1440 \
-        --model Unet_wPyramidASPP_wMain \
+        --model Unet_ASPPinBot \
         --optim Adam \
         --batch_size 2 \
         --base_lr 0.0006 \
@@ -34,6 +34,9 @@ python train_idrid_supervised_2d_smp.py \
         --encoder_deepth 5 \
         --backbone mobileone_s0
 
+
+Unet_ASPPinBot
+Unet_wPyramidASPP_wMain
 Unet_wFPN_wPyramidASPP
 Unet_wFPN_wDouble_ASPP
 Unet_wFPN_wASPP
@@ -51,10 +54,10 @@ efficientnet-b0 24
 python train_idrid_supervised_2d_smp.py \
         --num_works 8 \
         --device 0 \
-        --exp crop_IDRID/Dual_Decoder_Unet_wFPN_wAuxInPyramidASPP_wMain/fpn48-obj_loss5e-1_lr6e-4_poly-v2-interval-30/imgz1440_mobileone_s0/bs2_Adam_CLAHE0-5k\
+        --exp crop_IDRID/Dual_Decoder_Unet_wAuxInPyramidASPP_wMain/fpn48-obj_loss5e-1_lr6e-4_poly-v2-interval-30/imgz1440_mobileone_s0/bs2_Adam_CLAHE0-5k\
         --dataset_name crop_IDRID \
         --image_size 1440 \
-        --model Dual_Decoder_Unet_wFPN_wAuxInPyramidASPP_wMain \
+        --model Dual_Decoder_Unet_wAuxInPyramidASPP_wMain \
         --optim Adam \
         --batch_size 2 \
         --base_lr 0.0006 \
