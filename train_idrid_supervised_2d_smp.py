@@ -294,13 +294,13 @@ if __name__ == '__main__':
             # eval
             with torch.no_grad():
                 if iter_num % (54 / args.batch_size) == 0:
-                    if args.ema > 0 and (iter_num > args.ema * args.max_iterations):
-                        ema.apply_shadow()
-                        name = 'ema.pth'
-                        save_mode_path = os.path.join(
-                            snapshot_path, name)
-                        torch.save(model.state_dict(), save_mode_path)
-                        ema.restore()
+                    # if args.ema > 0 and (iter_num > args.ema * args.max_iterations):
+                    #     ema.apply_shadow()
+                    #     name = 'ema.pth'
+                    #     save_mode_path = os.path.join(
+                    #         snapshot_path, name)
+                    #     torch.save(model.state_dict(), save_mode_path)
+                    #     ema.restore()
 
 
                     model.eval()
