@@ -10,7 +10,7 @@ from model.netwotks.att_unet import AttU_Net
 from model.netwotks.sr_unet import Unet_wTri,Dual_Decoder_Unet_wTri,Unet_wFPN_wSpatial,Unet_wTri_wLightDecoder
 from model.netwotks.sr_unet import Unet_wFPN_wPyramidMHSA_SR_wLightDecoder,Unet_wFPN_wPyramidMHSA_SR,Unet_wFPN_wASPP,Unet_wFPN_wDouble_ASPP
 from model.netwotks.sr_unet import Unet_wFPN_wPyramidASPP,Unet_wFPN_wPyramidASPP_inFPN,Dual_Decoder_Unet_wFPN_wPyramidASPP
-from model.netwotks.sr_unet import Dual_Decoder_Unet_wFPN_wAuxInPyramidASPP,Dual_Decoder_Unet_wFPN_wAuxInPyramidASPP_wMain
+from model.netwotks.sr_unet import Dual_Decoder_Unet_wFPN_wAuxInPyramidASPP,Dual_Decoder_Unet_wFPN_wAuxInPyramidASPP_wMain,Dual_Decoder_Unet_wAuxInPyramidASPP_wMain
 from model.netwotks.sr_light_net import LightNet_wFPN,LightNet_wSR,LightNet_wFPN_wSR
 from model.netwotks.dual_decoer_unet import Dual_Decoder_Unet,Dual_Seg_Head_Unet,Dual_Decoder_SR_Unet,Dual_Decoder_SR_Unet_woSR,Dual_Decoder_SR_Unet_woFPN
 from model.netwotks.dual_decoer_unet import Dual_Decoder_Unet_DualFPN_CrossAttention,Dual_Decoder_SR_Unet_woSR_wRTFM
@@ -65,6 +65,7 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             encoder_weights='imagenet',
             in_channels=in_chns,
             classes=class_num1,
+            fpn_out_channels=args.fpn_out_c,
             decoder_attention_type=args.decoder_attention_type,
             encoder_depth=args.encoder_deepth,
             decoder_channels=decoder_channels
@@ -75,6 +76,7 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             encoder_weights='imagenet',
             in_channels=in_chns,
             classes=class_num1,
+            fpn_out_channels=args.fpn_out_c,
             decoder_attention_type=args.decoder_attention_type,
             encoder_depth=args.encoder_deepth,
             decoder_channels=decoder_channels
@@ -87,6 +89,7 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             encoder_weights='imagenet',
             in_channels=in_chns,
             classes=class_num1,
+            fpn_out_channels=args.fpn_out_c,
             decoder_attention_type=args.decoder_attention_type,
             encoder_depth=args.encoder_deepth,
             decoder_channels=decoder_channels
@@ -97,16 +100,30 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             encoder_weights='imagenet',
             in_channels=in_chns,
             classes=class_num1,
+            fpn_out_channels=args.fpn_out_c,
             decoder_attention_type=args.decoder_attention_type,
             encoder_depth=args.encoder_deepth,
             decoder_channels=decoder_channels
         )
+    elif model == "Dual_Decoder_Unet_wAuxInPyramidASPP_wMain":
+        net = Dual_Decoder_Unet_wAuxInPyramidASPP_wMain(
+            encoder_name=backbone,
+            encoder_weights='imagenet',
+            in_channels=in_chns,
+            classes=class_num1,
+            fpn_out_channels=args.fpn_out_c,
+            decoder_attention_type=args.decoder_attention_type,
+            encoder_depth=args.encoder_deepth,
+            decoder_channels=decoder_channels
+        )
+
     elif model == "Dual_Decoder_Unet_wFPN_wPyramidASPP":
         net = Dual_Decoder_Unet_wFPN_wPyramidASPP(
             encoder_name=backbone,
             encoder_weights='imagenet',
             in_channels=in_chns,
             classes=class_num1,
+            fpn_out_channels=args.fpn_out_c,
             decoder_attention_type=args.decoder_attention_type,
             encoder_depth=args.encoder_deepth,
             decoder_channels=decoder_channels
@@ -117,6 +134,7 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
             encoder_weights='imagenet',
             in_channels=in_chns,
             classes=class_num1,
+            fpn_out_channels=args.fpn_out_c,
             decoder_attention_type=args.decoder_attention_type,
             encoder_depth=args.encoder_deepth,
             decoder_channels=decoder_channels

@@ -1090,6 +1090,95 @@ class Dual_Decoder_Unet_wFPN_wAuxInPyramidASPP(SegmentationModel):
         return masks,masks2
 
 
+class Dual_Decoder_Unet_wAuxInPyramidASPP_wMain(SegmentationModel):
+
+    def __init__(
+            self,
+            encoder_name: str = "resnet34",
+            encoder_depth: int = 5,
+            encoder_weights: Optional[str] = "imagenet",
+            fpn_out_channels=256,
+            decoder_use_batchnorm: bool = True,
+            decoder_channels: List[int] = (256, 128, 64, 32, 16),
+            decoder_attention_type: Optional[str] = None,
+            in_channels: int = 3,
+            classes: int = 1,
+            activation: Optional[Union[str, callable]] = None,
+            aux_params: Optional[dict] = None,
+            fpn_pretrained = False,
+    ):
+        super().__init__()
+
+        self.encoder = get_encoder(
+            encoder_name,
+            in_channels=in_channels,
+            depth=encoder_depth,
+            weights=encoder_weights,
+        )
+
+
+        self.decoder = UnetDecoder(
+            encoder_channels=self.encoder.out_channels,
+            decoder_channels= decoder_channels ,
+            n_blocks=encoder_depth,
+            use_batchnorm=decoder_use_batchnorm,
+            center=True if encoder_name.startswith("vgg") else False,
+            attention_type=decoder_attention_type,
+        )
+
+        self.aspp = ASPP(in_channels=sum(self.encoder.out_channels[-4:]),out_channels=decoder_channels[-1],atrous_rates=(12, 24, 36))
+
+
+        self.segmentation_head = SegmentationHead(
+            in_channels=decoder_channels[-1] * 2,
+            out_channels=classes,
+            activation=activation,
+            kernel_size=3,
+        )
+        self.segmentation_head2 = SegmentationHead(
+            in_channels=decoder_channels[-1],
+            out_channels=2,
+            activation=activation,
+            kernel_size=3,
+        )
+
+
+
+        if aux_params is not None:
+            self.classification_head = ClassificationHead(in_channels=self.encoder.out_channels[-1], **aux_params)
+        else:
+            self.classification_head = None
+
+        self.name = "u-{}".format(encoder_name)
+        self.initialize()
+
+    def forward(self, x):
+        self.check_input_shape(x)
+
+        features = self.encoder(x)
+
+
+        aspp_feature = torch.cat([features[-4],
+                                  F.interpolate(features[-1],size=features[-4].size()[-2:]),
+                                  F.interpolate(features[-3],size=features[-4].size()[-2:]),
+                                  F.interpolate(features[-2],size=features[-4].size()[-2:])],
+                                 dim=1
+                                 )
+
+        aspp_feature = self.aspp(aspp_feature)
+
+        decoder_output = self.decoder(*features)
+
+        aspp_feature = F.interpolate(aspp_feature,size=decoder_output.size()[-2:])
+        decoder_output = torch.cat([decoder_output,aspp_feature],dim=1)
+
+        masks = self.segmentation_head(decoder_output)
+        masks2 = self.segmentation_head2(aspp_feature)
+
+        return masks,masks2
+
+
+
 class Dual_Decoder_Unet_wFPN_wAuxInPyramidASPP_wMain(SegmentationModel):
 
     def __init__(
@@ -2042,7 +2131,7 @@ if __name__ == '__main__':
     # encoder_depth = 4
     # decoder_channels = (256, 128, 64, 32)
 
-    model = Unet_wFPN_wPyramidASPP_inFPN(
+    model = Dual_Decoder_Unet_wAuxInPyramidASPP_wMain(
         encoder_name=backbone,
         encoder_weights='imagenet',
         in_channels=in_chns,
