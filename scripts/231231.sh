@@ -18,10 +18,10 @@ Unet_wFPN_wSKA_add_Spatial
 python train_idrid_supervised_2d_smp.py \
         --num_works 8 \
         --device 0 \
-        --exp crop_IDRID/UNet-scse/lr6e-4_poly-v2-interval-30/imgz1440_mobileone_s0/bs2_Adam_CLAHE0-5k\
+        --exp crop_IDRID/Unet_wPyramidAttentionASPP_wMain/lr6e-4_poly-v2-interval-30/imgz1440_mobileone_s0/bs2_Adam_CLAHE0-5k\
         --dataset_name crop_IDRID \
         --image_size 1440 \
-        --model UNet \
+        --model Unet_wPyramidAttentionASPP_wMain \
         --optim Adam \
         --batch_size 2 \
         --base_lr 0.0006 \
@@ -31,9 +31,15 @@ python train_idrid_supervised_2d_smp.py \
         --fpn_out_c 48 \
         --scheduler poly-v2 \
         --max_iterations 5000 \
-        --decoder_attention_type scse \
         --encoder_deepth 5 \
         --backbone mobileone_s0
+
+
+           --decoder_attention_type scse \
+
+Unet_wPyramidAttentionASPP_wMain
+
+
 
 Unet_ASPPinBotv2
 Unet_ASPPinBot

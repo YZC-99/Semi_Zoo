@@ -17,6 +17,7 @@ from model.module import fpn
 from model.module.farseg import SceneRelation
 from segmentation_models_pytorch.decoders.deeplabv3.decoder import ASPP
 from model.compare_modules.attention_aspp import Attnetion_ASPP
+from model.compare_modules.multi_scale_feature_extraction import MSFE
 
 class Unet_wFPN_wSR(SegmentationModel):
 
@@ -898,6 +899,96 @@ class Unet_wPyramidAttentionASPP_wMain(SegmentationModel):
         self.check_input_shape(x)
 
         features = self.encoder(x)
+
+
+        aspp_feature = torch.cat([features[-4],
+                                  F.interpolate(features[-1],size=features[-4].size()[-2:]),
+                                  F.interpolate(features[-3],size=features[-4].size()[-2:]),
+                                  F.interpolate(features[-2],size=features[-4].size()[-2:])],
+                                 dim=1
+                                 )
+
+        aspp_feature = self.aspp(aspp_feature)
+
+        decoder_output = self.decoder(*features)
+
+        aspp_feature = F.interpolate(aspp_feature,size=decoder_output.size()[-2:])
+        decoder_output = torch.cat([decoder_output,aspp_feature],dim=1)
+
+        masks = self.segmentation_head(decoder_output)
+
+        return masks
+
+class Unet_wMSFE_wPyramidAttentionASPP_wMain(SegmentationModel):
+
+    def __init__(
+            self,
+            encoder_name: str = "resnet34",
+            encoder_depth: int = 5,
+            encoder_weights: Optional[str] = "imagenet",
+            fpn_out_channels=256,
+            decoder_use_batchnorm: bool = True,
+            decoder_channels: List[int] = (256, 128, 64, 32, 16),
+            decoder_attention_type: Optional[str] = None,
+            in_channels: int = 3,
+            classes: int = 1,
+            activation: Optional[Union[str, callable]] = None,
+            aux_params: Optional[dict] = None,
+            fpn_pretrained = False,
+    ):
+        super().__init__()
+
+        self.encoder = get_encoder(
+            encoder_name,
+            in_channels=in_channels,
+            depth=encoder_depth,
+            weights=encoder_weights,
+        )
+
+
+        self.decoder = UnetDecoder(
+            encoder_channels=self.encoder.out_channels,
+            decoder_channels= decoder_channels ,
+            n_blocks=encoder_depth,
+            use_batchnorm=decoder_use_batchnorm,
+            center=True if encoder_name.startswith("vgg") else False,
+            attention_type=decoder_attention_type,
+        )
+
+        self.aspp = Attnetion_ASPP(in_channels=sum(self.encoder.out_channels[-4:]),out_channels=decoder_channels[-1],atrous_rates=(12, 24, 36))
+        self.msfe1 = MSFE(in_channels=self.encoder.out_channels[-4],scale_factor=1)
+        self.msfe2 = MSFE(in_channels=self.encoder.out_channels[-3],scale_factor=2)
+        self.msfe3 = MSFE(in_channels=self.encoder.out_channels[-2],scale_factor=4)
+        self.msfe4 = MSFE(in_channels=self.encoder.out_channels[-1],scale_factor=8)
+
+
+        self.segmentation_head = SegmentationHead(
+            in_channels=decoder_channels[-1] * 2,
+            out_channels=classes,
+            activation=activation,
+            kernel_size=3,
+        )
+
+
+
+
+        if aux_params is not None:
+            self.classification_head = ClassificationHead(in_channels=self.encoder.out_channels[-1], **aux_params)
+        else:
+            self.classification_head = None
+
+        self.name = "u-{}".format(encoder_name)
+        self.initialize()
+
+    def forward(self, x):
+        self.check_input_shape(x)
+
+        features = self.encoder(x)
+
+        features[-4] = self.msfe1(features[-4])
+        features[-3] = self.msfe2(features[-3])
+        features[-2] = self.msfe3(features[-2])
+        features[-1] = self.msfe4(features[-1])
 
 
         aspp_feature = torch.cat([features[-4],
@@ -2535,7 +2626,7 @@ if __name__ == '__main__':
     # encoder_depth = 4
     # decoder_channels = (256, 128, 64, 32)
 
-    model = Unet_wPyramidAttentionASPP_wMain(
+    model = Unet_wMSFE_wPyramidAttentionASPP_wMain(
         encoder_name=backbone,
         encoder_weights='imagenet',
         in_channels=in_chns,
