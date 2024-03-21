@@ -160,6 +160,7 @@ if __name__ == '__main__':
                                     batch_size=args.batch_size,
                                     num_workers=args.num_works,
                                     pin_memory=True,
+                                    drop_last= True,
                                     shuffle=True
                                     )
 
@@ -172,7 +173,7 @@ if __name__ == '__main__':
                                   size=args.image_size,
                                   CLAHE=args.CLAHE)
 
-    val_labeledtrainloader = DataLoader(val_dataset,batch_size=1,num_workers=1)
+    val_labeledtrainloader = DataLoader(val_dataset,batch_size=1,num_workers=1,drop_last=False)
     val_iteriter = tqdm(val_labeledtrainloader)
 
     model.train()
