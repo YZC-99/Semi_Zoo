@@ -4,7 +4,7 @@ from torch.nn import functional as F
 
 
 class MSFE(nn.Sequential):
-    def __init__(self, in_channels,scale_factor):
+    def __init__(self, in_channels):
         super().__init__()
         modules = []
         modules.append(nn.Conv2d(in_channels, in_channels, 1, bias=False))
