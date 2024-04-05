@@ -798,8 +798,8 @@ def build_model(args,model,backbone,in_chns,class_num1,class_num2,fuse_type,ckpt
         print("成功加载权重:{}".format(ckpt_weight))
         print("===================================")
 
-    model_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    model_size = model_parameters * 4  # float32参数每个占用4字节
-    model_size_mb = model_size / (1024 * 1024)  # 转换为MB
-    print(f'模型大小: {model_size_mb:.2f} MB')
+    # model_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    # model_size = model_parameters * 4  # float32参数每个占用4字节
+    # model_size_mb = model_size / (1024 * 1024)  # 转换为MB
+    # print(f'模型大小: {model_size_mb:.2f} MB')
     return net
