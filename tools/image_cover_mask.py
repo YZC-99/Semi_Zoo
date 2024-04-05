@@ -21,6 +21,7 @@ def apply_mask(image, mask,t=False):
     if t:
         mask_np[mask_np == 1] = 3
         mask_np[mask_np == 2] = 1
+
     # 对于mask中的每个唯一值，替换图像中对应的像素颜色
     for value, color in color_map.items():
         image_np[mask_np == value] = color
@@ -30,7 +31,6 @@ def apply_mask(image, mask,t=False):
 
 if __name__ == '__main__':
 
-    root_base = 'E:/Deep_Learning_DATABASE/fundus_images/DR/'
 
     # init dataset
     # images_root_path = 'D:/1-Study/220803研究生阶段学习/221216论文写作专区/DR_分割/数据集/实验结果/exp_refer_2d_dr/IDRiD_Images'
@@ -41,15 +41,26 @@ if __name__ == '__main__':
     # dataset_name = 'DDR'
     # image_size = 1024
 
-    images_root_path = 'D:/1-Study/220803研究生阶段学习/221216论文写作专区/DR_分割/数据集/实验结果/exp_refer_2d_dr/E-ophtha_images'
+    # images_root_path = 'D:/1-Study/220803研究生阶段学习/221216论文写作专区/DR_分割/数据集/实验结果/exp_refer_2d_dr/E-ophtha_images'
+    # dataset_name = 'E-ophtha'
+    # image_size = 1024
+
+    # icic
+    # images_root_path = 'D:/1-Study/220803研究生阶段学习/221216论文写作专区/DR_分割/ICIC2024/实验结果/IDRiD_Images'
+    # dataset_name = 'crop_IDRID'
+    # image_size = 1440
+
+    # images_root_path = 'D:/1-Study/220803研究生阶段学习/221216论文写作专区/DR_分割/ICIC2024/实验结果/DDR_Images'
+    # dataset_name = 'DDR'
+    # image_size = 1024
+
+
+    images_root_path = 'D:/1-Study/220803研究生阶段学习/221216论文写作专区/DR_分割/ICIC2024/实验结果/E-ophtha_images'
     dataset_name = 'E-ophtha'
     image_size = 1024
 
 
-
-
-
-    pred_root_base = 'D:/1-Study/220803研究生阶段学习/221216论文写作专区/DR_分割/数据集/实验结果/exp_refer_2d_dr/' + dataset_name
+    pred_root_base = 'D:/1-Study/220803研究生阶段学习/221216论文写作专区/DR_分割/ICIC2024/实验结果/' + dataset_name
 
     for m in os.listdir(pred_root_base):
         model = m

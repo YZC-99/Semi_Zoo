@@ -33,9 +33,12 @@ class up_conv(nn.Module):
         x = self.up(x)
         return x
 
+
 class Attention_block(nn.Module):
+    # 传参列表
     def __init__(self, F_g, F_l, F_int):
         super(Attention_block, self).__init__()
+        # 初始化
         self.W_g = nn.Sequential(
             nn.Conv2d(F_g, F_int, kernel_size=1, stride=1, padding=0, bias=True),
             nn.BatchNorm2d(F_int)
