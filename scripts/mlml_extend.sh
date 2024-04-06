@@ -1,7 +1,7 @@
 python train_idrid_supervised_2d_smp.py \
         --num_works 8 \
         --device 0 \
-        --exp crop_IDRID/Dual_Unet_wASPPv2_wFPN_wDeocderAttention-softmax_focal_blv-on-obj/lr6e-4_imgz1440_se_resnet50 \
+        --exp crop_IDRID/Dual_Unet_wASPPv2_wFPN_wDeocderAttention-softmax_focal_blv/lr6e-4_imgz1440_se_resnet50 \
         --dataset_name crop_IDRID \
         --image_size 1440 \
         --model Dual_Unet_wASPPv2_wFPN_wDeocderAttention \
@@ -17,11 +17,12 @@ python train_idrid_supervised_2d_smp.py \
         --main_criteria softmax_focal_blv \
         --obj_loss 1.0 \
         --encoder_deepth 5 \
+        --seed 3407 \
         --backbone se_resnet50
 
-        --obj_criteria \
+        --obj_criteria softmax_focal_blv\
 
-
+Dual_Unet_wMSFE_wASPPv2_wFPN_wDeocderAttention
 Unet_wMSFE_wFPN_wDeocderAttention
 Unet_wASPP_wFPN_wDeocderAttention
 Unet_wASPPv2_wFPN_wDeocderAttention
