@@ -23,3 +23,7 @@ python train_idrid_supervised_2d_smp.py \
 Unet_wMSFE_wFPN_wDeocderAttention
 Unet_wASPP_wFPN_wDeocderAttention
 Unet_wASPPv2_wFPN_wDeocderAttention
+Dual_Unet_wASPPv2_wFPN_wDeocderAttention
+
+
+obj_loss
