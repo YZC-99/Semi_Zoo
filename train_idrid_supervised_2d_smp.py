@@ -17,6 +17,7 @@ from utils.scheduler.my_scheduler import my_decay_v1
 from utils.bulid_model import build_model
 from utils.training_utils import criteria,EMA
 from dataloader.transform import cutmix
+from utils.blv_loss import Softmaxfocal_BlvLoss
 import time
 import logging
 import numpy as np
@@ -45,6 +46,7 @@ parser.add_argument('--ckpt_weight',type=str,default=None)
 
 # ==============loss===================
 parser.add_argument('--main_criteria', type=str, default='ce',choices=['ce','weight-ce','dice','ce-dice','blv','softmax_focal_blv','softmax_focal','annealing_softmax_focal'])
+parser.add_argument('--obj_criteria', type=str, default='bce',choices=['bce','ce','weight-ce','dice','ce-dice','blv','softmax_focal_blv','softmax_focal','annealing_softmax_focal'])
 parser.add_argument('--obj_loss', type=float, default=-1.0)
 parser.add_argument('--ce_weight', type=float, nargs='+', default=[1,1,1,1,1], help='List of floating-point values')
 parser.add_argument('--cls_num_list', type=float, nargs='+', default=[645688315,704963,6498614,5319349,1248855], help='')
@@ -190,6 +192,7 @@ if __name__ == '__main__':
     lr_ = args.base_lr
     model.train()
 
+    # obj_loss = BCEWithLogitsLoss()
     obj_loss = BCEWithLogitsLoss()
 
     print("=================共计训练epoch: {}====================".format(max_epoch))
@@ -229,8 +232,12 @@ if __name__ == '__main__':
                 outputs,obj_outputs = model(all_batch)
                 obj_label_batch = torch.zeros_like(label_label_batch)
                 obj_label_batch[label_label_batch > 0] = 1
-                onehot_obj_label_batch = torch.nn.functional.one_hot(obj_label_batch.to(torch.int64), num_classes=2).permute(0,3,1,2).float()
-                loss_seg_obj = obj_loss(obj_outputs,onehot_obj_label_batch)
+                if args.obj_criteria == 'bce':
+                    onehot_obj_label_batch = torch.nn.functional.one_hot(obj_label_batch.to(torch.int64), num_classes=2).permute(0,3,1,2).float()
+                    loss_seg_obj = obj_loss(obj_outputs,onehot_obj_label_batch)
+                else:
+                    softmax_focal_blv_criteria = Softmaxfocal_BlvLoss(cls_num_list=[645688315, 13771781])
+                    loss_seg_obj = softmax_focal_blv_criteria(obj_outputs, obj_label_batch)
             else:
                 outputs = model(all_batch)
 
